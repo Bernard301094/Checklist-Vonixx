@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Cloud, Lock, Mail, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Mail, Lock, AlertCircle, ArrowRight, Loader2, Factory } from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function LoginScreen() {
@@ -13,120 +13,167 @@ export default function LoginScreen() {
     e.preventDefault();
     setErrorMsg('');
     setLoading(true);
-
     try {
       if (isRegistering) {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-        });
+        const { error } = await supabase.auth.signUp({ email, password });
         if (error) throw error;
-        alert("Conta criada! Por favor, verifique seu e-mail (se o Supabase estiver configurado com confirmação).");
+        alert('Conta criada! Verifique seu e-mail se necessário.');
       } else {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
       }
     } catch (error: any) {
-      console.error(error);
-      if (error.status === 429) {
-        setErrorMsg('Muitas tentativas! Aguarde alguns segundos (proteção do Supabase).');
-      } else if (error.message === 'Email not confirmed') {
-        setErrorMsg('E-mail ainda não confirmado! Verifique sua caixa de entrada ou desabilite "Confirm Email" no painel do Supabase.');
-      } else if (error.status === 400 || error.code === 'invalid_credentials') {
-        setErrorMsg('Credenciais inválidas. Verifique seu e-mail e senha.');
-      } else {
-        setErrorMsg('Erro na autenticação: ' + error.message);
-      }
+      if (error.status === 429) setErrorMsg('Muitas tentativas. Aguarde alguns segundos.');
+      else if (error.message === 'Email not confirmed') setErrorMsg('E-mail não confirmado. Verifique sua caixa de entrada.');
+      else if (error.status === 400 || error.code === 'invalid_credentials') setErrorMsg('Credenciais inválidas. Verifique e-mail e senha.');
+      else setErrorMsg('Erro na autenticação: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex min-h-screen w-full items-center justify-center bg-slate-50 font-sans text-slate-800 p-4">
-      <div className="w-full max-w-[420px] flex flex-col gap-6">
-        
-        <div className="bg-white p-10 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden">
-          {/* Subtle accent gradient at the top */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500" />
-          
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Industria 4.0</h1>
-            <p className="text-sm text-slate-500 mt-2 font-medium">
-               {isRegistering ? 'Crie sua conta para começar' : 'Faça login para acessar o painel'}
-            </p>
+    <div style={{
+      minHeight: '100dvh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg)',
+      padding: 'var(--s4)',
+      fontFamily: 'var(--font-body)',
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        backgroundImage: `radial-gradient(circle at 20% 20%, rgba(13,148,136,0.06) 0%, transparent 60%),
+          radial-gradient(circle at 80% 80%, rgba(45,212,191,0.05) 0%, transparent 50%)`,
+      }} />
+      <div style={{
+        position: 'absolute', inset: 0, pointerEvents: 'none',
+        backgroundImage: `linear-gradient(var(--divider) 1px, transparent 1px),
+          linear-gradient(90deg, var(--divider) 1px, transparent 1px)`,
+        backgroundSize: '40px 40px',
+        opacity: 0.5,
+      }} />
+
+      <div className="animate-in" style={{
+        width: '100%', maxWidth: '440px',
+        display: 'flex', flexDirection: 'column', gap: 'var(--s6)',
+        position: 'relative', zIndex: 1,
+      }}>
+        <div style={{ textAlign: 'center', marginBottom: 'var(--s2)' }}>
+          <div style={{
+            width: 56, height: 56, borderRadius: 'var(--r-xl)',
+            background: 'var(--primary)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto var(--s4)',
+            boxShadow: '0 8px 24px rgba(13,148,136,0.35)',
+          }}>
+            <Factory size={28} color="#fff" strokeWidth={1.5} />
           </div>
+          <h1 style={{
+            fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)',
+            fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em',
+            lineHeight: 1.1,
+          }}>Indústria 4.0 Pro</h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginTop: 'var(--s2)', fontWeight: 500 }}>
+            {isRegistering ? 'Crie sua conta para começar' : 'Acesse o painel de gestão industrial'}
+          </p>
+        </div>
+
+        <div className="card" style={{ padding: 'var(--s8)', position: 'relative', overflow: 'hidden' }}>
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+            background: 'linear-gradient(90deg, var(--primary), #06b6d4, var(--primary))',
+          }} />
 
           {errorMsg && (
-             <div className="mb-6 p-3 bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl flex items-start gap-2.5">
-                <AlertCircle size={18} className="mt-0.5 shrink-0" />
-                <span className="font-medium">{errorMsg}</span>
-             </div>
+            <div style={{
+              display: 'flex', alignItems: 'flex-start', gap: 'var(--s3)',
+              padding: 'var(--s3) var(--s4)', borderRadius: 'var(--r-lg)',
+              background: 'var(--danger-hl)',
+              border: '1px solid rgba(220,38,38,0.2)',
+              marginBottom: 'var(--s6)',
+              fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--danger)',
+            }}>
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+              <span>{errorMsg}</span>
+            </div>
           )}
 
-          <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-slate-700">Email</label>
-              <div className="relative">
-                 <div className="absolute left-3 top-3.5 text-slate-400">
-                    <Mail size={18} strokeWidth={2.5} />
-                 </div>
-                 <input 
-                   type="email" 
-                   value={email}
-                   onChange={(e) => setEmail(e.target.value)}
-                   placeholder="ex: colaborador@industria.com"
-                   className="w-full pl-10 p-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400"
-                   required 
-                 />
-              </div>
-            </div>
-            
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-slate-700">Senha</label>
-              <div className="relative">
-                 <div className="absolute left-3 top-3.5 text-slate-400">
-                    <Lock size={18} strokeWidth={2.5} />
-                 </div>
-                 <input 
-                   type="password" 
-                   value={password}
-                   onChange={(e) => setPassword(e.target.value)}
-                   placeholder="••••••••"
-                   className="w-full pl-10 p-3 rounded-xl border border-slate-200 bg-slate-50/50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-sm font-medium text-slate-900 placeholder:text-slate-400"
-                   required
-                   minLength={6}
-                 />
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+                Endereço de E-mail
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Mail size={16} style={{
+                  position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)', pointerEvents: 'none',
+                }} />
+                <input
+                  type="email" value={email} onChange={e => setEmail(e.target.value)}
+                  placeholder="operador@industria.com"
+                  required className="input"
+                  style={{ paddingLeft: 'calc(var(--s4) + 16px + var(--s2))' }}
+                />
               </div>
             </div>
 
-            <button 
-              type="submit" 
-              disabled={loading}
-              className="w-full bg-slate-900 text-white font-semibold py-3 rounded-xl mt-2 hover:bg-slate-800 transition-all uppercase tracking-wide text-xs focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 disabled:opacity-70 disabled:cursor-not-allowed transform active:scale-[0.99] shadow-sm"
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+                Senha
+              </label>
+              <div style={{ position: 'relative' }}>
+                <Lock size={16} style={{
+                  position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)',
+                  color: 'var(--text-muted)', pointerEvents: 'none',
+                }} />
+                <input
+                  type="password" value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="••••••••" required minLength={6} className="input"
+                  style={{ paddingLeft: 'calc(var(--s4) + 16px + var(--s2))' }}
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit" disabled={loading} className="btn-primary"
+              style={{ marginTop: 'var(--s2)', width: '100%', height: 48 }}
             >
-              {loading ? 'Aguarde...' : (isRegistering ? 'Criar Conta' : 'Entrar na Plataforma')}
+              {loading
+                ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Aguarde...</>
+                : <>{isRegistering ? 'Criar Conta' : 'Entrar na Plataforma'} <ArrowRight size={16} /></>}
             </button>
           </form>
 
-          <div className="mt-8 text-center border-t border-slate-100 pt-6">
-             <button 
-                type="button"
-                onClick={() => setIsRegistering(!isRegistering)}
-                className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 hover:underline transition-colors"
-             >
-                {isRegistering ? 'Já tem uma conta? Fazer Login' : 'Não tem conta? Cadastrar-se'}
-             </button>
-          </div>
-
-          <div className="mt-6 text-xs text-slate-500 text-center bg-slate-50 border border-slate-100 p-4 rounded-xl leading-relaxed">
-            Dica: E-mails contendo <b className="text-slate-700">supervisor</b> acessam o painel de gerenciamento automaticamente.
+          <div style={{
+            marginTop: 'var(--s6)', paddingTop: 'var(--s6)',
+            borderTop: '1px solid var(--divider)', textAlign: 'center',
+          }}>
+            <button
+              type="button" onClick={() => { setIsRegistering(!isRegistering); setErrorMsg(''); }}
+              style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--primary)', background: 'none', border: 'none', cursor: 'pointer' }}
+            >
+              {isRegistering ? 'Já tem conta? Fazer Login' : 'Não tem conta? Cadastrar-se'}
+            </button>
           </div>
         </div>
+
+        <div style={{
+          padding: 'var(--s4)', borderRadius: 'var(--r-lg)',
+          background: 'var(--primary-hl)',
+          border: '1px solid rgba(13,148,136,0.15)',
+          fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+          lineHeight: 1.6,
+        }}>
+          <span style={{ fontWeight: 700, color: 'var(--primary)' }}>Dica de acesso:</span>
+          {' '}E-mails com <strong style={{ color: 'var(--text)' }}>supervisor</strong> no endereço acessam o painel gerencial completo. Demais usuários acessam a tela de operação e checklists.
+        </div>
       </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
