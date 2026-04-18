@@ -11,12 +11,12 @@ interface ColaboradorScreenProps {
   onCheck: (key: string, checked: boolean) => void;
   onSaveOccurrence: (occurrence: Omit<OccurrenceData, 'id'>) => void;
   userEmail: string;
+  reporterName: string;
+  shift: string;
 }
 
-export default function ColaboradorScreen({ onLogout, checklistState, onCheck, onSaveOccurrence, userEmail }: ColaboradorScreenProps) {
+export default function ColaboradorScreen({ onLogout, checklistState, onCheck, onSaveOccurrence, userEmail, reporterName, shift }: ColaboradorScreenProps) {
   const [activeOccurrence, setActiveOccurrence] = useState<{ section: string; item: string } | null>(null);
-  const [reporterName, setReporterName] = useState('');
-  const [shift, setShift] = useState('TURNO A');
   const [currentComment, setCurrentComment] = useState('');
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
@@ -45,10 +45,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
   };
 
   const handleOpenModal = (sectionTitle: string, itemStr: string) => {
-    if (!reporterName.trim()) {
-      alert('Por favor, preencha o Nome do Operador antes de registrar uma ocorrência.');
-      return;
-    }
     setActiveOccurrence({ section: sectionTitle, item: itemStr });
   };
 
@@ -150,28 +146,28 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--s5)', flexWrap: 'wrap', gap: 'var(--s3)' }}>
               <div>
                 <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700 }}>Identificação do operador</h2>
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s1)' }}>Dados vinculados a cada ocorrência registrada.</p>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s1)' }}>Dados vinculados à sua conta e a cada ocorrência registrada.</p>
               </div>
-              <span className="badge badge-red">Obrigatório</span>
+              <span className="badge badge-teal">Perfil ativo</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--s4)' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
-                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Mecânico / Operador</label>
-                <div style={{ position: 'relative' }}>
-                  <User2 size={16} style={{ position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                  <input type="text" className="input" style={{ paddingLeft: 'calc(var(--s4) + 18px + var(--s2))' }} placeholder="Ex: Carlos Silva" value={reporterName} onChange={e => setReporterName(e.target.value)} required />
+              {/* ✅ Muestra exactamente el nombre ingresado junto al turno */}
+              <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--primary-hl)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <User2 size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>Operador</div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)' }}>{reporterName}</div>
                 </div>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
-                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Turno</label>
-                <div style={{ position: 'relative' }}>
-                  <Clock3 size={16} style={{ position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-                  <select className="input" style={{ paddingLeft: 'calc(var(--s4) + 18px + var(--s2))', appearance: 'none' }} value={shift} onChange={e => setShift(e.target.value)}>
-                    <option value="TURNO A">TURNO A</option>
-                    <option value="TURNO B">TURNO B</option>
-                    <option value="TURNO C">TURNO C</option>
-                    <option value="TURNO D">TURNO D</option>
-                  </select>
+              <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--warning-hl)', color: 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <Clock3 size={18} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>Turno</div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)' }}>{shift}</div>
                 </div>
               </div>
             </div>
@@ -241,6 +237,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
             </div>
             <div style={{ padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s4)' }}>
+                {/* ✅ Nombre exacto del operador, sin fallback al email */}
                 <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)' }}>
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 'var(--s1)' }}>Operador</div>
                   <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{reporterName}</div>

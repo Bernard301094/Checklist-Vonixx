@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { Mail, Lock, AlertCircle, ArrowRight, Loader2, Factory } from 'lucide-react';
+import { Mail, Lock, AlertCircle, ArrowRight, Loader2, Factory, User, Briefcase } from 'lucide-react';
 import { supabase } from '../supabase';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [shift, setShift] = useState('TURNO A');
   const [isRegistering, setIsRegistering] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
@@ -15,7 +17,17 @@ export default function LoginScreen() {
     setLoading(true);
     try {
       if (isRegistering) {
-        const { error } = await supabase.auth.signUp({ email, password });
+        if (!name.trim()) throw new Error('Informe seu nome para criar a conta.');
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              name: name.trim(),
+              shift,
+            },
+          },
+        });
         if (error) throw error;
         alert('Conta criada! Verifique seu e-mail se necessário.');
       } else {
@@ -103,6 +115,55 @@ export default function LoginScreen() {
           )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
+
+            {/* Campos extras solo al registrarse */}
+            {isRegistering && (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+                    Nome do Operador
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <User size={16} style={{
+                      position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)', pointerEvents: 'none',
+                    }} />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={e => setName(e.target.value)}
+                      placeholder="Seu nome completo"
+                      required
+                      className="input"
+                      style={{ paddingLeft: 'calc(var(--s4) + 16px + var(--s2))' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+                    Turno
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <Briefcase size={16} style={{
+                      position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)',
+                      color: 'var(--text-muted)', pointerEvents: 'none', zIndex: 1,
+                    }} />
+                    <select
+                      value={shift}
+                      onChange={e => setShift(e.target.value)}
+                      className="input"
+                      style={{ paddingLeft: 'calc(var(--s4) + 16px + var(--s2))', appearance: 'none' }}
+                    >
+                      <option value="TURNO A">TURNO A</option>
+                      <option value="TURNO B">TURNO B</option>
+                      <option value="TURNO C">TURNO C</option>
+                    </select>
+                  </div>
+                </div>
+              </>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
               <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
                 Endereço de E-mail
