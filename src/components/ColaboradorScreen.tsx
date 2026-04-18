@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Camera, AlertTriangle, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Camera, AlertTriangle, X, CheckCircle2, ChevronDown, User2, Clock3, ImagePlus } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
 import Sidebar from './Sidebar';
@@ -14,33 +14,39 @@ interface ColaboradorScreenProps {
 }
 
 export default function ColaboradorScreen({ onLogout, checklistState, onCheck, onSaveOccurrence, userEmail }: ColaboradorScreenProps) {
-  const [activeOccurrence, setActiveOccurrence] = useState<{ section: string, item: string } | null>(null);
-  
-  // Identificação do Operador
+  const [activeOccurrence, setActiveOccurrence] = useState<{ section: string; item: string } | null>(null);
   const [reporterName, setReporterName] = useState('');
   const [shift, setShift] = useState('TURNO A');
-
-  // Local state for the modal
   const [currentComment, setCurrentComment] = useState('');
   const [currentPhotos, setCurrentPhotos] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(
+    Object.fromEntries(CHECKLIST_DATA.map(section => [section.id, true]))
+  );
+
+  const totalItems = useMemo(
+    () => CHECKLIST_DATA.reduce((acc, section) => acc + section.items.length, 0),
+    []
+  );
+  const checkedCount = Object.values(checklistState).filter(Boolean).length;
+  const progress = totalItems ? Math.round((checkedCount / totalItems) * 100) : 0;
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      const imageUrl = URL.createObjectURL(file);
-      setCurrentPhotos(prev => [...prev, imageUrl]);
+      Array.from(e.target.files).forEach(file => {
+        const imageUrl = URL.createObjectURL(file);
+        setCurrentPhotos(prev => [...prev, imageUrl]);
+      });
     }
   };
 
   const handleOpenModal = (sectionTitle: string, itemStr: string) => {
     if (!reporterName.trim()) {
-      alert("Por favor, preencha o Mome do Operador na seção de identificação (no topo) antes de registrar uma ocorrência.");
+      alert('Por favor, preencha o Nome do Operador antes de registrar uma ocorrência.');
       return;
     }
     setActiveOccurrence({ section: sectionTitle, item: itemStr });
   };
-
-  const [isUploading, setIsUploading] = useState(false);
 
   const handleSaveModal = async () => {
     if (!activeOccurrence) return;
@@ -48,59 +54,54 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     setIsUploading(true);
     let uploadSuccess = false;
 
-    // Send to Google Apps Script directly
     if (currentPhotos.length > 0) {
-       // @ts-ignore
-       const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+      // @ts-ignore
+      const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
 
-       if (!appsScriptUrl) {
-         alert("Erro: O VITE_APPS_SCRIPT_URL não foi configurado nos Secrets do aplicativo.");
-       } else {
-         try {
-           setIsUploading(true);
-           // Como as fotos podem ser grandes e o Apps Script tem limites de tempo por requisição,
-           // enviamos as fotos em paralelo (Promise.all) em vez de todas juntas no mesmo payload maciço.
-           const uploadPromises = currentPhotos.map(async (photoBase64, index) => {
-             const res = await fetch(appsScriptUrl, {
-               method: 'POST',
-               // text/plain prevents CORS preflight requests (OPTIONS), which Apps Script blocks.
-               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-               body: JSON.stringify({
-                 photo: photoBase64,
-                 filename: `Ocorrencia_${reporterName.trim()}_${Date.now()}_img${index}.jpg`,
-                 item: activeOccurrence.item
-               })
-             });
-             return res.json();
-           });
+      if (!appsScriptUrl) {
+        alert('Erro: O VITE_APPS_SCRIPT_URL não foi configurado nos Secrets do aplicativo.');
+      } else {
+        try {
+          const uploadPromises = currentPhotos.map(async (photoBase64, index) => {
+            const res = await fetch(appsScriptUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+              body: JSON.stringify({
+                photo: photoBase64,
+                filename: `Ocorrencia_${reporterName.trim()}_${Date.now()}_img${index}.jpg`,
+                item: activeOccurrence.item,
+              }),
+            });
+            return res.json();
+          });
 
-           await Promise.all(uploadPromises);
-           uploadSuccess = true;
-         } catch (e) {
-           console.error("Erro ao subir fotos pelo Apps Script:", e);
-           alert("Houve um problema de conexão ao enviar as fotos para o Google Drive.");
-         }
-       }
+          await Promise.all(uploadPromises);
+          uploadSuccess = true;
+        } catch (e) {
+          console.error('Erro ao subir fotos pelo Apps Script:', e);
+          alert('Houve um problema de conexão ao enviar as fotos para o Google Drive.');
+        }
+      }
     }
 
     onSaveOccurrence({
       section: activeOccurrence.section,
       item: activeOccurrence.item,
       comment: currentComment,
-      photos: currentPhotos, // We keep base64 version here so React can still render it instantly in supervisor panel
+      photos: currentPhotos,
       reporter: `${reporterName.trim()} (${shift}) - Auth: ${userEmail}`,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
 
     setCurrentComment('');
     setCurrentPhotos([]);
     setActiveOccurrence(null);
     setIsUploading(false);
-    
-    if(currentPhotos.length > 0 && uploadSuccess) {
-      alert('Ocorrência salva e enviada PARA O GOOGLE DRIVE com sucesso!');
+
+    if (currentPhotos.length > 0 && uploadSuccess) {
+      alert('Ocorrência salva e enviada para o Google Drive com sucesso!');
     } else {
-      alert('Ocorrência salva localmente (sem arquivos de Drive anexados com sucesso).');
+      alert('Ocorrência salva com sucesso.');
     }
   };
 
@@ -110,181 +111,352 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     setActiveOccurrence(null);
   };
 
+  const removePhoto = (index: number) => {
+    setCurrentPhotos(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const getSectionProgress = (sectionId: string, itemsLength: number) => {
+    const checked = Array.from({ length: itemsLength }).filter((_, idx) => checklistState[`${sectionId}-${idx}`]).length;
+    return {
+      checked,
+      total: itemsLength,
+      percent: itemsLength ? Math.round((checked / itemsLength) * 100) : 0,
+    };
+  };
+
+  const progressColor = progress >= 100 ? 'var(--success)' : progress >= 50 ? 'var(--warning)' : 'var(--primary)';
+
   return (
-    <div className="flex w-full h-[768px] max-w-6xl mx-auto bg-slate-50 font-sans relative overflow-hidden text-slate-800 mt-0 lg:mt-8 shadow-2xl rounded-2xl border border-slate-200">
+    <div style={{
+      display: 'flex',
+      width: '100%',
+      minHeight: '100dvh',
+      background: 'var(--bg)',
+      color: 'var(--text)',
+      overflow: 'hidden',
+    }}>
       <Sidebar role="colaborador" onLogout={onLogout} />
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col relative z-10 overflow-hidden bg-slate-50/50">
-         <div className="w-full h-full flex flex-col overflow-hidden relative">
-            
-            <Header userEmail={userEmail} title="Checklist Diário" />
+      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
+        <Header
+          userEmail={userEmail}
+          title="Checklist Diário"
+          subtitle="Inspeção operacional, conformidade por seção e registro imediato de ocorrências"
+        />
 
-            {/* Content -> Checklist Sections */}
-            <div className="flex-1 overflow-y-auto px-8 pb-8 pt-2 flex flex-col gap-6">
-               <form 
-                  onSubmit={(e) => { 
-                    e.preventDefault(); 
-                    if (!reporterName.trim()) {
-                      alert("Por favor, preencha o Nome do Operador antes de sincronizar o checklist!");
-                      return;
-                    }
-                    alert('Checklist geral sincronizado com sucesso!'); 
-                  }} 
-                  className="flex flex-col gap-6"
-               >
-                 
-                 {/* Seção Identificação */}
-                 <section className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden">
-                    <div className="absolute top-0 right-0 px-4 py-1 bg-indigo-50 border-b border-l border-indigo-100 rounded-bl-xl text-indigo-700 text-xs font-bold uppercase tracking-wider">
-                      Identificação Obrigatória
-                    </div>
-                    <div className="flex flex-col md:flex-row gap-6 mt-4">
-                      <div className="flex-1 flex flex-col gap-2">
-                         <label className="text-sm font-semibold text-slate-700">Mecânico / Operador</label>
-                         <input 
-                           type="text" 
-                           className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-sm font-medium text-slate-900"
-                           placeholder="Ex: Carlos Silva"
-                           value={reporterName}
-                           onChange={(e) => setReporterName(e.target.value)}
-                           required
-                         />
-                      </div>
-                      <div className="flex-1 flex flex-col gap-2">
-                         <label className="text-sm font-semibold text-slate-700">Turno</label>
-                         <select 
-                           className="w-full p-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 focus:bg-white transition-all text-sm font-medium text-slate-900"
-                           value={shift}
-                           onChange={(e) => setShift(e.target.value)}
-                         >
-                           <option value="TURNO A">TURNO A</option>
-                           <option value="TURNO B">TURNO B</option>
-                           <option value="TURNO C">TURNO C</option>
-                           <option value="TURNO D">TURNO D</option>
-                         </select>
-                      </div>
-                    </div>
-                 </section>
+        <div style={{ padding: 'var(--s6)', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>
+          <div className="card" style={{ padding: 'var(--s5)', display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s4)', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: 'var(--s1)' }}>
+                  Progresso Global
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--s2)' }}>
+                  <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', lineHeight: 1 }}>
+                    {progress}%
+                  </span>
+                  <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontWeight: 600 }}>
+                    {checkedCount} de {totalItems} itens conformes
+                  </span>
+                </div>
+              </div>
+              <span className={progress >= 100 ? 'badge badge-green' : progress >= 50 ? 'badge badge-amber' : 'badge badge-teal'}>
+                {progress >= 100 ? 'Concluído' : progress >= 50 ? 'Em andamento' : 'Iniciado'}
+              </span>
+            </div>
+            <div style={{ width: '100%', height: 10, background: 'var(--surface-3)', borderRadius: 'var(--r-full)', overflow: 'hidden' }}>
+              <div style={{ width: `${progress}%`, height: '100%', background: progressColor, transition: 'width 300ms ease' }} />
+            </div>
+          </div>
+        </div>
 
-                 {CHECKLIST_DATA.map((section) => (
-                   <section key={section.id} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm flex flex-col">
-                      <h2 className="text-lg font-bold text-slate-900 border-b border-slate-100 pb-4 mb-4">{section.title}</h2>
-                      
-                      <div className="flex flex-col gap-2">
-                        {section.items.map((item, idx) => {
-                          const itemKey = `${section.id}-${idx}`;
-                          return (
-                            <div key={idx} className="flex flex-col">
-                              <div className="flex items-start justify-between gap-4 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
-                                <label className="flex items-start gap-3 flex-1 cursor-pointer select-none">
-                                  <input 
-                                    type="checkbox" 
-                                    className="mt-0.5 w-5 h-5 rounded-md border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer accent-indigo-600 shrink-0" 
-                                    checked={checklistState[itemKey] || false}
-                                    onChange={(e) => onCheck(itemKey, e.target.checked)}
-                                  />
-                                  <span className="text-sm font-medium leading-relaxed text-slate-700 group-hover:text-slate-900 transition-colors">
-                                    {item}
+        <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
+          <form
+            onSubmit={e => {
+              e.preventDefault();
+              if (!reporterName.trim()) {
+                alert('Por favor, preencha o Nome do Operador antes de sincronizar o checklist!');
+                return;
+              }
+              alert('Checklist geral sincronizado com sucesso!');
+            }}
+            style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}
+          >
+            <section className="card" style={{ padding: 'var(--s6)', position: 'relative', overflow: 'hidden' }}>
+              <div style={{ position: 'absolute', insetInline: 0, top: 0, height: 2, background: 'linear-gradient(90deg, var(--primary), #06b6d4)' }} />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s4)', marginBottom: 'var(--s5)', flexWrap: 'wrap' }}>
+                <div>
+                  <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text)' }}>
+                    Identificação do operador
+                  </h2>
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s1)' }}>
+                    Esses dados acompanham cada ocorrência registrada no checklist.
+                  </p>
+                </div>
+                <span className="badge badge-red">Obrigatório</span>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--s4)' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>Mecânico / Operador</label>
+                  <div style={{ position: 'relative' }}>
+                    <User2 size={16} style={{ position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <input
+                      type="text"
+                      className="input"
+                      style={{ paddingLeft: 'calc(var(--s4) + 18px + var(--s2))' }}
+                      placeholder="Ex: Carlos Silva"
+                      value={reporterName}
+                      onChange={e => setReporterName(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>Turno</label>
+                  <div style={{ position: 'relative' }}>
+                    <Clock3 size={16} style={{ position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                    <select
+                      className="input"
+                      style={{ paddingLeft: 'calc(var(--s4) + 18px + var(--s2))', appearance: 'none' }}
+                      value={shift}
+                      onChange={e => setShift(e.target.value)}
+                    >
+                      <option value="TURNO A">TURNO A</option>
+                      <option value="TURNO B">TURNO B</option>
+                      <option value="TURNO C">TURNO C</option>
+                      <option value="TURNO D">TURNO D</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {CHECKLIST_DATA.map(section => {
+              const stats = getSectionProgress(section.id, section.items.length);
+              const isOpen = openSections[section.id];
+              return (
+                <section key={section.id} className="card" style={{ overflow: 'hidden' }}>
+                  <button
+                    type="button"
+                    onClick={() => setOpenSections(prev => ({ ...prev, [section.id]: !prev[section.id] }))}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 'var(--s4)',
+                      padding: 'var(--s5) var(--s6)',
+                      background: 'var(--surface)',
+                      textAlign: 'left',
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', flexWrap: 'wrap', marginBottom: 'var(--s2)' }}>
+                        <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text)' }}>{section.title}</h2>
+                        <span className={stats.percent === 100 ? 'badge badge-green' : stats.percent > 0 ? 'badge badge-amber' : 'badge badge-teal'}>
+                          {stats.checked}/{stats.total}
+                        </span>
+                      </div>
+                      <div style={{ width: '100%', height: 6, background: 'var(--surface-3)', borderRadius: 'var(--r-full)', overflow: 'hidden', maxWidth: 320 }}>
+                        <div style={{ width: `${stats.percent}%`, height: '100%', background: stats.percent === 100 ? 'var(--success)' : 'var(--primary)' }} />
+                      </div>
+                    </div>
+                    <ChevronDown size={18} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 180ms ease', color: 'var(--text-muted)' }} />
+                  </button>
+
+                  {isOpen && (
+                    <div style={{ padding: '0 var(--s4) var(--s4)', display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+                      {section.items.map((item, idx) => {
+                        const itemKey = `${section.id}-${idx}`;
+                        const checked = checklistState[itemKey] || false;
+                        return (
+                          <div
+                            key={idx}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'flex-start',
+                              justifyContent: 'space-between',
+                              gap: 'var(--s4)',
+                              padding: 'var(--s4)',
+                              borderRadius: 'var(--r-lg)',
+                              background: checked ? 'var(--success-hl)' : 'var(--surface-2)',
+                              border: `1px solid ${checked ? 'rgba(22,163,74,0.18)' : 'var(--border)'}`,
+                            }}
+                          >
+                            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--s3)', flex: 1, cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={e => onCheck(itemKey, e.target.checked)}
+                                style={{ marginTop: 3, width: 18, height: 18, accentColor: 'var(--primary)', cursor: 'pointer' }}
+                              />
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s1)' }}>
+                                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)', lineHeight: 1.5 }}>{item}</span>
+                                {checked && (
+                                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-xs)', color: 'var(--success)', fontWeight: 700 }}>
+                                    <CheckCircle2 size={14} /> Item validado
                                   </span>
-                                </label>
-                                
-                                {!checklistState[itemKey] && (
-                                  <button 
-                                    type="button" 
-                                    onClick={() => handleOpenModal(section.title, item)}
-                                    className="text-slate-400 hover:text-amber-500 hover:bg-amber-50 transition-all p-2 rounded-lg shrink-0 border border-transparent hover:border-amber-200"
-                                    title="Registrar Ocorrência"
-                                  >
-                                    <AlertTriangle size={18} />
-                                  </button>
                                 )}
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                   </section>
-                 ))}
+                            </label>
 
-                 {/* Submit Form */}
-                 <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mt-4">
-                   <button type="submit" className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl hover:bg-slate-800 transition-all uppercase tracking-wide text-sm shadow-sm active:scale-[0.99]">
-                     Sincronizar Respostas do Checklist
-                   </button>
-                 </div>
-               </form>
+                            {!checked && (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenModal(section.title, item)}
+                                className="btn-ghost"
+                                style={{ minWidth: 0, paddingInline: 'var(--s3)', color: 'var(--warning)', borderColor: 'rgba(217,119,6,0.18)', background: 'var(--warning-hl)' }}
+                                title="Registrar Ocorrência"
+                              >
+                                <AlertTriangle size={16} />
+                                <span style={{ display: 'none' }} className="desktop-inline">Ocorrência</span>
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </section>
+              );
+            })}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="submit" className="btn-primary" style={{ minWidth: 220 }}>
+                Sincronizar checklist
+              </button>
             </div>
-         </div>
+          </form>
+        </div>
       </main>
 
-      {/* Full-Screen Global Overlay Modal for Occurrences */}
       {activeOccurrence && (
-        <div className="absolute inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="w-full max-w-lg bg-white rounded-2xl border border-slate-200 p-8 shadow-2xl flex flex-col gap-6 transform transition-all">
-            <div className="flex justify-between items-start">
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(15,23,42,0.55)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: 'var(--s4)',
+          zIndex: 1000,
+        }}>
+          <div className="card" style={{ width: '100%', maxWidth: 760, maxHeight: '90vh', overflow: 'auto', boxShadow: 'var(--sh-xl)' }}>
+            <div style={{ padding: 'var(--s6)', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--s4)' }}>
               <div>
-                <h3 className="text-xl font-bold text-slate-900 tracking-tight flex items-center gap-3">
-                  <span className="w-1.5 h-6 bg-amber-500 rounded-full inline-block"></span>
-                  Registrar Ocorrência
+                <div className="badge badge-amber" style={{ marginBottom: 'var(--s3)' }}>Registro de ocorrência</div>
+                <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text)' }}>
+                  {activeOccurrence.item}
                 </h3>
-                <p className="text-slate-500 text-xs mt-3 font-semibold uppercase tracking-wider">{activeOccurrence.section}</p>
-                <p className="text-slate-800 text-sm font-medium mt-1 leading-snug">{activeOccurrence.item}</p>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s2)' }}>
+                  Seção: {activeOccurrence.section}
+                </p>
               </div>
-              <button 
-                onClick={handleCloseModal}
-                className="text-slate-400 hover:text-red-500 hover:bg-red-50 p-2 rounded-xl transition-colors"
-              >
-                <X size={20} strokeWidth={2.5} />
+              <button type="button" onClick={handleCloseModal} className="btn-ghost" style={{ paddingInline: 'var(--s3)' }}>
+                <X size={16} />
               </button>
             </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-slate-700">Comentário</label>
-              <textarea 
-                rows={3} 
-                className="p-3 rounded-xl border border-slate-200 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all text-sm font-medium text-slate-900 resize-none"
-                placeholder="Descreva o problema observado..."
-                value={currentComment}
-                onChange={(e) => setCurrentComment(e.target.value)}
-              ></textarea>
-            </div>
+            <div style={{ padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 'var(--s4)' }}>
+                <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 'var(--s1)' }}>
+                    Operador
+                  </div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)' }}>{reporterName || 'Não informado'}</div>
+                </div>
+                <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 'var(--s1)' }}>
+                    Turno
+                  </div>
+                  <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)' }}>{shift}</div>
+                </div>
+              </div>
 
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-semibold text-slate-700">Evidência (Fotos)</label>
-              <div className="flex flex-wrap gap-3">
-                 {currentPhotos.map((photo, i) => (
-                   <div key={i} className="w-20 h-20 rounded-xl border-2 border-slate-200 overflow-hidden relative shadow-sm">
-                      <img src={photo} alt="" className="w-full h-full object-cover" />
-                   </div>
-                 ))}
-                 
-                 <label className="w-20 h-20 bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-500 cursor-pointer hover:border-amber-500 hover:text-amber-600 hover:bg-amber-50 transition-all">
-                   <Camera size={20} className="mb-1" />
-                   <span className="text-[10px] font-bold uppercase tracking-wider">Foto</span>
-                   <input type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
-                 </label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)' }}>Comentário técnico</label>
+                <textarea
+                  className="input"
+                  value={currentComment}
+                  onChange={e => setCurrentComment(e.target.value)}
+                  placeholder="Descreva a não conformidade, impacto observado e ação necessária..."
+                  rows={5}
+                  style={{ resize: 'vertical', minHeight: 140 }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s4)', flexWrap: 'wrap' }}>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)' }}>Evidências fotográficas</label>
+                  <label className="btn-ghost" style={{ cursor: 'pointer' }}>
+                    <ImagePlus size={16} />
+                    Adicionar fotos
+                    <input type="file" accept="image/*" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+                  </label>
+                </div>
+
+                {currentPhotos.length === 0 ? (
+                  <div style={{
+                    border: '1px dashed var(--border)',
+                    borderRadius: 'var(--r-xl)',
+                    padding: 'var(--s8)',
+                    textAlign: 'center',
+                    background: 'var(--surface-2)',
+                    color: 'var(--text-muted)',
+                  }}>
+                    <Camera size={28} style={{ margin: '0 auto 12px', color: 'var(--text-faint)' }} />
+                    <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Nenhuma foto anexada</div>
+                    <div style={{ fontSize: 'var(--text-xs)', marginTop: '6px' }}>Adicione imagens para documentar a ocorrência.</div>
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 'var(--s4)' }}>
+                    {currentPhotos.map((photo, idx) => (
+                      <div key={idx} style={{ position: 'relative', borderRadius: 'var(--r-xl)', overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface-2)', aspectRatio: '4 / 3' }}>
+                        <img src={photo} alt={`Evidência ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <button
+                          type="button"
+                          onClick={() => removePhoto(idx)}
+                          style={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            width: 30,
+                            height: 30,
+                            borderRadius: '50%',
+                            background: 'rgba(15,23,42,0.72)',
+                            color: '#fff',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-4 pt-4 border-t border-slate-100">
-              <button 
-                onClick={handleCloseModal}
-                className="px-5 py-2.5 text-sm font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
-              <button 
-                onClick={handleSaveModal}
-                disabled={isUploading}
-                className="px-6 py-2.5 text-sm font-bold text-white bg-amber-500 hover:bg-amber-600 shadow-sm hover:shadow-md rounded-xl transition-all uppercase tracking-wide disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-95"
-              >
-                {isUploading ? 'Enviando...' : 'Salvar Ocorrência'}
+            <div style={{ padding: 'var(--s5) var(--s6)', borderTop: '1px solid var(--divider)', display: 'flex', justifyContent: 'flex-end', gap: 'var(--s3)', flexWrap: 'wrap' }}>
+              <button type="button" className="btn-ghost" onClick={handleCloseModal}>Cancelar</button>
+              <button type="button" className="btn-primary" onClick={handleSaveModal} disabled={isUploading}>
+                {isUploading ? 'Enviando...' : 'Salvar ocorrência'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`
+        @media (min-width: 768px) {
+          .desktop-inline { display: inline !important; }
+        }
+      `}</style>
     </div>
   );
 }
