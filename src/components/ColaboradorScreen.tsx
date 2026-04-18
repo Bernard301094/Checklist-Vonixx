@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { Camera, AlertTriangle, X, CheckCircle2, ChevronDown, User2, Clock3, ImagePlus } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
-import { supabase } from '../supabase';
 import Header from './Header';
 
 interface ColaboradorScreenProps {
@@ -13,17 +12,13 @@ interface ColaboradorScreenProps {
   userEmail: string;
 }
 
-interface PendingPhoto {
-  file: File;
-  preview: string;
-}
-
 export default function ColaboradorScreen({ onLogout, checklistState, onCheck, onSaveOccurrence, userEmail }: ColaboradorScreenProps) {
   const [activeOccurrence, setActiveOccurrence] = useState<{ section: string; item: string } | null>(null);
   const [reporterName, setReporterName] = useState('');
   const [shift, setShift] = useState('TURNO A');
   const [currentComment, setCurrentComment] = useState('');
-  const [currentPhotos, setCurrentPhotos] = useState<PendingPhoto[]>([]);
+  const [currentFiles, setCurrentFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     Object.fromEntries(CHECKLIST_DATA.map(section => [section.id, true]))
@@ -35,13 +30,16 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
   const progressColor = progress >= 100 ? 'var(--success)' : progress >= 50 ? 'var(--warning)' : 'var(--primary)';
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const selected = Array.from(e.target.files).map(file => ({
-        file,
-        preview: URL.createObjectURL(file),
-      }));
-      setCurrentPhotos(prev => [...prev, ...selected]);
-    }
+    if (!e.target.files) return;
+    const files = Array.from(e.target.files);
+    setCurrentFiles(prev => [...prev, ...files]);
+    setPreviewUrls(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
+  };
+
+  const removePhoto = (idx: number) => {
+    URL.revokeObjectURL(previewUrls[idx]);
+    setCurrentFiles(prev => prev.filter((_, i) => i !== idx));
+    setPreviewUrls(prev => prev.filter((_, i) => i !== idx));
   };
 
   const handleOpenModal = (sectionTitle: string, itemStr: string) => {
@@ -52,74 +50,85 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     setActiveOccurrence({ section: sectionTitle, item: itemStr });
   };
 
-  const uploadPhotosToSupabase = async () => {
-    if (currentPhotos.length === 0) return [] as string[];
-
-    const bucketName = 'occurrence-photos';
-    const uploadedUrls = await Promise.all(
-      currentPhotos.map(async ({ file }, index) => {
-        const ext = file.name.split('.').pop() || 'jpg';
-        const safeReporter = reporterName.trim().replace(/\s+/g, '-').toLowerCase();
-        const safeItem = activeOccurrence?.item.replace(/\s+/g, '-').toLowerCase().slice(0, 40) || 'item';
-        const filePath = `${new Date().toISOString().slice(0, 10)}/${safeReporter}/${Date.now()}-${index}-${safeItem}.${ext}`;
-
-        const { error: uploadError } = await supabase.storage.from(bucketName).upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
-        return data.publicUrl;
-      })
-    );
-
-    return uploadedUrls;
-  };
+  // Converts a File to base64 string for Apps Script upload
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
   const handleSaveModal = async () => {
     if (!activeOccurrence) return;
     setIsUploading(true);
 
-    try {
-      const uploadedPhotoUrls = await uploadPhotosToSupabase();
+    // @ts-ignore
+    const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+    let persistedPhotoUrls: string[] = [];
 
-      onSaveOccurrence({
-        section: activeOccurrence.section,
-        item: activeOccurrence.item,
-        comment: currentComment,
-        photos: uploadedPhotoUrls,
-        reporter: `${reporterName.trim()} (${shift}) - Auth: ${userEmail}`,
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
+    if (currentFiles.length > 0) {
+      if (!appsScriptUrl) {
+        alert('Erro: VITE_APPS_SCRIPT_URL não configurado. As fotos não serão enviadas ao Google Drive.');
+        // Fallback: use blob previews for same-session display only
+        persistedPhotoUrls = [...previewUrls];
+      } else {
+        try {
+          const results = await Promise.all(
+            currentFiles.map(async (file, index) => {
+              const base64 = await fileToBase64(file);
+              const filename = `Ocorrencia_${reporterName.trim()}_${Date.now()}_img${index}.${file.name.split('.').pop() || 'jpg'}`;
+              const res = await fetch(appsScriptUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                  base64,
+                  filename,
+                  mimeType: file.type || 'image/jpeg',
+                  item: activeOccurrence.item,
+                }),
+              });
+              const json = await res.json();
+              // Apps Script should return { url: "https://drive.google.com/..." }
+              return json.url || json.fileUrl || json.driveUrl || null;
+            })
+          );
+          persistedPhotoUrls = results.filter(Boolean) as string[];
 
-      currentPhotos.forEach(photo => URL.revokeObjectURL(photo.preview));
-      setCurrentComment('');
-      setCurrentPhotos([]);
-      setActiveOccurrence(null);
-      alert(uploadedPhotoUrls.length > 0 ? 'Ocorrência salva com fotos no Supabase!' : 'Ocorrência salva com sucesso.');
-    } catch (error) {
-      console.error('Erro ao salvar ocorrência:', error);
-      alert('Erro ao enviar as fotos. Verifique se o bucket "occurrence-photos" existe e é público no Supabase.');
-    } finally {
-      setIsUploading(false);
+          if (persistedPhotoUrls.length === 0) {
+            console.warn('Apps Script não retornou URLs públicas. Verifique o script.');
+          }
+        } catch (e) {
+          console.error('Erro ao subir fotos:', e);
+          alert('Problema ao enviar fotos para o Google Drive. As fotos não serão persistidas.');
+        }
+      }
     }
+
+    onSaveOccurrence({
+      section: activeOccurrence.section,
+      item: activeOccurrence.item,
+      comment: currentComment,
+      photos: persistedPhotoUrls,
+      reporter: `${reporterName.trim()} (${shift}) - Auth: ${userEmail}`,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    });
+
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    setCurrentFiles([]);
+    setPreviewUrls([]);
+    setCurrentComment('');
+    setActiveOccurrence(null);
+    setIsUploading(false);
+    alert(persistedPhotoUrls.length > 0 ? 'Ocorrência salva com fotos no Google Drive!' : 'Ocorrência salva com sucesso.');
   };
 
   const handleCloseModal = () => {
-    currentPhotos.forEach(photo => URL.revokeObjectURL(photo.preview));
+    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    setCurrentFiles([]);
+    setPreviewUrls([]);
     setCurrentComment('');
-    setCurrentPhotos([]);
     setActiveOccurrence(null);
-  };
-
-  const removePhoto = (idx: number) => {
-    setCurrentPhotos(prev => {
-      const photo = prev[idx];
-      if (photo) URL.revokeObjectURL(photo.preview);
-      return prev.filter((_, i) => i !== idx);
-    });
   };
 
   const getSectionProgress = (sectionId: string, len: number) => {
@@ -156,6 +165,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
         <form onSubmit={e => { e.preventDefault(); if (!reporterName.trim()) { alert('Preencha o Nome do Operador!'); return; } alert('Checklist sincronizado!'); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
+
           <section className="card" style={{ padding: 'var(--s6)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', insetInline: 0, top: 0, height: 2, background: 'linear-gradient(90deg, var(--primary), #06b6d4)' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--s5)', flexWrap: 'wrap', gap: 'var(--s3)' }}>
@@ -274,16 +284,17 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                     <input type="file" accept="image/*" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
                   </label>
                 </div>
-                {currentPhotos.length === 0 ? (
+                {previewUrls.length === 0 ? (
                   <div style={{ border: '1px dashed var(--border)', borderRadius: 'var(--r-xl)', padding: 'var(--s8)', textAlign: 'center', background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
                     <Camera size={26} style={{ margin: '0 auto 10px', color: 'var(--text-faint)' }} />
                     <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Nenhuma foto anexada</div>
+                    <div style={{ fontSize: 'var(--text-xs)', marginTop: 6, color: 'var(--text-faint)' }}>As fotos serão enviadas ao Google Drive ao salvar</div>
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--s3)' }}>
-                    {currentPhotos.map((photo, idx) => (
+                    {previewUrls.map((preview, idx) => (
                       <div key={idx} style={{ position: 'relative', borderRadius: 'var(--r-xl)', overflow: 'hidden', border: '1px solid var(--border)', aspectRatio: '4/3' }}>
-                        <img src={photo.preview} alt={`Evidência ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        <img src={preview} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         <button type="button" onClick={() => removePhoto(idx)} style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(15,23,42,0.7)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
                       </div>
                     ))}
@@ -293,7 +304,9 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
             </div>
             <div style={{ padding: 'var(--s5) var(--s6)', borderTop: '1px solid var(--divider)', display: 'flex', justifyContent: 'flex-end', gap: 'var(--s3)', flexWrap: 'wrap' }}>
               <button type="button" className="btn-ghost" onClick={handleCloseModal}>Cancelar</button>
-              <button type="button" className="btn-primary" onClick={handleSaveModal} disabled={isUploading}>{isUploading ? 'Enviando...' : 'Salvar ocorrência'}</button>
+              <button type="button" className="btn-primary" onClick={handleSaveModal} disabled={isUploading}>
+                {isUploading ? 'Enviando ao Drive...' : 'Salvar ocorrência'}
+              </button>
             </div>
           </div>
         </div>
