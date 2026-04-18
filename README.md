@@ -4,7 +4,7 @@ Sistema de gestão industrial focado em **Checklists Diários** e **Reporte de O
 
 ## 📋 Funcionalidades Principais
 
-- **Autenticação Segura (Firebase):** Sistema de login e cadastro real. Senhas criptografadas e e-mails verificados pelo Google Firebase.
+- **Autenticação Segura (Supabase):** Sistema de login e cadastro real. Senhas criptografadas e gestão de usuários via Supabase Auth.
 - **Hierarquia de Acesso:**
   - **Supervisor:** Acesso a um Dashboard consolidado com todas as ocorrências críticas enviadas pela equipe.
   - **Colaborador:** Interface otimizada para checklists rápidos no chão de fábrica.
@@ -16,7 +16,7 @@ Sistema de gestão industrial focado em **Checklists Diários** e **Reporte de O
 
 - **Frontend:** React 18, TypeScript, Tailwind CSS, Lucide Icons.
 - **Backend:** Node.js, Express (para proxy de mídias e persistência de OAuth).
-- **Banco de Dados & Auth:** Firebase Authentication.
+- **Banco de Dados & Auth:** Supabase (Auth & PostgreSQL).
 - **Armazenamento de Mídia:** Google Drive API v3.
 - **Animações:** Framer Motion.
 
@@ -24,7 +24,7 @@ Sistema de gestão industrial focado em **Checklists Diários** e **Reporte de O
 
 ### 1. Requisitos
 - Node.js instalado.
-- Conta no Firebase Console.
+- Conta no Supabase.
 - Credenciais de API do Google Cloud (OAuth 2.0) para integração com Drive.
 
 ### 2. Variáveis de Ambiente
@@ -34,6 +34,10 @@ Crie as seguintes variáveis no menu **Settings/Secrets** do AI Studio:
 GOOGLE_CLIENT_ID="..."
 GOOGLE_CLIENT_SECRET="..."
 GOOGLE_REDIRECT_URI="..."
+
+# Supabase Configuration
+VITE_SUPABASE_URL="..."
+VITE_SUPABASE_ANON_KEY="..."
 ```
 *(O `GOOGLE_REDIRECT_URI` deve ser a URL do seu app seguida de `/auth/callback`)*
 
@@ -51,7 +55,7 @@ npm run dev
 ## 📂 Estrutura do Projeto
 
 - `/src/components`: Componentes visuais (Login, Dashboards).
-- `/src/firebase.ts`: Inicialização do SDK do Firebase.
+- `/src/supabase.ts`: Inicialização do SDK do Supabase.
 - `/server.ts`: Servidor Express para gestão de Token Drive e Upload de arquivos.
 - `/drive-token.json`: (Gerado automaticamente) Armazena de forma persistente o acesso ao Drive.
 

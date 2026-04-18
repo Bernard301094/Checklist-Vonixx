@@ -8,52 +8,121 @@ import LoginScreen from './components/LoginScreen';
 import SupervisorScreen from './components/SupervisorScreen';
 import ColaboradorScreen from './components/ColaboradorScreen';
 import { OccurrenceData } from './types';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
-import { auth } from './firebase';
+import { supabase } from './supabase';
 import { INITIAL_OCCURRENCES } from './constants';
 
+interface AuthUser {
+  email?: string;
+}
+
 export default function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [role, setRole] = useState<'login' | 'supervisor' | 'colaborador'>('login');
   const [authLoading, setAuthLoading] = useState(true);
   
-  // Base de Dados Mockada Compartilhada
+  // Base de Dados Real do Supabase
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
-  const [occurrences, setOccurrences] = useState<OccurrenceData[]>(INITIAL_OCCURRENCES);
+  const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
+
+  // Carregar dados iniciais do Banco de Dados
+  useEffect(() => {
+    async function loadData() {
+      // 1. Carregar Checklists
+      const { data: checklistsData } = await supabase.from('checklists').select('*');
+      if (checklistsData) {
+        const state: Record<string, boolean> = {};
+        checklistsData.forEach(item => {
+          state[item.item_key] = item.is_checked;
+        });
+        setChecklistState(state);
+      }
+
+      // 2. Carregar Ocorrências
+      const { data: occData } = await supabase
+        .from('occurrences')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (occData) {
+        setOccurrences(occData as OccurrenceData[]);
+      }
+    }
+
+    if (role !== 'login') {
+      loadData();
+    }
+  }, [role]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      const user = session?.user;
+      setCurrentUser(user ? { email: user.email } : null);
+      updateRole(user?.email);
       setAuthLoading(false);
-      setCurrentUser(user);
-      if (user && user.email) {
-         // Auto-route based on email containing 'supervisor'
-         if (user.email.includes('supervisor')) {
-            setRole('supervisor');
-         } else {
-            setRole('colaborador');
-         }
-      } else {
-         setRole('login');
-      }
     });
 
-    return () => unsubscribe();
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const user = session?.user;
+      setCurrentUser(user ? { email: user.email } : null);
+      updateRole(user?.email);
+      setAuthLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
+  const updateRole = (email?: string) => {
+    if (email) {
+      if (email.includes('supervisor')) {
+        setRole('supervisor');
+      } else {
+        setRole('colaborador');
+      }
+    } else {
+      setRole('login');
+    }
+  };
+
   const handleLogout = async () => {
-    await signOut(auth);
+    await supabase.auth.signOut();
   };
 
-  const handleAddOccurrence = (occurrence: Omit<OccurrenceData, 'id'>) => {
-    const newOccurrence: OccurrenceData = {
-      ...occurrence,
-      id: Math.random().toString(36).substr(2, 9)
-    };
-    setOccurrences(prev => [newOccurrence, ...prev]);
+  const handleAddOccurrence = async (occurrence: Omit<OccurrenceData, 'id'>) => {
+    const { data, error } = await supabase
+      .from('occurrences')
+      .insert([occurrence])
+      .select()
+      .single();
+
+    if (error) {
+       console.error("Erro ao salvar ocorrência no banco:", error);
+       alert("Erro ao salvar no banco de dados.");
+       return;
+    }
+
+    if (data) {
+      setOccurrences(prev => [data as OccurrenceData, ...prev]);
+    }
   };
 
-  const handleCheck = (key: string, checked: boolean) => {
+  const handleCheck = async (key: string, checked: boolean) => {
+    // 1. Atualizar UI instantaneamente (Optimistic Update)
     setChecklistState(prev => ({ ...prev, [key]: checked }));
+
+    // 2. Salvar no Supabase (Upsert)
+    const { error } = await supabase
+      .from('checklists')
+      .upsert({ 
+        item_key: key, 
+        is_checked: checked,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'item_key' });
+
+    if (error) {
+      console.error("Erro ao sincronizar checklist:", error);
+    }
   };
 
   if (authLoading) {

@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Cloud, Lock, Mail, AlertCircle } from 'lucide-react';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
+import { supabase } from '../supabase';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -9,49 +8,6 @@ export default function LoginScreen() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  const [driveConnected, setDriveConnected] = useState(false);
-
-  useEffect(() => {
-    // Check if the backend is authenticated for Drive
-    fetch('/api/auth/status')
-      .then(res => res.json())
-      .then(data => setDriveConnected(data.authenticated))
-      .catch(() => setDriveConnected(false));
-
-    const handleMessage = (event: MessageEvent) => {
-      if (event.data?.type === 'OAUTH_AUTH_SUCCESS') {
-        setDriveConnected(true);
-      }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, []);
-
-  const handleConnectDrive = async () => {
-    try {
-      const response = await fetch('/api/auth/url');
-      if (!response.ok) throw new Error('Failed to get auth URL');
-      const { url } = await response.json();
-
-      const authWindow = window.open(url, 'oauth_popup', 'width=600,height=700');
-      if (!authWindow) {
-        alert('Por favor autorize o uso de popups neste site para conectar.');
-      }
-    } catch (e) {
-      console.error(e);
-      alert('Erro ao tentar autenticar');
-    }
-  };
-
-  const handleDisconnectDrive = async () => {
-    try {
-      await fetch('/api/auth/disconnect', { method: 'POST' });
-      setDriveConnected(false);
-    } catch (e) {
-      console.error(e);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,17 +16,30 @@ export default function LoginScreen() {
 
     try {
       if (isRegistering) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+        });
+        if (error) throw error;
+        alert("Conta criada! Por favor, verifique seu e-mail (se o Supabase estiver configurado com confirmação).");
       } else {
-        await signInWithEmailAndPassword(auth, email, password);
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (error) throw error;
       }
     } catch (error: any) {
       console.error(error);
-      if (error.code === 'auth/email-already-in-use') setErrorMsg('Este email já está cadastrado.');
-      else if (error.code === 'auth/wrong-password') setErrorMsg('Senha incorreta.');
-      else if (error.code === 'auth/user-not-found') setErrorMsg('Usuário não encontrado.');
-      else if (error.code === 'auth/weak-password') setErrorMsg('A senha precisa ter pelo menos 6 caracteres.');
-      else setErrorMsg('Erro na autenticação: ' + error.message);
+      if (error.status === 429) {
+        setErrorMsg('Muitas tentativas! Aguarde alguns segundos (proteção do Supabase).');
+      } else if (error.message === 'Email not confirmed') {
+        setErrorMsg('E-mail ainda não confirmado! Verifique sua caixa de entrada ou desabilite "Confirm Email" no painel do Supabase.');
+      } else if (error.status === 400 || error.code === 'invalid_credentials') {
+        setErrorMsg('Credenciais inválidas. Verifique seu e-mail e senha.');
+      } else {
+        setErrorMsg('Erro na autenticação: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -80,29 +49,6 @@ export default function LoginScreen() {
     <div className="flex min-h-screen w-full items-center justify-center bg-slate-50 font-sans text-slate-800 p-4">
       <div className="w-full max-w-[420px] flex flex-col gap-6">
         
-        {/* Drive Integration Banner */}
-        {!driveConnected && (
-          <div className="p-4 rounded-2xl border shadow-sm flex items-center justify-between bg-amber-50 border-amber-200/60">
-            <div className="flex items-center gap-3">
-              <Cloud size={24} className="text-amber-600" />
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-amber-700">
-                  Drive Desconectado
-                </p>
-                <p className="text-xs text-amber-600/80 font-medium mt-0.5">
-                  Requerido para salvar mídias.
-                </p>
-              </div>
-            </div>
-            <button 
-              onClick={handleConnectDrive}
-              className="px-4 py-2 bg-amber-500 text-white text-xs font-bold uppercase tracking-wide rounded-lg hover:bg-amber-600 transition-all shadow-sm active:scale-95 whitespace-nowrap"
-            >
-              Conectar
-            </button>
-          </div>
-        )}
-
         <div className="bg-white p-10 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 relative overflow-hidden">
           {/* Subtle accent gradient at the top */}
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-cyan-500" />

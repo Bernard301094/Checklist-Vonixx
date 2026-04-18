@@ -38,6 +38,11 @@ try {
 }
 
 app.get("/api/auth/url", (req, res) => {
+  if (!CLIENT_ID || !CLIENT_SECRET) {
+    return res.status(500).json({ 
+      error: "Google API credentials (CLIENT_ID / CLIENT_SECRET) are not configured in environment variables. Connectivity disabled." 
+    });
+  }
   const url = oauth2Client.generateAuthUrl({
     access_type: "offline",
     scope: ["https://www.googleapis.com/auth/drive.file"],

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Camera, AlertTriangle, X } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
@@ -48,31 +48,38 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     setIsUploading(true);
     let uploadSuccess = false;
 
-    // Send the base64 photos to our Express server if we have any
+    // Send to Google Apps Script directly
     if (currentPhotos.length > 0) {
-       try {
-         const res = await fetch('/api/upload', {
-           method: 'POST',
-           headers: { 'Content-Type': 'application/json' },
-           body: JSON.stringify({
-             photos: currentPhotos,
-             item: activeOccurrence.item,
-             reporter: `${reporterName.trim()} (${shift}) - ${userEmail}`
-           })
-         });
-         
-         if (!res.ok) {
-             const errData = await res.json();
-             if (res.status === 401) {
-                alert("Erro: A API do Google Drive ainda não foi conectada. Peça ao Supervisor para conectar no menu de Login.");
-             } else {
-                alert("Erro ao subir fotos para o Google Drive: " + errData.error);
-             }
-         } else {
-             uploadSuccess = true;
+       // @ts-ignore
+       const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+
+       if (!appsScriptUrl) {
+         alert("Erro: O VITE_APPS_SCRIPT_URL não foi configurado nos Secrets do aplicativo.");
+       } else {
+         try {
+           setIsUploading(true);
+           // Como as fotos podem ser grandes e o Apps Script tem limites de tempo por requisição,
+           // enviamos as fotos em paralelo (Promise.all) em vez de todas juntas no mesmo payload maciço.
+           const uploadPromises = currentPhotos.map(async (photoBase64, index) => {
+             const res = await fetch(appsScriptUrl, {
+               method: 'POST',
+               // text/plain prevents CORS preflight requests (OPTIONS), which Apps Script blocks.
+               headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+               body: JSON.stringify({
+                 photo: photoBase64,
+                 filename: `Ocorrencia_${reporterName.trim()}_${Date.now()}_img${index}.jpg`,
+                 item: activeOccurrence.item
+               })
+             });
+             return res.json();
+           });
+
+           await Promise.all(uploadPromises);
+           uploadSuccess = true;
+         } catch (e) {
+           console.error("Erro ao subir fotos pelo Apps Script:", e);
+           alert("Houve um problema de conexão ao enviar as fotos para o Google Drive.");
          }
-       } catch (e) {
-           alert("Falha de conexão com o servidor local.");
        }
     }
 
