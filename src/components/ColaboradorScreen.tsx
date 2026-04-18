@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import { Camera, AlertTriangle, X, CheckCircle2, ChevronDown, User2, Clock3, ImagePlus } from 'lucide-react';
+import { Camera, AlertTriangle, X, CheckCircle2, ChevronDown, User2, Clock3, ImagePlus, Loader2 } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
 import Header from './Header';
+import { uploadPhoto } from '../lib/uploadPhoto';
 
 interface ColaboradorScreenProps {
   onLogout: () => void;
@@ -20,6 +21,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     Object.fromEntries(CHECKLIST_DATA.map(s => [s.id, true]))
   );
@@ -44,81 +46,35 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
 
   const handleOpenModal = (sectionTitle: string, itemStr: string) => {
     if (!reporterName.trim()) {
-      alert('Por favor, preencha o Nome do Operador antes de registrar uma ocorr\u00eancia.');
+      alert('Por favor, preencha o Nome do Operador antes de registrar uma ocorrência.');
       return;
     }
     setActiveOccurrence({ section: sectionTitle, item: itemStr });
   };
 
-  const fileToBase64 = (file: File): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      // Returns ONLY the raw base64 without the data URI prefix
-      reader.onload = () => resolve((reader.result as string).split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
   const handleSaveModal = async () => {
     if (!activeOccurrence) return;
     setIsUploading(true);
+    setUploadProgress('');
 
-    // @ts-ignore
-    const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
     let driveUrls: string[] = [];
 
     if (currentFiles.length > 0) {
-      if (!appsScriptUrl) {
-        alert('VITE_APPS_SCRIPT_URL n\u00e3o configurado.');
-      } else {
-        try {
-          driveUrls = await Promise.all(
-            currentFiles.map(async (file, index) => {
-              const base64 = await fileToBase64(file);
-              const filename = `Ocorrencia_${reporterName.trim().replace(/\s+/g, '_')}_${Date.now()}_img${index}.${file.name.split('.').pop() || 'jpg'}`;
-
-              const res = await fetch(appsScriptUrl, {
-                method: 'POST',
-                // No 'no-cors' — we need to read the response to get the Drive URL.
-                // Apps Script deployed as "Anyone" does respond, but browser may still
-                // block due to redirect. If this throws, the catch below handles it.
-                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                body: JSON.stringify({
-                  base64,
-                  mimeType: file.type || 'image/jpeg',
-                  filename,
-                  item: activeOccurrence.item,
-                }),
-              });
-
-              const json = await res.json();
-              return (json.url || json.fileUrl || json.driveUrl || '') as string;
-            })
-          );
-          driveUrls = driveUrls.filter(Boolean);
-        } catch (err: any) {
-          console.error('Erro ao subir fotos:', err);
-          // CORS still blocking — fall back to no-cors (upload happens, no URL returned)
-          console.warn('Fallback: enviando com no-cors (sem URL de retorno)');
-          try {
-            await Promise.all(
-              currentFiles.map(async (file, index) => {
-                const base64 = await fileToBase64(file);
-                const filename = `Ocorrencia_${reporterName.trim().replace(/\s+/g, '_')}_${Date.now()}_img${index}.${file.name.split('.').pop() || 'jpg'}`;
-                await fetch(appsScriptUrl, {
-                  method: 'POST',
-                  mode: 'no-cors',
-                  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                  body: JSON.stringify({ base64, mimeType: file.type || 'image/jpeg', filename, item: activeOccurrence.item }),
-                });
-              })
-            );
-            alert('Fotos enviadas ao Drive (verifique a pasta). URLs n\u00e3o dispon\u00edveis por restri\u00e7\u00e3o CORS.');
-          } catch (e2) {
-            console.error('Fallback tamb\u00e9m falhou:', e2);
-            alert('N\u00e3o foi poss\u00edvel enviar as fotos ao Google Drive.');
-          }
+      try {
+        const results: string[] = [];
+        for (let i = 0; i < currentFiles.length; i++) {
+          setUploadProgress(`Enviando foto ${i + 1} de ${currentFiles.length}...`);
+          const url = await uploadPhoto(currentFiles[i], `ocorrencias/${reporterName.trim().replace(/\s+/g, '_')}`);
+          results.push(url);
         }
+        driveUrls = results;
+        setUploadProgress('');
+      } catch (err: any) {
+        console.error('Erro ao subir fotos para Supabase:', err);
+        alert(`Erro ao enviar fotos: ${err.message}`);
+        setIsUploading(false);
+        setUploadProgress('');
+        return;
       }
     }
 
@@ -126,7 +82,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
       section: activeOccurrence.section,
       item: activeOccurrence.item,
       comment: currentComment,
-      // Store Drive URLs if available, otherwise keep blob previews for this session
       photos: driveUrls.length > 0 ? driveUrls : [...previewUrls],
       reporter: `${reporterName.trim()} (${shift}) - Auth: ${userEmail}`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -140,13 +95,14 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     setIsUploading(false);
 
     if (driveUrls.length > 0) {
-      alert(`Ocorr\u00eancia salva! ${driveUrls.length} foto(s) no Google Drive.`);
+      alert(`Ocorrência salva! ${driveUrls.length} foto(s) enviadas ao Supabase Storage (comprimidas).`);
     } else {
-      alert('Ocorr\u00eancia salva com sucesso.');
+      alert('Ocorrência salva com sucesso.');
     }
   };
 
   const handleCloseModal = () => {
+    if (isUploading) return;
     previewUrls.forEach(u => URL.revokeObjectURL(u));
     setCurrentFiles([]);
     setPreviewUrls([]);
@@ -163,8 +119,8 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text)' }}>
       <Header
         userEmail={userEmail}
-        title="Checklist Di\u00e1rio"
-        subtitle="Inspe\u00e7\u00e3o operacional, conformidade por se\u00e7\u00e3o e registro imediato de ocorr\u00eancias"
+        title="Checklist Diário"
+        subtitle="Inspeção operacional, conformidade por seção e registro imediato de ocorrências"
         role="colaborador"
         onLogout={onLogout}
       />
@@ -177,7 +133,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
               <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', fontWeight: 600 }}>{checkedCount} de {totalItems} itens conformes</span>
             </div>
             <span className={progress >= 100 ? 'badge badge-green' : progress >= 50 ? 'badge badge-amber' : 'badge badge-teal'}>
-              {progress >= 100 ? 'Conclu\u00eddo' : progress >= 50 ? 'Em andamento' : 'Iniciado'}
+              {progress >= 100 ? 'Concluído' : progress >= 50 ? 'Em andamento' : 'Iniciado'}
             </span>
           </div>
           <div style={{ width: '100%', height: 8, background: 'var(--surface-3)', borderRadius: 'var(--r-full)', overflow: 'hidden' }}>
@@ -187,20 +143,20 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
-        <form onSubmit={e => { e.preventDefault(); if (!reporterName.trim()) { alert('Preencha o Nome do Operador!'); return; } alert('Checklist sincronizado!'); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
+        <form onSubmit={e => { e.preventDefault(); alert('Checklist sincronizado!'); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
 
           <section className="card" style={{ padding: 'var(--s6)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', insetInline: 0, top: 0, height: 2, background: 'linear-gradient(90deg, var(--primary), #06b6d4)' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--s5)', flexWrap: 'wrap', gap: 'var(--s3)' }}>
               <div>
-                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700 }}>Identifica\u00e7\u00e3o do operador</h2>
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s1)' }}>Dados vinculados a cada ocorr\u00eancia registrada.</p>
+                <h2 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700 }}>Identificação do operador</h2>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s1)' }}>Dados vinculados a cada ocorrência registrada.</p>
               </div>
-              <span className="badge badge-red">Obrigat\u00f3rio</span>
+              <span className="badge badge-red">Obrigatório</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--s4)' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
-                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Mec\u00e2nico / Operador</label>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Mecânico / Operador</label>
                 <div style={{ position: 'relative' }}>
                   <User2 size={16} style={{ position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
                   <input type="text" className="input" style={{ paddingLeft: 'calc(var(--s4) + 18px + var(--s2))' }} placeholder="Ex: Carlos Silva" value={reporterName} onChange={e => setReporterName(e.target.value)} required />
@@ -277,11 +233,11 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
           <div className="card" style={{ width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto', boxShadow: 'var(--sh-xl)' }}>
             <div style={{ padding: 'var(--s6)', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--s4)' }}>
               <div>
-                <div className="badge badge-amber" style={{ marginBottom: 'var(--s3)' }}>Registro de ocorr\u00eancia</div>
+                <div className="badge badge-amber" style={{ marginBottom: 'var(--s3)' }}>Registro de ocorrência</div>
                 <h3 style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700 }}>{activeOccurrence.item}</h3>
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s2)' }}>Se\u00e7\u00e3o: {activeOccurrence.section}</p>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s2)' }}>Seção: {activeOccurrence.section}</p>
               </div>
-              <button type="button" onClick={handleCloseModal} className="btn-ghost" style={{ paddingInline: 'var(--s3)' }}><X size={16} /></button>
+              <button type="button" onClick={handleCloseModal} disabled={isUploading} className="btn-ghost" style={{ paddingInline: 'var(--s3)' }}><X size={16} /></button>
             </div>
             <div style={{ padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s4)' }}>
@@ -295,44 +251,56 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                 </div>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
-                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>Coment\u00e1rio t\u00e9cnico</label>
-                <textarea className="input" value={currentComment} onChange={e => setCurrentComment(e.target.value)} placeholder="Descreva a n\u00e3o conformidade, impacto observado e a\u00e7\u00e3o necess\u00e1ria..." rows={5} style={{ resize: 'vertical', minHeight: 130 }} />
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>Comentário técnico</label>
+                <textarea className="input" value={currentComment} onChange={e => setCurrentComment(e.target.value)} placeholder="Descreva a não conformidade, impacto observado e ação necessária..." rows={5} style={{ resize: 'vertical', minHeight: 130 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--s3)' }}>
-                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>Evid\u00eancias fotogr\u00e1ficas</label>
+                  <div>
+                    <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>Evidências fotográficas</label>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Comprimidas automaticamente antes do envio (máx. 1280px, JPEG 72%)</p>
+                  </div>
                   <label className="btn-ghost" style={{ cursor: 'pointer' }}>
                     <ImagePlus size={16} /> Adicionar fotos
-                    <input type="file" accept="image/*" multiple onChange={handleFileUpload} style={{ display: 'none' }} />
+                    <input type="file" accept="image/*" multiple onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
                   </label>
                 </div>
                 {previewUrls.length === 0 ? (
                   <div style={{ border: '1px dashed var(--border)', borderRadius: 'var(--r-xl)', padding: 'var(--s8)', textAlign: 'center', background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
                     <Camera size={26} style={{ margin: '0 auto 10px', color: 'var(--text-faint)' }} />
                     <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>Nenhuma foto anexada</div>
-                    <div style={{ fontSize: 'var(--text-xs)', marginTop: 6, color: 'var(--text-faint)' }}>As fotos ser\u00e3o enviadas ao Google Drive ao salvar</div>
+                    <div style={{ fontSize: 'var(--text-xs)', marginTop: 6, color: 'var(--text-faint)' }}>Fotos são comprimidas e salvas no Supabase Storage</div>
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--s3)' }}>
                     {previewUrls.map((preview, idx) => (
                       <div key={idx} style={{ position: 'relative', borderRadius: 'var(--r-xl)', overflow: 'hidden', border: '1px solid var(--border)', aspectRatio: '4/3' }}>
                         <img src={preview} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        <button type="button" onClick={() => removePhoto(idx)} style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(15,23,42,0.7)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
+                        {!isUploading && (
+                          <button type="button" onClick={() => removePhoto(idx)} style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(15,23,42,0.7)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
               </div>
             </div>
-            <div style={{ padding: 'var(--s5) var(--s6)', borderTop: '1px solid var(--divider)', display: 'flex', justifyContent: 'flex-end', gap: 'var(--s3)', flexWrap: 'wrap' }}>
-              <button type="button" className="btn-ghost" onClick={handleCloseModal}>Cancelar</button>
-              <button type="button" className="btn-primary" onClick={handleSaveModal} disabled={isUploading}>
-                {isUploading ? 'Enviando ao Drive...' : 'Salvar ocorr\u00eancia'}
-              </button>
+            <div style={{ padding: 'var(--s5) var(--s6)', borderTop: '1px solid var(--divider)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s3)', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--primary)', fontWeight: 600, minHeight: 20 }}>
+                {isUploading && <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}><Loader2 size={15} style={{ animation: 'spin 1s linear infinite' }} />{uploadProgress || 'Processando...'}</span>}
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--s3)' }}>
+                <button type="button" className="btn-ghost" onClick={handleCloseModal} disabled={isUploading}>Cancelar</button>
+                <button type="button" className="btn-primary" onClick={handleSaveModal} disabled={isUploading}>
+                  {isUploading ? 'Enviando...' : 'Salvar ocorrência'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }
