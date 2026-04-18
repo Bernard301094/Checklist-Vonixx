@@ -21,7 +21,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
   const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
-    Object.fromEntries(CHECKLIST_DATA.map(section => [section.id, true]))
+    Object.fromEntries(CHECKLIST_DATA.map(s => [s.id, true]))
   );
 
   const totalItems = useMemo(() => CHECKLIST_DATA.reduce((acc, s) => acc + s.items.length, 0), []);
@@ -53,7 +53,8 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
   const fileToBase64 = (file: File): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
-      reader.onload = () => resolve((reader.result as string));
+      // Returns ONLY the raw base64 without the data URI prefix
+      reader.onload = () => resolve((reader.result as string).split(',')[1]);
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
@@ -64,29 +65,23 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
 
     // @ts-ignore
     const appsScriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
-    // We store filenames so supervisor can reference them even without Drive URL
-    const photoFilenames: string[] = [];
+    let driveUrls: string[] = [];
 
     if (currentFiles.length > 0) {
       if (!appsScriptUrl) {
-        alert('VITE_APPS_SCRIPT_URL n\u00e3o configurado. As fotos n\u00e3o ser\u00e3o enviadas ao Google Drive.');
+        alert('VITE_APPS_SCRIPT_URL n\u00e3o configurado.');
       } else {
-        // Google Apps Script does not send CORS headers, so we must use no-cors.
-        // With no-cors we cannot read the response, but the file IS uploaded.
-        // We generate a predictable filename and store it for reference.
         try {
-          await Promise.all(
+          driveUrls = await Promise.all(
             currentFiles.map(async (file, index) => {
-              const base64DataUrl = await fileToBase64(file);
-              // Strip the data URI prefix to get raw base64
-              const base64 = base64DataUrl.replace(/^data:image\/\w+;base64,/, '');
+              const base64 = await fileToBase64(file);
               const filename = `Ocorrencia_${reporterName.trim().replace(/\s+/g, '_')}_${Date.now()}_img${index}.${file.name.split('.').pop() || 'jpg'}`;
-              photoFilenames.push(filename);
 
-              // Use no-cors to bypass CORS restriction on Apps Script
-              await fetch(appsScriptUrl, {
+              const res = await fetch(appsScriptUrl, {
                 method: 'POST',
-                mode: 'no-cors',
+                // No 'no-cors' — we need to read the response to get the Drive URL.
+                // Apps Script deployed as "Anyone" does respond, but browser may still
+                // block due to redirect. If this throws, the catch below handles it.
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify({
                   base64,
@@ -95,38 +90,64 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                   item: activeOccurrence.item,
                 }),
               });
+
+              const json = await res.json();
+              return (json.url || json.fileUrl || json.driveUrl || '') as string;
             })
           );
-        } catch (e) {
-          console.error('Erro ao subir fotos:', e);
+          driveUrls = driveUrls.filter(Boolean);
+        } catch (err: any) {
+          console.error('Erro ao subir fotos:', err);
+          // CORS still blocking — fall back to no-cors (upload happens, no URL returned)
+          console.warn('Fallback: enviando com no-cors (sem URL de retorno)');
+          try {
+            await Promise.all(
+              currentFiles.map(async (file, index) => {
+                const base64 = await fileToBase64(file);
+                const filename = `Ocorrencia_${reporterName.trim().replace(/\s+/g, '_')}_${Date.now()}_img${index}.${file.name.split('.').pop() || 'jpg'}`;
+                await fetch(appsScriptUrl, {
+                  method: 'POST',
+                  mode: 'no-cors',
+                  headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                  body: JSON.stringify({ base64, mimeType: file.type || 'image/jpeg', filename, item: activeOccurrence.item }),
+                });
+              })
+            );
+            alert('Fotos enviadas ao Drive (verifique a pasta). URLs n\u00e3o dispon\u00edveis por restri\u00e7\u00e3o CORS.');
+          } catch (e2) {
+            console.error('Fallback tamb\u00e9m falhou:', e2);
+            alert('N\u00e3o foi poss\u00edvel enviar as fotos ao Google Drive.');
+          }
         }
       }
     }
 
-    // Save occurrence — photos array stores filenames as reference
-    // (Drive URLs cannot be retrieved with no-cors; supervisor sees filenames)
     onSaveOccurrence({
       section: activeOccurrence.section,
       item: activeOccurrence.item,
       comment: currentComment,
-      photos: previewUrls, // keep blob previews for same-session display
+      // Store Drive URLs if available, otherwise keep blob previews for this session
+      photos: driveUrls.length > 0 ? driveUrls : [...previewUrls],
       reporter: `${reporterName.trim()} (${shift}) - Auth: ${userEmail}`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
 
-    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    previewUrls.forEach(u => URL.revokeObjectURL(u));
     setCurrentFiles([]);
     setPreviewUrls([]);
     setCurrentComment('');
     setActiveOccurrence(null);
     setIsUploading(false);
-    alert(photoFilenames.length > 0
-      ? `Ocorr\u00eancia salva! ${photoFilenames.length} foto(s) enviada(s) ao Google Drive.`
-      : 'Ocorr\u00eancia salva com sucesso.');
+
+    if (driveUrls.length > 0) {
+      alert(`Ocorr\u00eancia salva! ${driveUrls.length} foto(s) no Google Drive.`);
+    } else {
+      alert('Ocorr\u00eancia salva com sucesso.');
+    }
   };
 
   const handleCloseModal = () => {
-    previewUrls.forEach(url => URL.revokeObjectURL(url));
+    previewUrls.forEach(u => URL.revokeObjectURL(u));
     setCurrentFiles([]);
     setPreviewUrls([]);
     setCurrentComment('');
@@ -217,7 +238,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                   </div>
                   <ChevronDown size={18} style={{ transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 180ms ease', color: 'var(--text-muted)', flexShrink: 0 }} />
                 </button>
-
                 {isOpen && (
                   <div style={{ padding: '0 var(--s4) var(--s4)', display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
                     {section.items.map((item, idx) => {
@@ -233,7 +253,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                             </div>
                           </label>
                           {!checked && (
-                            <button type="button" onClick={() => handleOpenModal(section.title, item)} className="btn-ghost" style={{ minWidth: 0, paddingInline: 'var(--s3)', color: 'var(--warning)', borderColor: 'rgba(217,119,6,0.18)', background: 'var(--warning-hl)' }} title="Registrar Ocorr\u00eancia">
+                            <button type="button" onClick={() => handleOpenModal(section.title, item)} className="btn-ghost" style={{ minWidth: 0, paddingInline: 'var(--s3)', color: 'var(--warning)', borderColor: 'rgba(217,119,6,0.18)', background: 'var(--warning-hl)' }}>
                               <AlertTriangle size={15} />
                             </button>
                           )}
