@@ -115,6 +115,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text)' }}>
       <Header
         userEmail={userEmail}
+        displayName={reporterName || userEmail}
         title="Checklist Diário"
         subtitle="Inspeção operacional, conformidade por seção e registro imediato de ocorrências"
         role="colaborador"

@@ -77,28 +77,35 @@ export default function App() {
     return data.role === 'supervisor' ? 'supervisor' : 'colaborador';
   };
 
+  const applySession = async (session: any) => {
+    const user = session?.user;
+    setCurrentUser(user ? { email: user.email } : null);
+
+    if (user) {
+      // ✅ Carrega role da base de dados
+      const dbRole = await fetchRoleFromDB(user.id);
+      setRole(dbRole);
+
+      // ✅ Carrega nome e turno dos metadados do usuário registrado
+      if (user.user_metadata?.name) {
+        setReporterName(user.user_metadata.name);
+      }
+      if (user.user_metadata?.shift) {
+        setShift(user.user_metadata.shift);
+      }
+    } else {
+      setRole('login');
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      const user = session?.user;
-      setCurrentUser(user ? { email: user.email } : null);
-      if (user) {
-        const dbRole = await fetchRoleFromDB(user.id);
-        setRole(dbRole);
-      } else {
-        setRole('login');
-      }
+      await applySession(session);
       setAuthLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const user = session?.user;
-      setCurrentUser(user ? { email: user.email } : null);
-      if (user) {
-        const dbRole = await fetchRoleFromDB(user.id);
-        setRole(dbRole);
-      } else {
-        setRole('login');
-      }
+      await applySession(session);
       setAuthLoading(false);
     });
 

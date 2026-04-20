@@ -2,6 +2,7 @@ import { Factory, LogOut } from 'lucide-react';
 
 interface HeaderProps {
   userEmail: string;
+  displayName?: string;
   title: string;
   subtitle?: string;
   showSyncStatus?: boolean;
@@ -9,15 +10,17 @@ interface HeaderProps {
   onLogout?: () => void;
 }
 
-export default function Header({ userEmail, title, subtitle, showSyncStatus = false, role, onLogout }: HeaderProps) {
+export default function Header({ userEmail, displayName, title, subtitle, showSyncStatus = false, role, onLogout }: HeaderProps) {
   const now = new Date();
   const formattedTime = new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit', minute: '2-digit',
   }).format(now);
 
-  const initials = userEmail
-    .split('@')[0]
-    .split(/[._-]/)
+  const label = displayName || userEmail;
+
+  const initials = label
+    .split(/[\s@._-]+/)
+    .filter(Boolean)
     .map(p => p[0]?.toUpperCase())
     .slice(0, 2)
     .join('');
@@ -114,7 +117,7 @@ export default function Header({ userEmail, title, subtitle, showSyncStatus = fa
               fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--sidebar-text)',
               maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
             }} className="email-label">
-              {userEmail}
+              {label}
             </span>
             <span style={{
               fontSize: 10, fontWeight: 700, color: 'var(--sidebar-muted)',

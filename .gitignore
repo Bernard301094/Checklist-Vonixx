@@ -7,3 +7,7 @@ coverage/
 .env*
 !.env.example
 drive-token.json
+# Keystore files - DO NOT COMMIT
+*.jks
+*.keystore
+*.jks.b64
