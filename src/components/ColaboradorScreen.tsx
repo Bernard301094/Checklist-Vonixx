@@ -252,16 +252,28 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                 <textarea className="input" value={currentComment} onChange={e => setCurrentComment(e.target.value)} placeholder="Descreva a não conformidade, impacto observado e ação necessária..." rows={5} style={{ resize: 'vertical', minHeight: 130 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+                
+                {/* AQUI ESTÁ LA IMPLEMENTACIÓN DE LOS DOS BOTONES */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--s3)' }}>
                   <div>
                     <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>Evidências fotográficas</label>
                     <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Comprimidas automaticamente antes do envio (máx. 1280px, JPEG 72%)</p>
                   </div>
-                  <label className="btn-ghost" style={{ cursor: 'pointer' }}>
-                    <ImagePlus size={16} /> Adicionar fotos
-                    <input type="file" accept="image/*" multiple onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
-                  </label>
+                  <div style={{ display: 'flex', gap: 'var(--s2)' }}>
+                    {/* Botón exclusivo para la Cámara */}
+                    <label className="btn-ghost" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <Camera size={16} /> Tirar Foto
+                      <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
+                    </label>
+                    
+                    {/* Botón para la Galería */}
+                    <label className="btn-ghost" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <ImagePlus size={16} /> Galeria
+                      <input type="file" accept="image/*" multiple onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
+                    </label>
+                  </div>
                 </div>
+
                 {previewUrls.length === 0 ? (
                   <div style={{ border: '1px dashed var(--border)', borderRadius: 'var(--r-xl)', padding: 'var(--s8)', textAlign: 'center', background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
                     <Camera size={26} style={{ margin: '0 auto 10px', color: 'var(--text-faint)' }} />
