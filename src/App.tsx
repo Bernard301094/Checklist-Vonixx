@@ -23,7 +23,6 @@ export default function App() {
   const [role, setRole] = useState<'login' | 'supervisor' | 'colaborador'>('login');
   const [authLoading, setAuthLoading] = useState(true);
 
-  // ✅ NUEVO: estado para nombre y turno capturados en LoginScreen
   const [reporterName, setReporterName] = useState('');
   const [shift, setShift] = useState('TURNO A');
 
@@ -63,35 +62,51 @@ export default function App() {
     }
   }, [role]);
 
+  const fetchRoleFromDB = async (userId: string): Promise<'supervisor' | 'colaborador'> => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (error || !data) {
+      console.warn('Perfil não encontrado, usando role padrão: colaborador');
+      return 'colaborador';
+    }
+
+    return data.role === 'supervisor' ? 'supervisor' : 'colaborador';
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       const user = session?.user;
       setCurrentUser(user ? { email: user.email } : null);
-      updateRole(user?.email);
+      if (user) {
+        const dbRole = await fetchRoleFromDB(user.id);
+        setRole(dbRole);
+      } else {
+        setRole('login');
+      }
       setAuthLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       const user = session?.user;
       setCurrentUser(user ? { email: user.email } : null);
-      updateRole(user?.email);
+      if (user) {
+        const dbRole = await fetchRoleFromDB(user.id);
+        setRole(dbRole);
+      } else {
+        setRole('login');
+      }
       setAuthLoading(false);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const updateRole = (email?: string) => {
-    if (email) {
-      setRole(email.includes('supervisor') ? 'supervisor' : 'colaborador');
-    } else {
-      setRole('login');
-    }
-  };
-
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    // ✅ Limpia nombre y turno al cerrar sesión
     setReporterName('');
     setShift('TURNO A');
   };
@@ -142,7 +157,6 @@ export default function App() {
 
   if (role === 'login') {
     return (
-      // ✅ LoginScreen recibe callbacks para guardar nombre y turno antes de hacer login
       <LoginScreen
         onSetReporterName={setReporterName}
         onSetShift={setShift}
@@ -163,7 +177,6 @@ export default function App() {
   }
 
   return (
-    // ✅ Pasa reporterName y shift al ColaboradorScreen
     <ColaboradorScreen
       onLogout={handleLogout}
       checklistState={checklistState}
