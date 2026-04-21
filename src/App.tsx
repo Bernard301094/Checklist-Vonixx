@@ -26,7 +26,7 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
   const [useBiometrics, setUseBiometrics] = useState<boolean>(() => {
-    return localStorage.getItem('useBiometrics') !== 'false';
+    return localStorage.getItem('useBiometrics') === 'true';
   });
 
   const [reporterName, setReporterName] = useState('');
@@ -48,6 +48,11 @@ export default function App() {
     setUseBiometrics(prev => {
       const next = !prev;
       localStorage.setItem('useBiometrics', String(next));
+      if (next) {
+        alert('Bloqueio por biometria ATIVADO. O app pedirá sua digital ao ser reaberto.');
+      } else {
+        alert('Bloqueio por biometria DESATIVADO.');
+      }
       return next;
     });
   };
@@ -109,7 +114,7 @@ export default function App() {
 
     if (user) {
       // Lock screen initially on resume if we have a user and biometrics enabled
-      const isBioEnabled = localStorage.getItem('useBiometrics') !== 'false';
+      const isBioEnabled = localStorage.getItem('useBiometrics') === 'true';
       if (isBioEnabled) {
         setIsLocked(true);
       }

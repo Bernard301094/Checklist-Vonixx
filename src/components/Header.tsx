@@ -12,7 +12,7 @@ interface HeaderProps {
   onToggleBiometrics?: () => void;
 }
 
-export default function Header({ userEmail, displayName, title, subtitle, showSyncStatus = false, role, onLogout }: HeaderProps) {
+export default function Header({ userEmail, displayName, title, subtitle, showSyncStatus = false, role, onLogout, useBiometrics, onToggleBiometrics }: HeaderProps) {
   const now = new Date();
   const formattedTime = new Intl.DateTimeFormat('pt-BR', {
     hour: '2-digit', minute: '2-digit',
@@ -132,19 +132,25 @@ export default function Header({ userEmail, displayName, title, subtitle, showSy
           {onToggleBiometrics && typeof useBiometrics === 'boolean' && (
             <button
               onClick={onToggleBiometrics}
+              className="bio-toggle-btn"
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                width: 36, height: 36, borderRadius: 'var(--r-lg)',
-                background: useBiometrics ? 'rgba(13,148,136,0.15)' : 'transparent',
-                border: `1px solid ${useBiometrics ? 'rgba(13,148,136,0.25)' : 'var(--sidebar-border)'}`,
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '0 var(--s3)', height: 36, borderRadius: 'var(--r-lg)',
+                background: useBiometrics ? 'rgba(13,148,136,0.18)' : 'rgba(255,255,255,0.05)',
+                border: `1px solid ${useBiometrics ? 'rgba(13,148,136,0.35)' : 'var(--sidebar-border)'}`,
                 color: useBiometrics ? 'var(--primary)' : 'var(--sidebar-muted)',
                 cursor: 'pointer',
                 transition: 'all var(--t)',
+                fontSize: 11,
+                fontWeight: 700,
+                letterSpacing: '0.03em',
+                whiteSpace: 'nowrap',
               }}
-              aria-label={useBiometrics ? "Desativar bloqueio por digital" : "Ativar bloqueio por digital"}
-              title={useBiometrics ? "Desativar bloqueio por digital" : "Ativar bloqueio por digital"}
+              aria-label={useBiometrics ? 'Desativar bloqueio por digital' : 'Ativar bloqueio por digital'}
+              title={useBiometrics ? 'Bloqueio por digital ATIVADO — clique para desativar' : 'Bloqueio por digital DESATIVADO — clique para ativar'}
             >
-              <Fingerprint size={16} />
+              <Fingerprint size={15} style={{ flexShrink: 0 }} />
+              <span className="bio-label">{useBiometrics ? 'Digital ON' : 'Digital OFF'}</span>
             </button>
           )}
 
@@ -209,6 +215,12 @@ export default function Header({ userEmail, displayName, title, subtitle, showSy
         }
         @media (max-width: 480px) {
           .email-label { display: none !important; }
+          .bio-label { display: none !important; }
+        }
+        /* Mostra o botão de digital apenas em mobile/tablet (< 1024px) */
+        .bio-toggle-btn { display: flex !important; }
+        @media (min-width: 1024px) {
+          .bio-toggle-btn { display: none !important; }
         }
       `}</style>
     </header>
