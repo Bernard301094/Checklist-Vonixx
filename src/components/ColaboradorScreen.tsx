@@ -13,9 +13,11 @@ interface ColaboradorScreenProps {
   userEmail: string;
   reporterName: string;
   shift: string;
+  useBiometrics?: boolean;
+  onToggleBiometrics?: () => void;
 }
 
-export default function ColaboradorScreen({ onLogout, checklistState, onCheck, onSaveOccurrence, userEmail, reporterName, shift }: ColaboradorScreenProps) {
+export default function ColaboradorScreen({ onLogout, checklistState, onCheck, onSaveOccurrence, userEmail, reporterName, shift, useBiometrics, onToggleBiometrics }: ColaboradorScreenProps) {
   const [activeOccurrence, setActiveOccurrence] = useState<{ section: string; item: string } | null>(null);
   const [currentComment, setCurrentComment] = useState('');
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
@@ -120,6 +122,8 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
         subtitle="Inspeção operacional, conformidade por seção e registro imediato de ocorrências"
         role="colaborador"
         onLogout={onLogout}
+        useBiometrics={useBiometrics}
+        onToggleBiometrics={onToggleBiometrics}
       />
 
       <div style={{ padding: 'var(--s5) var(--s6)', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>

@@ -7,9 +7,11 @@ interface SupervisorScreenProps {
   onLogout: () => void;
   occurrences: OccurrenceData[];
   checklistState: Record<string, boolean>;
+  useBiometrics?: boolean;
+  onToggleBiometrics?: () => void;
 }
 
-export default function SupervisorScreen({ onLogout, occurrences, checklistState }: SupervisorScreenProps) {
+export default function SupervisorScreen({ onLogout, occurrences, checklistState, useBiometrics, onToggleBiometrics }: SupervisorScreenProps) {
   const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
 
   const verifiedCount = Object.values(checklistState).filter(v => v).length;
@@ -57,6 +59,8 @@ export default function SupervisorScreen({ onLogout, occurrences, checklistState
         showSyncStatus={true}
         role="supervisor"
         onLogout={onLogout}
+        useBiometrics={useBiometrics}
+        onToggleBiometrics={onToggleBiometrics}
       />
 
       <div style={{ padding: 'var(--s5) var(--s6)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s4)', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>

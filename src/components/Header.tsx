@@ -1,4 +1,4 @@
-import { Factory, LogOut } from 'lucide-react';
+import { Factory, LogOut, Fingerprint } from 'lucide-react';
 
 interface HeaderProps {
   userEmail: string;
@@ -8,6 +8,8 @@ interface HeaderProps {
   showSyncStatus?: boolean;
   role?: 'supervisor' | 'colaborador';
   onLogout?: () => void;
+  useBiometrics?: boolean;
+  onToggleBiometrics?: () => void;
 }
 
 export default function Header({ userEmail, displayName, title, subtitle, showSyncStatus = false, role, onLogout }: HeaderProps) {
@@ -126,6 +128,25 @@ export default function Header({ userEmail, displayName, title, subtitle, showSy
               {formattedTime}
             </span>
           </div>
+
+          {onToggleBiometrics && typeof useBiometrics === 'boolean' && (
+            <button
+              onClick={onToggleBiometrics}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: 36, height: 36, borderRadius: 'var(--r-lg)',
+                background: useBiometrics ? 'rgba(13,148,136,0.15)' : 'transparent',
+                border: `1px solid ${useBiometrics ? 'rgba(13,148,136,0.25)' : 'var(--sidebar-border)'}`,
+                color: useBiometrics ? 'var(--primary)' : 'var(--sidebar-muted)',
+                cursor: 'pointer',
+                transition: 'all var(--t)',
+              }}
+              aria-label={useBiometrics ? "Desativar bloqueio por digital" : "Ativar bloqueio por digital"}
+              title={useBiometrics ? "Desativar bloqueio por digital" : "Ativar bloqueio por digital"}
+            >
+              <Fingerprint size={16} />
+            </button>
+          )}
 
           {onLogout && (
             <button

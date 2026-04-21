@@ -25,13 +25,16 @@ export default function App() {
   const [role, setRole] = useState<'login' | 'supervisor' | 'colaborador'>('login');
   const [authLoading, setAuthLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
+  const [useBiometrics, setUseBiometrics] = useState<boolean>(() => {
+    return localStorage.getItem('useBiometrics') !== 'false';
+  });
 
   const [reporterName, setReporterName] = useState('');
   const [shift, setShift] = useState('TURNO A');
 
   useEffect(() => {
     const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-      if (!isActive && role !== 'login') {
+      if (!isActive && role !== 'login' && useBiometrics) {
         setIsLocked(true);
       }
     });
@@ -39,7 +42,15 @@ export default function App() {
     return () => {
       listener.then(l => l.remove());
     };
-  }, [role]);
+  }, [role, useBiometrics]);
+
+  const toggleBiometrics = () => {
+    setUseBiometrics(prev => {
+      const next = !prev;
+      localStorage.setItem('useBiometrics', String(next));
+      return next;
+    });
+  };
 
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
   const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
@@ -97,8 +108,11 @@ export default function App() {
     setCurrentUser(user ? { email: user.email } : null);
 
     if (user) {
-      // Lock screen initially on resume if we have a user
-      setIsLocked(true);
+      // Lock screen initially on resume if we have a user and biometrics enabled
+      const isBioEnabled = localStorage.getItem('useBiometrics') !== 'false';
+      if (isBioEnabled) {
+        setIsLocked(true);
+      }
 
       // ✅ Carrega role da base de dados
       const dbRole = await fetchRoleFromDB(user.id);
@@ -208,6 +222,8 @@ export default function App() {
         onLogout={handleLogout}
         occurrences={occurrences}
         checklistState={checklistState}
+        useBiometrics={useBiometrics}
+        onToggleBiometrics={toggleBiometrics}
       />
     );
   }
@@ -221,6 +237,8 @@ export default function App() {
       userEmail={currentUser?.email || ''}
       reporterName={reporterName}
       shift={shift}
+      useBiometrics={useBiometrics}
+      onToggleBiometrics={toggleBiometrics}
     />
   );
 }
