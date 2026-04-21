@@ -4,6 +4,7 @@ import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
 import Header from './Header';
 import { uploadPhoto } from '../lib/uploadPhoto';
+import { ToastContainer, useToast } from './Toast';
 
 interface ColaboradorScreenProps {
   onLogout: () => void;
@@ -18,6 +19,8 @@ interface ColaboradorScreenProps {
 }
 
 export default function ColaboradorScreen({ onLogout, checklistState, onCheck, onSaveOccurrence, userEmail, reporterName, shift, useBiometrics, onToggleBiometrics }: ColaboradorScreenProps) {
+  const { toasts, removeToast, toast } = useToast();
+
   const [activeOccurrence, setActiveOccurrence] = useState<{ section: string; item: string } | null>(null);
   const [currentComment, setCurrentComment] = useState('');
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
@@ -69,7 +72,8 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
         setUploadProgress('');
       } catch (err: any) {
         console.error('Erro ao subir fotos para Supabase:', err);
-        alert(`Erro ao enviar fotos: ${err.message}`);
+        // ✅ Toast de error en vez de alert()
+        toast.error('Erro ao enviar fotos', err.message);
         setIsUploading(false);
         setUploadProgress('');
         return;
@@ -92,10 +96,11 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     setActiveOccurrence(null);
     setIsUploading(false);
 
+    // ✅ Toast de éxito en vez de alert()
     if (driveUrls.length > 0) {
-      alert(`Ocorrência salva! ${driveUrls.length} foto(s) enviadas ao Supabase Storage (comprimidas).`);
+      toast.success('Ocorrência salva!', `${driveUrls.length} foto(s) enviadas ao Supabase Storage com sucesso.`);
     } else {
-      alert('Ocorrência salva com sucesso.');
+      toast.success('Ocorrência salva com sucesso.');
     }
   };
 
@@ -144,8 +149,14 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
-        <form onSubmit={e => { e.preventDefault(); alert('Checklist sincronizado!'); }} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
-
+        <form
+          onSubmit={e => {
+            e.preventDefault();
+            // ✅ Toast en vez de alert()
+            toast.success('Checklist sincronizado!', 'Todos os dados foram salvos com sucesso.');
+          }}
+          style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}
+        >
           <section className="card" style={{ padding: 'var(--s6)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', insetInline: 0, top: 0, height: 2, background: 'linear-gradient(90deg, var(--primary), #06b6d4)' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--s5)', flexWrap: 'wrap', gap: 'var(--s3)' }}>
@@ -156,7 +167,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
               <span className="badge badge-teal">Perfil ativo</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 'var(--s4)' }}>
-              {/* ✅ Muestra exactamente el nombre ingresado junto al turno */}
               <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
                 <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--primary-hl)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <User2 size={18} />
@@ -229,6 +239,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
         </form>
       </div>
 
+      {/* Modal de ocorrência */}
       {activeOccurrence && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.55)', backdropFilter: 'blur(8px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 'var(--s4)', zIndex: 1000 }}>
           <div className="card" style={{ width: '100%', maxWidth: 720, maxHeight: '90vh', overflow: 'auto', boxShadow: 'var(--sh-xl)' }}>
@@ -242,7 +253,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
             </div>
             <div style={{ padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s4)' }}>
-                {/* ✅ Nombre exacto del operador, sin fallback al email */}
                 <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)' }}>
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, marginBottom: 'var(--s1)' }}>Operador</div>
                   <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{reporterName}</div>
@@ -257,21 +267,16 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                 <textarea className="input" value={currentComment} onChange={e => setCurrentComment(e.target.value)} placeholder="Descreva a não conformidade, impacto observado e ação necessária..." rows={5} style={{ resize: 'vertical', minHeight: 130 }} />
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
-                
-                {/* AQUI ESTÁ LA IMPLEMENTACIÓN DE LOS DOS BOTONES */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--s3)' }}>
                   <div>
                     <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>Evidências fotográficas</label>
                     <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Comprimidas automaticamente antes do envio (máx. 1280px, JPEG 72%)</p>
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--s2)' }}>
-                    {/* Botón exclusivo para la Cámara */}
                     <label className="btn-ghost" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Camera size={16} /> Tirar Foto
                       <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
                     </label>
-                    
-                    {/* Botón para la Galería */}
                     <label className="btn-ghost" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <ImagePlus size={16} /> Galeria
                       <input type="file" accept="image/*" multiple onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
@@ -291,7 +296,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                       <div key={idx} style={{ position: 'relative', borderRadius: 'var(--r-xl)', overflow: 'hidden', border: '1px solid var(--border)', aspectRatio: '4/3' }}>
                         <img src={preview} alt={`Preview ${idx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         {!isUploading && (
-                          <button type="button" onClick={() => removePhoto(idx)} style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(15,23,42,0.7)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={13} /></button>
+                          <button type="button" onClick={() => removePhoto(idx)} style={{ position: 'absolute', top: 8, right: 8, width: 28, height: 28, borderRadius: '50%', background: 'rgba(15,23,42,0.7)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer' }}><X size={13} /></button>
                         )}
                       </div>
                     ))}
@@ -313,6 +318,9 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
           </div>
         </div>
       )}
+
+      {/* ✅ Toast container — aparece en bottom-right */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>

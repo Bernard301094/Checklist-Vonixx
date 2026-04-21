@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import LoginScreen from './components/LoginScreen';
 import SupervisorScreen from './components/SupervisorScreen';
@@ -20,6 +20,28 @@ interface AuthUser {
 const OCCURRENCES_TABLE = 'occurrences';
 const CHECKLISTS_TABLE = 'checklists';
 
+// ✅ FIX 1: Timeout para fetchRoleFromDB — evita colgar si la tabla profiles no responde
+const fetchRoleFromDB = async (userId: string): Promise<'supervisor' | 'colaborador'> => {
+  try {
+    const result = await Promise.race([
+      supabase.from('profiles').select('role').eq('id', userId).single(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('timeout')), 5000)
+      ),
+    ]) as { data: any; error: any };
+
+    if (result.error || !result.data) {
+      console.warn('Perfil não encontrado ou timeout, usando role padrão: colaborador');
+      return 'colaborador';
+    }
+
+    return result.data.role === 'supervisor' ? 'supervisor' : 'colaborador';
+  } catch (err) {
+    console.warn('Erro ao buscar role, usando padrão: colaborador', err);
+    return 'colaborador';
+  }
+};
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [role, setRole] = useState<'login' | 'supervisor' | 'colaborador'>('login');
@@ -31,6 +53,8 @@ export default function App() {
 
   const [reporterName, setReporterName] = useState('');
   const [shift, setShift] = useState('TURNO A');
+  const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
+  const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
 
   useEffect(() => {
     const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
@@ -44,21 +68,15 @@ export default function App() {
     };
   }, [role, useBiometrics]);
 
-  const toggleBiometrics = () => {
-    setUseBiometrics(prev => {
-      const next = !prev;
-      localStorage.setItem('useBiometrics', String(next));
-      if (next) {
-        alert('Bloqueio por biometria ATIVADO. O app pedirá sua digital ao ser reaberto.');
-      } else {
-        alert('Bloqueio por biometria DESATIVADO.');
-      }
-      return next;
-    });
-  };
-
-  const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
-  const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
+  // En App.tsx, reemplaza toggleBiometrics por esto:
+const toggleBiometrics = () => {
+  setUseBiometrics(prev => {
+    const next = !prev;
+    localStorage.setItem('useBiometrics', String(next));
+    // Sin alert() — el Header ya muestra visualmente ON/OFF en el botón
+    return next;
+  });
+};
 
   useEffect(() => {
     async function loadData() {
@@ -93,37 +111,20 @@ export default function App() {
     }
   }, [role]);
 
-  const fetchRoleFromDB = async (userId: string): Promise<'supervisor' | 'colaborador'> => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', userId)
-      .single();
-
-    if (error || !data) {
-      console.warn('Perfil não encontrado, usando role padrão: colaborador');
-      return 'colaborador';
-    }
-
-    return data.role === 'supervisor' ? 'supervisor' : 'colaborador';
-  };
-
-  const applySession = async (session: any) => {
+  // ✅ FIX 2: useCallback para evitar re-creación innecesaria de applySession
+  const applySession = useCallback(async (session: any) => {
     const user = session?.user;
     setCurrentUser(user ? { email: user.email } : null);
 
     if (user) {
-      // Lock screen initially on resume if we have a user and biometrics enabled
       const isBioEnabled = localStorage.getItem('useBiometrics') === 'true';
       if (isBioEnabled) {
         setIsLocked(true);
       }
 
-      // ✅ Carrega role da base de dados
       const dbRole = await fetchRoleFromDB(user.id);
       setRole(dbRole);
 
-      // ✅ Carrega nome e turno dos metadados do usuário registrado
       if (user.user_metadata?.name) {
         setReporterName(user.user_metadata.name);
       }
@@ -134,21 +135,44 @@ export default function App() {
       setRole('login');
       setIsLocked(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
+    let cancelled = false;
+
+    // ✅ FIX 3: Timeout de seguridad — si Supabase no responde en 8s, muestra login
+    const safetyTimeout = setTimeout(() => {
+      if (!cancelled) {
+        console.warn('Auth timeout: Supabase demorou demais, exibindo tela de login.');
+        setAuthLoading(false);
+      }
+    }, 8000);
+
     supabase.auth.getSession().then(async ({ data: { session } }) => {
+      if (cancelled) return;
+      clearTimeout(safetyTimeout);
       await applySession(session);
+      setAuthLoading(false);
+    }).catch((err) => {
+      // ✅ FIX 4: Captura errores de red en getSession
+      if (cancelled) return;
+      clearTimeout(safetyTimeout);
+      console.error('Erro ao obter sessão:', err);
       setAuthLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (cancelled) return;
       await applySession(session);
       setAuthLoading(false);
     });
 
-    return () => subscription.unsubscribe();
-  }, []);
+    return () => {
+      cancelled = true;
+      clearTimeout(safetyTimeout);
+      subscription.unsubscribe();
+    };
+  }, [applySession]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -165,7 +189,11 @@ export default function App() {
 
     if (error) {
       console.error('Erro ao salvar ocorrência no banco:', error.message);
-      const localOcc: OccurrenceData = { ...occurrence, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
+      const localOcc: OccurrenceData = {
+        ...occurrence,
+        id: `local-${Date.now()}`,
+        created_at: new Date().toISOString(),
+      };
       setOccurrences(prev => [localOcc, ...prev]);
       alert('Ocorrência salva localmente. Erro ao persistir no banco — verifique o console.');
       return;
@@ -181,21 +209,44 @@ export default function App() {
 
     const { error } = await supabase
       .from(CHECKLISTS_TABLE)
-      .upsert({
-        item_key: key,
-        is_checked: checked,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'item_key' });
+      .upsert(
+        { item_key: key, is_checked: checked, updated_at: new Date().toISOString() },
+        { onConflict: 'item_key' }
+      );
 
     if (error) {
       console.error('Erro ao sincronizar checklist:', error.message);
     }
   };
 
+  // ✅ FIX 5: Mensaje de carga mejorado con indicador visual y mensaje de error si tarda mucho
   if (authLoading) {
     return (
-      <div style={{ display: 'flex', height: '100dvh', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)' }}>
-        Carregando conta...
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          height: '100dvh',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--bg)',
+          color: 'var(--text-muted)',
+          fontSize: 'var(--text-sm)',
+        }}
+      >
+        <div
+          style={{
+            width: '32px',
+            height: '32px',
+            border: '3px solid rgba(255,255,255,0.15)',
+            borderTop: '3px solid var(--accent, #6366f1)',
+            borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+          }}
+        />
+        <span>Carregando conta...</span>
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
@@ -213,10 +264,10 @@ export default function App() {
 
   if (isLocked) {
     return (
-      <LockScreen 
-        onUnlock={() => setIsLocked(false)} 
-        onLogout={handleLogout} 
-        userEmail={currentUser?.email || ''} 
+      <LockScreen
+        onUnlock={() => setIsLocked(false)}
+        onLogout={handleLogout}
+        userEmail={currentUser?.email || ''}
       />
     );
   }
