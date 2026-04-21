@@ -4,9 +4,11 @@
  */
 
 import { useState, useEffect } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
 import LoginScreen from './components/LoginScreen';
 import SupervisorScreen from './components/SupervisorScreen';
 import ColaboradorScreen from './components/ColaboradorScreen';
+import LockScreen from './components/LockScreen';
 import { OccurrenceData } from './types';
 import { supabase } from './supabase';
 import { INITIAL_OCCURRENCES } from './constants';
@@ -22,9 +24,22 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [role, setRole] = useState<'login' | 'supervisor' | 'colaborador'>('login');
   const [authLoading, setAuthLoading] = useState(true);
+  const [isLocked, setIsLocked] = useState(false);
 
   const [reporterName, setReporterName] = useState('');
   const [shift, setShift] = useState('TURNO A');
+
+  useEffect(() => {
+    const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
+      if (!isActive && role !== 'login') {
+        setIsLocked(true);
+      }
+    });
+
+    return () => {
+      listener.then(l => l.remove());
+    };
+  }, [role]);
 
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
   const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
@@ -82,6 +97,9 @@ export default function App() {
     setCurrentUser(user ? { email: user.email } : null);
 
     if (user) {
+      // Lock screen initially on resume if we have a user
+      setIsLocked(true);
+
       // ✅ Carrega role da base de dados
       const dbRole = await fetchRoleFromDB(user.id);
       setRole(dbRole);
@@ -95,6 +113,7 @@ export default function App() {
       }
     } else {
       setRole('login');
+      setIsLocked(false);
     }
   };
 
@@ -127,7 +146,7 @@ export default function App() {
 
     if (error) {
       console.error('Erro ao salvar ocorrência no banco:', error.message);
-      const localOcc: OccurrenceData = { ...occurrence, id: `local-${Date.now()}` };
+      const localOcc: OccurrenceData = { ...occurrence, id: `local-${Date.now()}`, created_at: new Date().toISOString() };
       setOccurrences(prev => [localOcc, ...prev]);
       alert('Ocorrência salva localmente. Erro ao persistir no banco — verifique o console.');
       return;
@@ -169,6 +188,16 @@ export default function App() {
         onSetShift={setShift}
         reporterName={reporterName}
         shift={shift}
+      />
+    );
+  }
+
+  if (isLocked) {
+    return (
+      <LockScreen 
+        onUnlock={() => setIsLocked(false)} 
+        onLogout={handleLogout} 
+        userEmail={currentUser?.email || ''} 
       />
     );
   }

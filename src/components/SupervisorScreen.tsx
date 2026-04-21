@@ -30,6 +30,24 @@ export default function SupervisorScreen({ onLogout, occurrences, checklistState
   const prevPhoto = () => setLightbox(prev => prev ? { ...prev, index: prev.index === 0 ? prev.photos.length - 1 : prev.index - 1 } : null);
   const nextPhoto = () => setLightbox(prev => prev ? { ...prev, index: prev.index === prev.photos.length - 1 ? 0 : prev.index + 1 } : null);
 
+  const groupedOccurrences = occurrences.reduce((acc, occ) => {
+    const dateObj = occ.created_at ? new Date(occ.created_at) : new Date();
+    // Default to PT-BR format (DD/MM/YYYY)
+    const dateStr = dateObj.toLocaleDateString('pt-BR');
+    const reporter = occ.reporter.split(' - Auth:')[0]; // Extract just the reporter name + shift
+
+    if (!acc[dateStr]) acc[dateStr] = {};
+    if (!acc[dateStr][reporter]) acc[dateStr][reporter] = [];
+    
+    acc[dateStr][reporter].push(occ);
+    return acc;
+  }, {} as Record<string, Record<string, OccurrenceData[]>>);
+
+  const sortedDates = Object.keys(groupedOccurrences).sort((a, b) => {
+    const parseDate = (d: string) => d.split('/').reverse().join('-');
+    return parseDate(b).localeCompare(parseDate(a)); // sort descending
+  });
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text)' }}>
       <Header
@@ -69,57 +87,73 @@ export default function SupervisorScreen({ onLogout, occurrences, checklistState
             <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s2)', maxWidth: 480 }}>O checklist está seguindo sem desvios registrados neste turno. Continue monitorando a evolução do progresso global.</p>
           </div>
         ) : (
-          occurrences.map((occ, idx) => (
-            <section key={occ.id} className="card animate-in" style={{ overflow: 'hidden', animationDelay: `${idx * 40}ms` }}>
-              <div style={{ padding: 'var(--s5) var(--s6)', background: 'var(--sidebar-bg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s4)', flexWrap: 'wrap' }}>
-                <div>
-                  <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 'var(--s1)' }}>Seção monitorada</div>
-                  <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: '#fff' }}>{occ.section}</h2>
-                </div>
-                <span className="badge badge-amber">Ocorrência crítica</span>
-              </div>
+          sortedDates.map((dateStr) => (
+            <div key={dateStr} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
+              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, color: 'var(--text)', borderBottom: '1px solid var(--border)', paddingBottom: 'var(--s2)' }}>
+                Data: {dateStr}
+              </h2>
+              
+              {Object.keys(groupedOccurrences[dateStr]).map((reporter) => (
+                <div key={reporter} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s4)', marginLeft: 'var(--s4)' }}>
+                  <h3 style={{ fontSize: 'var(--text-md)', fontWeight: 600, color: 'var(--primary)' }}>
+                    Colaborador: {reporter}
+                  </h3>
+                  
+                  {groupedOccurrences[dateStr][reporter].map((occ, idx) => (
+                    <section key={occ.id} className="card animate-in" style={{ overflow: 'hidden', animationDelay: `${idx * 40}ms`, marginLeft: 'var(--s4)' }}>
+                      <div style={{ padding: 'var(--s5) var(--s6)', background: 'var(--sidebar-bg)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s4)', flexWrap: 'wrap' }}>
+                        <div>
+                          <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'rgba(255,255,255,0.45)', marginBottom: 'var(--s1)' }}>Seção monitorada</div>
+                          <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: '#fff' }}>{occ.section}</h2>
+                        </div>
+                        <span className="badge badge-amber">Ocorrência crítica</span>
+                      </div>
 
-              <div style={{ padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--s4)' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
-                    <div>
-                      <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--warning)', marginBottom: 'var(--s2)' }}>Fator crítico</div>
-                      <div style={{ padding: 'var(--s4)', background: 'var(--warning-hl)', border: '1px solid rgba(217,119,6,0.16)', borderRadius: 'var(--r-xl)' }}>
-                        <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, lineHeight: 1.4 }}>{occ.item}</h3>
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s2)' }}>Comentário do operador</div>
-                      <div style={{ padding: 'var(--s4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)' }}>
-                        <p style={{ fontSize: 'var(--text-sm)', lineHeight: 1.7, fontWeight: 500 }}>{occ.comment || 'Sem comentário informado.'}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
-                    {[{ label: 'Relatado por', value: occ.reporter }, { label: 'Hora do registro', value: occ.time }, { label: 'Evidências', value: `${occ.photos.length} foto(s)` }].map(item => (
-                      <div key={item.label} className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)' }}>
-                        <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s1)' }}>{item.label}</div>
-                        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                      <div style={{ padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 'var(--s4)' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
+                            <div>
+                              <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--warning)', marginBottom: 'var(--s2)' }}>Fator crítico</div>
+                              <div style={{ padding: 'var(--s4)', background: 'var(--warning-hl)', border: '1px solid rgba(217,119,6,0.16)', borderRadius: 'var(--r-xl)' }}>
+                                <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, lineHeight: 1.4 }}>{occ.item}</h3>
+                              </div>
+                            </div>
+                            <div>
+                              <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s2)' }}>Comentário do operador</div>
+                              <div style={{ padding: 'var(--s4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)' }}>
+                                <p style={{ fontSize: 'var(--text-sm)', lineHeight: 1.7, fontWeight: 500 }}>{occ.comment || 'Sem comentário informado.'}</p>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+                            {[{ label: 'Hora do registro', value: occ.time }, { label: 'Evidências', value: `${occ.photos.length} foto(s)` }].map(item => (
+                              <div key={item.label} className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)' }}>
+                                <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s1)' }}>{item.label}</div>
+                                <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{item.value}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
 
-                {occ.photos.length > 0 && (
-                  <div>
-                    <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s3)' }}>Evidências fotográficas</div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s4)' }}>
-                      {occ.photos.map((photo, pIdx) => (
-                        <button key={pIdx} type="button" onClick={() => openLightbox(occ.photos, pIdx)} style={{ position: 'relative', borderRadius: 'var(--r-xl)', overflow: 'hidden', border: '1px solid var(--border)', aspectRatio: '16/10', padding: 0, cursor: 'zoom-in', background: 'var(--surface-2)' }}>
-                          <img src={photo} alt={`Evidência ${pIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                          <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(15,23,42,0.75)', color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '5px 8px', borderRadius: 999 }}>Foto {pIdx + 1}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </section>
+                        {occ.photos.length > 0 && (
+                          <div>
+                            <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s3)' }}>Evidências fotográficas</div>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s4)' }}>
+                              {occ.photos.map((photo, pIdx) => (
+                                <button key={pIdx} type="button" onClick={() => openLightbox(occ.photos, pIdx)} style={{ position: 'relative', borderRadius: 'var(--r-xl)', overflow: 'hidden', border: '1px solid var(--border)', aspectRatio: '16/10', padding: 0, cursor: 'zoom-in', background: 'var(--surface-2)' }}>
+                                  <img src={photo} alt={`Evidência ${pIdx + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  <div style={{ position: 'absolute', top: 10, left: 10, background: 'rgba(15,23,42,0.75)', color: '#fff', fontSize: 10, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', padding: '5px 8px', borderRadius: 999 }}>Foto {pIdx + 1}</div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </section>
+                  ))}
+                </div>
+              ))}
+            </div>
           ))
         )}
       </div>

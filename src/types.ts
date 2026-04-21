@@ -6,4 +6,5 @@ export interface OccurrenceData {
   photos: string[];
   reporter: string;
   time: string;
+  created_at?: string;
 }
