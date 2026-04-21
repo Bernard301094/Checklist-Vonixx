@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Fingerprint, Lock, LogOut } from 'lucide-react';
 import { NativeBiometric } from '@capgo/capacitor-native-biometric';
+import { App as CapacitorApp } from '@capacitor/app';
 
 interface LockScreenProps {
   onUnlock: () => void;
@@ -11,35 +12,63 @@ interface LockScreenProps {
 export default function LockScreen({ onUnlock, onLogout, userEmail }: LockScreenProps) {
   const [error, setError] = useState<string | null>(null);
   const [isSupported, setIsSupported] = useState<boolean>(true);
+  
+  // Usamos una referencia para evitar llamar al diálogo múltiple veces y que se sature
+  const isPrompting = useRef(false);
 
   useEffect(() => {
-    checkBiometricSupport();
-  }, []);
+    let listener: any;
 
-  const checkBiometricSupport = async () => {
-    try {
-      const result = await NativeBiometric.isAvailable();
-      if (!result.isAvailable) {
-        // If not available, we can just unlock it or show a message.
-        // For security, if they don't have it set up, we'll let them through 
-        // or force them to set it up. Let's assume if it's completely unsupported, we unlock.
-        console.warn('Biometrics not available on this device');
+    const checkBiometricSupport = async () => {
+      try {
+        const result = await NativeBiometric.isAvailable();
+        if (!result.isAvailable) {
+          console.warn('Biometrics not available on this device');
+          setIsSupported(false);
+          onUnlock(); 
+          return;
+        }
+        
+        // 1. Verificamos si la app está ACTIVA antes de pedir la huella por primera vez
+        const appState = await CapacitorApp.getState();
+        if (appState.isActive) {
+          triggerAuth();
+        }
+
+        // 2. Escuchamos el evento de cuando el usuario REGRESA a la app
+        listener = await CapacitorApp.addListener('appStateChange', (state) => {
+          if (state.isActive && !isPrompting.current) {
+            // Un pequeño delay (300ms) es CRUCIAL para evitar la pantalla blanca.
+            // Permite que el WebView se redibuje antes de ser bloqueado por el diálogo nativo.
+            setTimeout(() => {
+              triggerAuth();
+            }, 300);
+          }
+        });
+
+      } catch (err: any) {
+        console.error('Error checking biometric support', err);
         setIsSupported(false);
         onUnlock(); 
-        return;
       }
-      
-      // Auto-trigger auth on mount if supported
-      triggerAuth();
-    } catch (err: any) {
-      console.error('Error checking biometric support', err);
-      setIsSupported(false);
-      onUnlock(); // Fallback to unlock if there's an error checking support (e.g. on web)
-    }
-  };
+    };
+
+    checkBiometricSupport();
+
+    // Limpiamos el listener al desmontar
+    return () => {
+      if (listener) {
+        listener.remove();
+      }
+    };
+  }, []);
 
   const triggerAuth = async () => {
+    if (isPrompting.current) return;
+
     setError(null);
+    isPrompting.current = true; // Bloqueamos para que no se ejecute dos veces
+
     try {
       await NativeBiometric.verifyIdentity({
         reason: 'Verifique sua identidade para acessar o aplicativo',
@@ -48,9 +77,10 @@ export default function LockScreen({ onUnlock, onLogout, userEmail }: LockScreen
         description: 'Segurança exigida para acesso ao painel.',
       });
       
-      // If we reach here, authentication was successful
+      isPrompting.current = false;
       onUnlock();
     } catch (err: any) {
+      isPrompting.current = false;
       console.error('Biometric authentication failed', err);
       setError('Autenticação falhou ou foi cancelada.');
     }
