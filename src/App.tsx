@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import LoginScreen from './components/LoginScreen';
 import SupervisorScreen from './components/SupervisorScreen';
@@ -64,6 +64,11 @@ export default function App() {
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
   const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
 
+  // ── Ref para rastrear o userId já processado ──
+  // Evita rebuscar o role quando o onAuthStateChange dispara eventos
+  // duplicados (TOKEN_REFRESHED, USER_UPDATED) para o mesmo usuário.
+  const resolvedUserIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (!isActive && role !== 'login' && useBiometrics) {
@@ -117,39 +122,49 @@ export default function App() {
   const applySession = useCallback(async (session: any) => {
     const user = session?.user;
 
-    if (user) {
-      setCurrentUser({ id: user.id, email: user.email, user_metadata: user.user_metadata });
-
-      // ── Verifica se precisa trocar a senha ──
-      // Lemos diretamente do servidor para evitar cache local
-      const forceChange = user.user_metadata?.force_password_change === true;
-
-      if (forceChange) {
-        setMustChangePassword(true);
-        setRole('colaborador');
-        setAuthLoading(false);
-        return;
-      }
-
-      setMustChangePassword(false);
-
-      const isBioEnabled = localStorage.getItem('useBiometrics') === 'true';
-      if (isBioEnabled) setIsLocked(true);
-
-      const dbRole = await fetchRoleFromDB(user.id);
-      setRole(dbRole);
-
-      if (user.user_metadata?.name) setReporterName(user.user_metadata.name);
-      if (user.user_metadata?.full_name) setReporterName(user.user_metadata.full_name);
-      if (user.user_metadata?.shift) setShift(user.user_metadata.shift);
-      if (user.user_metadata?.turno) setShift(user.user_metadata.turno);
-    } else {
-      // Sem sessão → volta para login, limpa tudo
+    if (!user) {
+      // Sem sessão → volta para login, reseta tudo
+      resolvedUserIdRef.current = null;
       setCurrentUser(null);
       setRole('login');
       setIsLocked(false);
       setMustChangePassword(false);
+      return;
     }
+
+    setCurrentUser({ id: user.id, email: user.email, user_metadata: user.user_metadata });
+
+    // ── Verifica troca obrigatória de senha ──
+    if (user.user_metadata?.force_password_change === true) {
+      resolvedUserIdRef.current = user.id;
+      setMustChangePassword(true);
+      setRole('colaborador');
+      return;
+    }
+
+    setMustChangePassword(false);
+
+    // ── Evita rebuscar role para o mesmo usuário ──
+    // onAuthStateChange pode disparar TOKEN_REFRESHED / USER_UPDATED
+    // múltiplas vezes. Se já processamos este userId, não sobrescrevemos
+    // o role (que já foi corretamente definido na primeira vez).
+    if (resolvedUserIdRef.current === user.id) {
+      return;
+    }
+
+    // Primeiro acesso deste userId nesta sessão
+    resolvedUserIdRef.current = user.id;
+
+    const isBioEnabled = localStorage.getItem('useBiometrics') === 'true';
+    if (isBioEnabled) setIsLocked(true);
+
+    const dbRole = await fetchRoleFromDB(user.id);
+    setRole(dbRole);
+
+    if (user.user_metadata?.name) setReporterName(user.user_metadata.name);
+    if (user.user_metadata?.full_name) setReporterName(user.user_metadata.full_name);
+    if (user.user_metadata?.shift) setShift(user.user_metadata.shift);
+    if (user.user_metadata?.turno) setShift(user.user_metadata.turno);
   }, []);
 
   useEffect(() => {
@@ -188,6 +203,7 @@ export default function App() {
   }, [applySession]);
 
   const handleLogout = async () => {
+    resolvedUserIdRef.current = null;
     await supabase.auth.signOut();
     setReporterName('');
     setShift('TURNO A');
@@ -253,17 +269,12 @@ export default function App() {
     );
   }
 
-  // ── Tela de troca obrigatória de senha ──
-  // Só é exibida se a sessão está ativa E o flag está marcado.
-  // Se o usuário der F5 ou fechar o app, o Supabase relê o metadata
-  // e retorna aqui novamente — comportamento esperado.
-  // Se clicar em "Sair" no botão da ChangePasswordScreen, o signOut
-  // dispara onAuthStateChange → session=null → role='login'.
   if (mustChangePassword && currentUser) {
     return (
       <ChangePasswordScreen
         userEmail={currentUser.email || ''}
         onPasswordChanged={async () => {
+          resolvedUserIdRef.current = null; // força nova leitura de role
           const { data: { session } } = await supabase.auth.getSession();
           await applySession(session);
         }}
