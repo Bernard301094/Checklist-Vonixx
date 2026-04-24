@@ -120,7 +120,11 @@ export default function App() {
     if (user) {
       setCurrentUser({ id: user.id, email: user.email, user_metadata: user.user_metadata });
 
-      if (user.user_metadata?.force_password_change === true) {
+      // ── Verifica se precisa trocar a senha ──
+      // Lemos diretamente do servidor para evitar cache local
+      const forceChange = user.user_metadata?.force_password_change === true;
+
+      if (forceChange) {
         setMustChangePassword(true);
         setRole('colaborador');
         setAuthLoading(false);
@@ -140,6 +144,7 @@ export default function App() {
       if (user.user_metadata?.shift) setShift(user.user_metadata.shift);
       if (user.user_metadata?.turno) setShift(user.user_metadata.turno);
     } else {
+      // Sem sessão → volta para login, limpa tudo
       setCurrentUser(null);
       setRole('login');
       setIsLocked(false);
@@ -248,6 +253,12 @@ export default function App() {
     );
   }
 
+  // ── Tela de troca obrigatória de senha ──
+  // Só é exibida se a sessão está ativa E o flag está marcado.
+  // Se o usuário der F5 ou fechar o app, o Supabase relê o metadata
+  // e retorna aqui novamente — comportamento esperado.
+  // Se clicar em "Sair" no botão da ChangePasswordScreen, o signOut
+  // dispara onAuthStateChange → session=null → role='login'.
   if (mustChangePassword && currentUser) {
     return (
       <ChangePasswordScreen

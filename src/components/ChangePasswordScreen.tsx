@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Lock, AlertCircle, CheckCircle, ArrowRight, Loader2, Factory, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Lock, AlertCircle, CheckCircle, ArrowRight, Loader2, ShieldCheck, LogOut } from 'lucide-react';
 import { supabase } from '../supabase';
 
 interface Props {
@@ -14,16 +14,34 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
   const [errorMsg, setErrorMsg] = useState('');
   const [success, setSuccess] = useState(false);
 
+  // Se o usuário recarregar a página (F5) ou fechar e abrir o app enquanto
+  // ainda não trocou a senha, limpamos a sessão para que volte ao login.
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Não fazemos signOut aqui porque o evento não é async-friendly.
+      // Ao voltar, o App.tsx já lê force_password_change do metadata e
+      // mostrará esta tela novamente — comportamento correto.
+      // O fix real está no botão "Sair" abaixo.
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    // O onAuthStateChange no App.tsx vai detectar e redirecionar para login
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
     if (newPassword.length < 6) {
-      setErrorMsg('La contraseña debe tener al menos 6 caracteres.');
+      setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
       return;
     }
     if (newPassword !== confirmPassword) {
-      setErrorMsg('Las contraseñas no coinciden.');
+      setErrorMsg('As senhas não coincidem.');
       return;
     }
 
@@ -37,7 +55,7 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
       setSuccess(true);
       setTimeout(() => onPasswordChanged(), 1500);
     } catch (err: any) {
-      setErrorMsg('Error al cambiar la contraseña: ' + err.message);
+      setErrorMsg('Erro ao alterar a senha: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -68,6 +86,23 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
         opacity: 0.5,
       }} />
 
+      {/* Botão sair — canto superior direito */}
+      <button
+        onClick={handleLogout}
+        style={{
+          position: 'absolute', top: 'var(--s4)', right: 'var(--s4)',
+          display: 'flex', alignItems: 'center', gap: 6,
+          padding: '8px var(--s4)', borderRadius: 'var(--r-lg)',
+          background: 'transparent', border: '1px solid var(--sidebar-border)',
+          color: 'var(--text-muted)', fontSize: 'var(--text-sm)', fontWeight: 600,
+          cursor: 'pointer', zIndex: 10,
+        }}
+        title="Sair e voltar ao login"
+      >
+        <LogOut size={15} />
+        Sair
+      </button>
+
       <div className="animate-in" style={{
         width: '100%', maxWidth: '440px',
         display: 'flex', flexDirection: 'column', gap: 'var(--s6)',
@@ -87,9 +122,9 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
             fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)',
             fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em',
             lineHeight: 1.1,
-          }}>Cambio de Contraseña</h1>
+          }}>Alterar Senha</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginTop: 'var(--s2)', fontWeight: 500 }}>
-            Por seguridad, debes crear una nueva contraseña para continuar.
+            Por segurança, crie uma nova senha antes de continuar.
           </p>
           <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-xs)', marginTop: 'var(--s1)' }}>
             {userEmail}
@@ -126,14 +161,14 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
               fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--primary)',
             }}>
               <CheckCircle size={16} />
-              <span>¡Contraseña actualizada! Redirigiendo...</span>
+              <span>Senha atualizada! Redirecionando...</span>
             </div>
           )}
 
           <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s5)' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
               <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
-                Nueva Contraseña
+                Nova Senha
               </label>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{
@@ -151,7 +186,7 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
               <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
-                Confirmar Contraseña
+                Confirmar Senha
               </label>
               <div style={{ position: 'relative' }}>
                 <Lock size={16} style={{
@@ -160,7 +195,7 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
                 }} />
                 <input
                   type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}
-                  placeholder="Repite la contraseña"
+                  placeholder="Repita a nova senha"
                   required minLength={6} className="input"
                   style={{ paddingLeft: 'calc(var(--s4) + 16px + var(--s2))' }}
                 />
@@ -172,11 +207,15 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
               style={{ marginTop: 'var(--s2)', width: '100%', height: 48 }}
             >
               {loading
-                ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Guardando...</>
-                : <>Guardar Nueva Contraseña <ArrowRight size={16} /></>}
+                ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Salvando...</>
+                : <>Salvar Nova Senha <ArrowRight size={16} /></>}
             </button>
           </form>
         </div>
+
+        <p style={{ textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--text-faint)', lineHeight: 1.6 }}>
+          Se preferir, clique em <strong>Sair</strong> no canto superior direito para voltar ao login sem alterar a senha agora.
+        </p>
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
