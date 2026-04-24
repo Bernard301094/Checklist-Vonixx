@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Lock, LogOut, Fingerprint } from 'lucide-react';
+import { NativeBiometric } from 'capacitor-native-biometric';
 
 interface LockScreenProps {
   onUnlock: () => void;
@@ -10,15 +11,35 @@ interface LockScreenProps {
 export default function LockScreen({ onUnlock, onLogout, userEmail }: LockScreenProps) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [bioLoading, setBioLoading] = useState(false);
 
-  // Simulação de biometria — em produção usar Capacitor FaceId/TouchId
-  const handleBiometric = () => {
-    onUnlock();
+  const handleBiometric = async () => {
+    setBioLoading(true);
+    setError('');
+    try {
+      await NativeBiometric.verifyIdentity({
+        reason: 'Confirme sua identidade para desbloquear o aplicativo',
+        title: 'Autenticação Biométrica',
+        subtitle: 'Use sua impressão digital ou reconhecimento facial',
+        description: userEmail,
+        useFallback: true,
+        maxAttempts: 3,
+      });
+      onUnlock();
+    } catch (err: any) {
+      if (err?.code === 10) {
+        // Usuário cancelou
+        setError('');
+      } else {
+        setError('Biometria não reconhecida. Tente o PIN.');
+      }
+    } finally {
+      setBioLoading(false);
+    }
   };
 
   const handlePin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Aqui você pode validar um PIN real; por ora qualquer entrada desbloqueia
     if (pin.length >= 4) {
       onUnlock();
     } else {
@@ -71,11 +92,12 @@ export default function LockScreen({ onUnlock, onLogout, userEmail }: LockScreen
 
         <button
           onClick={handleBiometric}
+          disabled={bioLoading}
           className="btn-primary"
           style={{ width: '100%', height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--s3)' }}
         >
           <Fingerprint size={20} />
-          Desbloquear com biometria
+          {bioLoading ? 'Aguardando biometria...' : 'Desbloquear com biometria'}
         </button>
 
         <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 'var(--s3)', color: 'var(--text-faint)', fontSize: 'var(--text-xs)' }}>
