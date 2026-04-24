@@ -229,6 +229,70 @@ a, button, [role="button"], input, textarea, select {
   box-shadow: 0 0 0 3px var(--primary-hl);
 }
 
+/* ── SELECT / DROPDOWN ────────────────────────────────────── */
+select.input,
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--surface-2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--s4) center;
+  background-size: 16px 16px;
+  padding-right: calc(var(--s4) + 16px + var(--s3));
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  color: var(--text);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  font-family: var(--font-body);
+  min-height: 44px;
+  cursor: pointer;
+  transition: border-color var(--t), background-color var(--t), box-shadow var(--t);
+}
+
+select.input:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary);
+  background-color: var(--surface);
+  box-shadow: 0 0 0 3px var(--primary-hl);
+}
+
+select.input:hover,
+select:hover {
+  border-color: var(--text-faint);
+  background-color: var(--surface);
+}
+
+/* Option theming — best effort (browser/OS controlled) */
+select option {
+  background-color: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  padding: var(--s2) var(--s3);
+}
+
+select option:checked,
+select option:hover {
+  background-color: var(--primary-hl);
+  color: var(--primary);
+}
+
+/* Dark mode: swap the chevron to a lighter tint */
+[data-theme="dark"] select.input,
+[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+[data-theme="dark"] select option {
+  background-color: var(--surface-2);
+  color: var(--text);
+}
+
 /* Badge */
 .badge {
   display: inline-flex; align-items: center; gap: var(--s1);

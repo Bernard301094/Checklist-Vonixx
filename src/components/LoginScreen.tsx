@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { Mail, Lock, AlertCircle, ArrowRight, Loader2, Factory, User, Briefcase } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Mail, Lock, AlertCircle, ArrowRight, Loader2, Factory, User, Briefcase, Clock } from 'lucide-react';
 import { supabase } from '../supabase';
+import CustomSelect from './CustomSelect';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -10,6 +11,25 @@ export default function LoginScreen() {
   const [isRegistering, setIsRegistering] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [cooldown, setCooldown] = useState(0); // seconds remaining
+  const cooldownRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const startCooldown = (seconds = 60) => {
+    setCooldown(seconds);
+    if (cooldownRef.current) clearInterval(cooldownRef.current);
+    cooldownRef.current = setInterval(() => {
+      setCooldown(prev => {
+        if (prev <= 1) {
+          clearInterval(cooldownRef.current!);
+          setErrorMsg('');
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  useEffect(() => () => { if (cooldownRef.current) clearInterval(cooldownRef.current); }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,10 +55,16 @@ export default function LoginScreen() {
         if (error) throw error;
       }
     } catch (error: any) {
-      if (error.status === 429) setErrorMsg('Muitas tentativas. Aguarde alguns segundos.');
-      else if (error.message === 'Email not confirmed') setErrorMsg('E-mail não confirmado. Verifique sua caixa de entrada.');
-      else if (error.status === 400 || error.code === 'invalid_credentials') setErrorMsg('Credenciais inválidas. Verifique e-mail e senha.');
-      else setErrorMsg('Erro na autenticação: ' + error.message);
+      if (error.status === 429) {
+        startCooldown(60);
+        setErrorMsg('rate_limit');
+      } else if (error.message === 'Email not confirmed') {
+        setErrorMsg('E-mail não confirmado. Verifique sua caixa de entrada.');
+      } else if (error.status === 400 || error.code === 'invalid_credentials') {
+        setErrorMsg('Credenciais inválidas. Verifique e-mail e senha.');
+      } else {
+        setErrorMsg('Erro na autenticação: ' + error.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -110,7 +136,11 @@ export default function LoginScreen() {
               fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--danger)',
             }}>
               <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-              <span>{errorMsg}</span>
+              <span>
+                {errorMsg === 'rate_limit' 
+                  ? 'Muitas tentativas. Aguarde o tempo indicado no botão para tentar novamente.' 
+                  : errorMsg}
+              </span>
             </div>
           )}
 
@@ -144,22 +174,17 @@ export default function LoginScreen() {
                   <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
                     Turno
                   </label>
-                  <div style={{ position: 'relative' }}>
-                    <Briefcase size={16} style={{
-                      position: 'absolute', left: 'var(--s4)', top: '50%', transform: 'translateY(-50%)',
-                      color: 'var(--text-muted)', pointerEvents: 'none', zIndex: 1,
-                    }} />
-                    <select
-                      value={shift}
-                      onChange={e => setShift(e.target.value)}
-                      className="input"
-                      style={{ paddingLeft: 'calc(var(--s4) + 16px + var(--s2))', appearance: 'none' }}
-                    >
-                      <option value="TURNO A">TURNO A</option>
-                      <option value="TURNO B">TURNO B</option>
-                      <option value="TURNO C">TURNO C</option>
-                    </select>
-                  </div>
+                  <CustomSelect
+                    value={shift}
+                    onChange={setShift}
+                    icon={<Briefcase size={16} />}
+                    options={[
+                      { value: 'TURNO A', label: 'TURNO A' },
+                      { value: 'TURNO B', label: 'TURNO B' },
+                      { value: 'TURNO C', label: 'TURNO C' },
+                      { value: 'TURNO D', label: 'TURNO D' },
+                    ]}
+                  />
                 </div>
               </>
             )}
@@ -200,12 +225,14 @@ export default function LoginScreen() {
             </div>
 
             <button
-              type="submit" disabled={loading} className="btn-primary"
+              type="submit" disabled={loading || cooldown > 0} className="btn-primary"
               style={{ marginTop: 'var(--s2)', width: '100%', height: 48 }}
             >
               {loading
                 ? <><Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} /> Aguarde...</>
-                : <>{isRegistering ? 'Criar Conta' : 'Entrar na Plataforma'} <ArrowRight size={16} /></>}
+                : cooldown > 0
+                  ? <><Clock size={16} /> Aguarde {cooldown}s para tentar novamente</>
+                  : <>{isRegistering ? 'Criar Conta' : 'Entrar na Plataforma'} <ArrowRight size={16} /></>}
             </button>
           </form>
 
