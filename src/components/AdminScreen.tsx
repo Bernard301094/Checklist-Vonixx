@@ -1,14 +1,19 @@
-import { useState, useEffect } from 'react';
-import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo } from 'lucide-react';
 import Header from './Header';
 import CustomSelect from './CustomSelect';
+import DashboardView from './DashboardView';
 import { supabase } from '../supabase';
+import { OccurrenceData } from '../types';
+import { CHECKLIST_DATA } from '../constants';
 
 interface AdminScreenProps {
   onLogout: () => void;
   currentUserEmail: string;
   useBiometrics?: boolean;
   onToggleBiometrics?: () => void;
+  occurrences?: OccurrenceData[];
+  checklistState?: Record<string, boolean>;
 }
 
 interface ManagedUser {
@@ -21,6 +26,21 @@ interface ManagedUser {
   last_sign_in_at?: string | null;
   force_password_change?: boolean;
   temp_password?: string | null;
+  user_metadata?: any;
+  app_metadata?: any;
+}
+
+interface ChecklistSection {
+  id: string;
+  title: string;
+  items: string[];
+}
+
+function isPasswordPending(user: ManagedUser): boolean {
+  if (user.user_metadata && typeof user.user_metadata.force_password_change !== 'undefined') {
+    return user.user_metadata.force_password_change === true;
+  }
+  return user.force_password_change === true;
 }
 
 function generatePassword(length = 6): string {
@@ -35,7 +55,8 @@ function formatDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics, onToggleBiometrics }: AdminScreenProps) {
+export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics, onToggleBiometrics, occurrences = [], checklistState = {} }: AdminScreenProps) {
+  const [activeTab, setActiveTab] = useState<'users' | 'dashboard' | 'checklist'>('users');
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<'supervisor' | 'colaborador'>('colaborador');
@@ -48,6 +69,66 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editUser, setEditUser] = useState<ManagedUser | null>(null);
+  const [editFullName, setEditFullName] = useState('');
+  const [editRole, setEditRole] = useState<'admin' | 'supervisor' | 'colaborador'>('colaborador');
+  const [editShift, setEditShift] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  // --- Checklist Management State ---
+  const [checklistTemplate, setChecklistTemplate] = useState<ChecklistSection[]>(() => {
+    const saved = localStorage.getItem('checklist_template');
+    return saved ? JSON.parse(saved) : CHECKLIST_DATA;
+  });
+  const [saveChecklistSuccess, setSaveChecklistSuccess] = useState(false);
+
+  const handleUpdateSectionTitle = (sectionIndex: number, newTitle: string) => {
+    const newTemplate = [...checklistTemplate];
+    newTemplate[sectionIndex].title = newTitle;
+    setChecklistTemplate(newTemplate);
+  };
+
+  const handleUpdateItem = (sectionIndex: number, itemIndex: number, newValue: string) => {
+    const newTemplate = [...checklistTemplate];
+    newTemplate[sectionIndex].items[itemIndex] = newValue;
+    setChecklistTemplate(newTemplate);
+  };
+
+  const handleAddItem = (sectionIndex: number) => {
+    const newTemplate = [...checklistTemplate];
+    newTemplate[sectionIndex].items.push('Novo item de inspeção');
+    setChecklistTemplate(newTemplate);
+  };
+
+  const handleDeleteItem = (sectionIndex: number, itemIndex: number) => {
+    const newTemplate = [...checklistTemplate];
+    newTemplate[sectionIndex].items.splice(itemIndex, 1);
+    setChecklistTemplate(newTemplate);
+  };
+
+  const handleAddSection = () => {
+    const newTemplate = [...checklistTemplate];
+    newTemplate.push({
+      id: `secao_${Date.now()}`,
+      title: 'Nova Seção',
+      items: ['Novo item']
+    });
+    setChecklistTemplate(newTemplate);
+  };
+
+  const handleDeleteSection = (sectionIndex: number) => {
+    const newTemplate = [...checklistTemplate];
+    newTemplate.splice(sectionIndex, 1);
+    setChecklistTemplate(newTemplate);
+  };
+
+  const handleSaveChecklistTemplate = () => {
+    localStorage.setItem('checklist_template', JSON.stringify(checklistTemplate));
+    setSaveChecklistSuccess(true);
+    setTimeout(() => setSaveChecklistSuccess(false), 3000);
+    // Ideally this would save to the database in a checklist_templates table.
+    // For now, it stays locally so it doesn't break the existing implementation.
+  };
 
   const functionUrl = 'https://aogzdxwruaqgiaprmvuz.supabase.co/functions/v1/create-user';
   const listUrl = 'https://aogzdxwruaqgiaprmvuz.supabase.co/functions/v1/list-users';
@@ -57,6 +138,42 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     const token = data.session?.access_token;
     if (!token) throw new Error('Sessão inválida. Faça login novamente.');
     return token;
+  };
+
+  const openEditModal = (user: ManagedUser) => {
+    setEditUser(user);
+    setEditFullName(user.full_name || '');
+    setEditRole(user.role || 'colaborador');
+    setEditShift(user.shift || 'TURNO A');
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editUser) return;
+    setSavingEdit(true);
+    setErrorMsg('');
+    try {
+      const token = await getToken();
+      const response = await fetch(functionUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          email: editUser.email,
+          full_name: editFullName.trim(),
+          role: editRole,
+          turno: editShift,
+          update_user: true
+        }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Erro ao atualizar usuário');
+      setEditUser(null);
+      await loadUsers();
+    } catch (err: any) {
+      setErrorMsg('Erro na edição: ' + err.message);
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const loadUsers = async () => {
@@ -167,7 +284,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         <Clock size={11} /> Aguardando 1º acesso
       </span>
     );
-    if (user.force_password_change) return (
+    if (isPasswordPending(user)) return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, background: 'rgba(251,146,60,0.12)', border: '1px solid rgba(251,146,60,0.3)', fontSize: 11, fontWeight: 700, color: '#fb923c' }}>
         <ShieldAlert size={11} /> Senha pendente
       </span>
@@ -189,13 +306,40 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         useBiometrics={useBiometrics} onToggleBiometrics={onToggleBiometrics}
       />
 
-      {/* Stats */}
-      <div style={{ padding: 'var(--s5) var(--s6)', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--s4)', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>
+        <button 
+          onClick={() => setActiveTab('users')} 
+          style={{ flex: 1, padding: 'var(--s3)', fontWeight: 600, color: activeTab === 'users' ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === 'users' ? '2px solid var(--primary)' : '2px solid transparent' }}
+        >
+          <Users size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} /> Usuários
+        </button>
+        <button 
+          onClick={() => setActiveTab('dashboard')} 
+          style={{ flex: 1, padding: 'var(--s3)', fontWeight: 600, color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === 'dashboard' ? '2px solid var(--primary)' : '2px solid transparent' }}
+        >
+          <LayoutDashboard size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} /> Dashboard
+        </button>
+        <button 
+          onClick={() => setActiveTab('checklist')} 
+          style={{ flex: 1, padding: 'var(--s3)', fontWeight: 600, color: activeTab === 'checklist' ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === 'checklist' ? '2px solid var(--primary)' : '2px solid transparent' }}
+        >
+          <ListTodo size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} /> Checklist
+        </button>
+      </div>
+
+      {activeTab === 'dashboard' && (
+        <DashboardView occurrences={occurrences} checklistState={checklistState} />
+      )}
+
+      {activeTab === 'users' && (
+        <>
+          {/* Stats */}
+          <div className="admin-stats-grid">
         {[
           { label: 'Total de usuários', value: String(users.length), icon: Users, tone: 'var(--primary)', bg: 'var(--primary-hl)' },
           { label: 'Supervisores', value: String(users.filter(u => u.role === 'supervisor').length), icon: Shield, tone: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
           { label: 'Colaboradores', value: String(users.filter(u => u.role === 'colaborador').length), icon: Users, tone: 'var(--success)', bg: 'var(--success-hl)' },
-          { label: 'Ativos', value: String(users.filter(u => u.last_sign_in_at && !u.force_password_change).length), icon: ShieldCheck, tone: 'var(--success)', bg: 'var(--success-hl)' },
+          { label: 'Ativos', value: String(users.filter(u => u.last_sign_in_at && !isPasswordPending(u)).length), icon: ShieldCheck, tone: 'var(--success)', bg: 'var(--success-hl)' },
         ].map(stat => {
           const Icon = stat.icon;
           return (
@@ -212,7 +356,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         })}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s6)', display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)', gap: 'var(--s6)' }}>
+      <div className="admin-content-grid" style={{ flex: 1, overflowY: 'auto' }}>
 
         {/* Formulário */}
         <section className="card" style={{ padding: 'var(--s6)', alignSelf: 'start' }}>
@@ -288,6 +432,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                       </div>
                       {user.role !== 'admin' ? (
                         <div style={{ display: 'flex', gap: 'var(--s2)', flexShrink: 0 }}>
+                          <button type="button" onClick={() => openEditModal(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
+                            <UserPlus size={14} /> Editar
+                          </button>
                           <button type="button" onClick={() => handleResetPassword(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
                             <KeyRound size={14} /> Redefinir
                           </button>
@@ -304,7 +451,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                       <span className="badge">{user.shift || 'Sem turno'}</span>
                       <StatusBadge user={user} />
                     </div>
-                    {pwd && (
+                    {pwd && isPasswordPending(user) && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', padding: 'var(--s3) var(--s4)', borderRadius: 'var(--r-lg)', background: 'rgba(13,148,136,0.07)', border: '1px solid rgba(13,148,136,0.2)' }}>
                         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>Senha temporária:</span>
                         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'var(--text-md)', letterSpacing: '0.15em', color: 'var(--primary)', flex: 1 }}>
@@ -326,6 +473,116 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
           )}
         </section>
       </div>
+      </>
+      )}
+
+      {activeTab === 'checklist' && (
+        <div style={{ padding: 'var(--s6)', flex: 1, overflowY: 'auto' }}>
+          <div className="card" style={{ padding: 'var(--s6)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--s5)', flexWrap: 'wrap', gap: 'var(--s4)' }}>
+              <div>
+                <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Gestão do Checklist</h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginTop: 4 }}>Configure os itens que os operadores deverão inspecionar diariamente.</p>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--s3)', alignItems: 'center' }}>
+                {saveChecklistSuccess && (
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <CheckCircle2 size={16} /> Salvo com sucesso
+                  </span>
+                )}
+                <button onClick={handleAddSection} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <UserPlus size={16} /> Nova Seção
+                </button>
+                <button onClick={handleSaveChecklistTemplate} className="btn-primary" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  Salvar Checklist
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}>
+              {checklistTemplate.map((section, sIdx) => (
+                <div key={section.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', padding: 'var(--s5)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', marginBottom: 'var(--s4)' }}>
+                    <input 
+                      value={section.title} 
+                      onChange={(e) => handleUpdateSectionTitle(sIdx, e.target.value)} 
+                      style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border)', fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text)', padding: '4px 0' }}
+                    />
+                    <button onClick={() => handleDeleteSection(sIdx)} style={{ color: 'var(--danger)', background: 'rgba(220,38,38,0.1)', padding: 6, borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center' }} title="Excluir Seção">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+                    {section.items.map((item, iIdx) => (
+                      <div key={iIdx} style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
+                        <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
+                        <input 
+                          value={item} 
+                          onChange={(e) => handleUpdateItem(sIdx, iIdx, e.target.value)} 
+                          className="input" 
+                          style={{ flex: 1, height: 40 }}
+                        />
+                        <button onClick={() => handleDeleteItem(sIdx, iIdx)} style={{ color: 'var(--text-muted)', padding: 6, display: 'flex', alignItems: 'center' }} title="Remover item">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                    <button onClick={() => handleAddItem(sIdx)} style={{ alignSelf: 'flex-start', color: 'var(--primary)', background: 'transparent', fontWeight: 600, fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', gap: 6, marginTop: 'var(--s2)' }}>
+                      + Adicionar item
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal edição */}
+      {editUser && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 'var(--s4)', animation: 'fadeIn 0.15s ease' }}>
+          <div style={{ width: '100%', maxWidth: 440, background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-2xl)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)', overflow: 'hidden', animation: 'slideUp 0.2s ease' }}>
+            <div style={{ padding: 'var(--s6) var(--s6) var(--s5)', display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s4)' }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--primary-hl)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <UserPlus size={24} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text)', lineHeight: 1.2 }}>Editar Usuário</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600, marginTop: 2 }}>{editUser.email}</div>
+                </div>
+              </div>
+              <button onClick={() => setEditUser(null)} style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', color: 'var(--text-muted)', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                <X size={16} />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveEdit} style={{ padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
+              <div>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Nome completo</label>
+                <input className="input" value={editFullName} onChange={e => setEditFullName(e.target.value)} placeholder="Nome do colaborador" required />
+              </div>
+              <div>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Perfil</label>
+                <CustomSelect value={editRole} onChange={(v) => setEditRole(v as 'supervisor' | 'colaborador')} options={[{ value: 'colaborador', label: 'Colaborador' }, { value: 'supervisor', label: 'Supervisor' }, { value: 'admin', label: 'Administrador' }]} />
+              </div>
+              <div>
+                <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Turno</label>
+                <CustomSelect value={editShift} onChange={setEditShift} options={[{ value: 'TURNO A', label: 'TURNO A' }, { value: 'TURNO B', label: 'TURNO B' }, { value: 'TURNO C', label: 'TURNO C' }, { value: 'TURNO D', label: 'TURNO D' }]} />
+              </div>
+              
+              <div style={{ display: 'flex', gap: 'var(--s3)', marginTop: 'var(--s4)' }}>
+                <button type="button" onClick={() => setEditUser(null)} disabled={savingEdit} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
+                  Cancelar
+                </button>
+                <button type="submit" disabled={savingEdit} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: savingEdit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Modal exclusão — redesenhado */}
       {confirmDelete && (

@@ -114,7 +114,7 @@ export default function App() {
       }
     }
 
-    if (role === 'supervisor' || role === 'colaborador') {
+    if (role === 'admin' || role === 'supervisor' || role === 'colaborador') {
       loadData();
     }
   }, [role]);
@@ -303,6 +303,8 @@ export default function App() {
         currentUserEmail={currentUser?.email || ''}
         useBiometrics={useBiometrics}
         onToggleBiometrics={toggleBiometrics}
+        occurrences={occurrences}
+        checklistState={checklistState}
       />
     );
   }
