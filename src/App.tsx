@@ -69,9 +69,19 @@ export default function App() {
   // duplicados (TOKEN_REFRESHED, USER_UPDATED) para o mesmo usuário.
   const resolvedUserIdRef = useRef<string | null>(null);
 
+  // --- SOLUCIÓN APLICADA AQUÍ ---
   useEffect(() => {
     const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (!isActive && role !== 'login' && useBiometrics) {
+        
+        // Verificamos si la app se fue a segundo plano porque abrimos la cámara
+        const skip = localStorage.getItem('skipBiometric');
+        if (skip === 'true') {
+          // Borramos la bandera para que la próxima vez sí se bloquee normalmente
+          localStorage.removeItem('skipBiometric');
+          return; // No bloqueamos la pantalla
+        }
+        
         setIsLocked(true);
       }
     });
@@ -145,9 +155,6 @@ export default function App() {
     setMustChangePassword(false);
 
     // ── Evita rebuscar role para o mesmo usuário ──
-    // onAuthStateChange pode disparar TOKEN_REFRESHED / USER_UPDATED
-    // múltiplas vezes. Se já processamos este userId, não sobrescrevemos
-    // o role (que já foi corretamente definido na primeira vez).
     if (resolvedUserIdRef.current === user.id) {
       return;
     }

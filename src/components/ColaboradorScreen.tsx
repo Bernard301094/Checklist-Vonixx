@@ -74,7 +74,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
         setUploadProgress('');
       } catch (err: any) {
         console.error('Erro ao subir fotos para Supabase:', err);
-        // ✅ Toast de error en vez de alert()
         toast.error('Erro ao enviar fotos', err.message);
         setIsUploading(false);
         setUploadProgress('');
@@ -98,7 +97,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
     setActiveOccurrence(null);
     setIsUploading(false);
 
-    // ✅ Toast de éxito en vez de alert()
     if (driveUrls.length > 0) {
       toast.success('Ocorrência salva!', `${driveUrls.length} foto(s) enviadas ao Supabase Storage com sucesso.`);
     } else {
@@ -154,7 +152,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
         <form
           onSubmit={e => {
             e.preventDefault();
-            // ✅ Toast en vez de alert()
             toast.success('Checklist sincronizado!', 'Todos os dados foram salvos com sucesso.');
           }}
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}
@@ -304,16 +301,36 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                     <label style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>Evidências fotográficas</label>
                     <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2 }}>Comprimidas automaticamente antes do envio (máx. 1280px, JPEG 72%)</p>
                   </div>
+                  
+                  {/* --- SOLUCIÓN APLICADA AQUÍ: onClick en los inputs --- */}
                   <div style={{ display: 'flex', gap: 'var(--s2)' }}>
                     <label className="btn-ghost" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <Camera size={16} /> Tirar Foto
-                      <input type="file" accept="image/*" capture="environment" onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment" 
+                        onChange={handleFileUpload} 
+                        onClick={() => localStorage.setItem('skipBiometric', 'true')} 
+                        disabled={isUploading} 
+                        style={{ display: 'none' }} 
+                      />
                     </label>
                     <label className="btn-ghost" style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
                       <ImagePlus size={16} /> Galeria
-                      <input type="file" accept="image/*" multiple onChange={handleFileUpload} disabled={isUploading} style={{ display: 'none' }} />
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple 
+                        onChange={handleFileUpload} 
+                        onClick={() => localStorage.setItem('skipBiometric', 'true')} 
+                        disabled={isUploading} 
+                        style={{ display: 'none' }} 
+                      />
                     </label>
                   </div>
+                  {/* ---------------------------------------------------- */}
+                  
                 </div>
 
                 {previewUrls.length === 0 ? (
@@ -351,7 +368,6 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
         </div>
       )}
 
-      {/* ✅ Toast container — aparece en bottom-right */}
       <ToastContainer toasts={toasts} onClose={removeToast} />
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>

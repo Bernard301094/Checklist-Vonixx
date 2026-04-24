@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo } from 'lucide-react';
+import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo, CheckCircle2 } from 'lucide-react';
 import Header from './Header';
 import CustomSelect from './CustomSelect';
 import DashboardView from './DashboardView';
@@ -82,6 +82,22 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   });
   const [saveChecklistSuccess, setSaveChecklistSuccess] = useState(false);
 
+  // Cargar checklist de la base de datos al montar (Opcional pero recomendado)
+  useEffect(() => {
+    async function loadTemplate() {
+      const { data, error } = await supabase
+        .from('checklist_templates')
+        .select('data')
+        .eq('key', 'padrao')
+        .single();
+      if (data && data.data) {
+        setChecklistTemplate(data.data as ChecklistSection[]);
+        localStorage.setItem('checklist_template', JSON.stringify(data.data));
+      }
+    }
+    loadTemplate();
+  }, []);
+
   const handleUpdateSectionTitle = (sectionIndex: number, newTitle: string) => {
     const newTemplate = [...checklistTemplate];
     newTemplate[sectionIndex].title = newTitle;
@@ -122,12 +138,24 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setChecklistTemplate(newTemplate);
   };
 
-  const handleSaveChecklistTemplate = () => {
-    localStorage.setItem('checklist_template', JSON.stringify(checklistTemplate));
-    setSaveChecklistSuccess(true);
-    setTimeout(() => setSaveChecklistSuccess(false), 3000);
-    // Ideally this would save to the database in a checklist_templates table.
-    // For now, it stays locally so it doesn't break the existing implementation.
+  // --- FUNCIÓN ACTUALIZADA PARA GUARDAR EN SUPABASE ---
+  const handleSaveChecklistTemplate = async () => {
+    try {
+      const { error } = await supabase
+        .from('checklist_templates')
+        .upsert(
+          { key: 'padrao', data: checklistTemplate, updated_at: new Date().toISOString() },
+          { onConflict: 'key' }
+        );
+
+      if (error) throw error;
+
+      localStorage.setItem('checklist_template', JSON.stringify(checklistTemplate));
+      setSaveChecklistSuccess(true);
+      setTimeout(() => setSaveChecklistSuccess(false), 3000);
+    } catch (err: any) {
+      alert('Erro ao salvar template: ' + err.message);
+    }
   };
 
   const functionUrl = 'https://aogzdxwruaqgiaprmvuz.supabase.co/functions/v1/create-user';
@@ -147,6 +175,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setEditShift(user.shift || 'TURNO A');
   };
 
+  // --- FUNCIÓN ACTUALIZADA PARA ENVIAR EL USER_ID A LA EDGE FUNCTION ---
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUser) return;
@@ -158,6 +187,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
+          user_id: editUser.id, // ID exacto del usuario
           email: editUser.email,
           full_name: editFullName.trim(),
           role: editRole,
@@ -301,7 +331,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       <Header
         userEmail={currentUserEmail}
         title="Painel Administrativo"
-        subtitle="Gerencie acessos, crie usuários e redefina senhas temporárias"
+        subtitle="Gerencie acessos, crie usuários e modifique o checklist"
         showSyncStatus={true} role="admin" onLogout={onLogout}
         useBiometrics={useBiometrics} onToggleBiometrics={onToggleBiometrics}
       />
@@ -333,147 +363,134 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
 
       {activeTab === 'users' && (
         <>
-          {/* Stats */}
           <div className="admin-stats-grid">
-        {[
-          { label: 'Total de usuários', value: String(users.length), icon: Users, tone: 'var(--primary)', bg: 'var(--primary-hl)' },
-          { label: 'Supervisores', value: String(users.filter(u => u.role === 'supervisor').length), icon: Shield, tone: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
-          { label: 'Colaboradores', value: String(users.filter(u => u.role === 'colaborador').length), icon: Users, tone: 'var(--success)', bg: 'var(--success-hl)' },
-          { label: 'Ativos', value: String(users.filter(u => u.last_sign_in_at && !isPasswordPending(u)).length), icon: ShieldCheck, tone: 'var(--success)', bg: 'var(--success-hl)' },
-        ].map(stat => {
-          const Icon = stat.icon;
-          return (
-            <div key={stat.label} className="card" style={{ padding: 'var(--s5)', display: 'flex', alignItems: 'center', gap: 'var(--s4)' }}>
-              <div style={{ width: 46, height: 46, borderRadius: 'var(--r-xl)', background: stat.bg, color: stat.tone, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                <Icon size={21} />
-              </div>
-              <div>
-                <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s1)' }}>{stat.label}</div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700 }}>{stat.value}</div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="admin-content-grid" style={{ flex: 1, overflowY: 'auto' }}>
-
-        {/* Formulário */}
-        <section className="card" style={{ padding: 'var(--s6)', alignSelf: 'start' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', marginBottom: 'var(--s5)' }}>
-            <UserPlus size={20} color="var(--primary)" />
-            <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Criar novo usuário</h2>
+            {[
+              { label: 'Total de usuários', value: String(users.length), icon: Users, tone: 'var(--primary)', bg: 'var(--primary-hl)' },
+              { label: 'Supervisores', value: String(users.filter(u => u.role === 'supervisor').length), icon: Shield, tone: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
+              { label: 'Colaboradores', value: String(users.filter(u => u.role === 'colaborador').length), icon: Users, tone: 'var(--success)', bg: 'var(--success-hl)' },
+              { label: 'Ativos', value: String(users.filter(u => u.last_sign_in_at && !isPasswordPending(u)).length), icon: ShieldCheck, tone: 'var(--success)', bg: 'var(--success-hl)' },
+            ].map(stat => {
+              const Icon = stat.icon;
+              return (
+                <div key={stat.label} className="card" style={{ padding: 'var(--s5)', display: 'flex', alignItems: 'center', gap: 'var(--s4)' }}>
+                  <div style={{ width: 46, height: 46, borderRadius: 'var(--r-xl)', background: stat.bg, color: stat.tone, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Icon size={21} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s1)' }}>{stat.label}</div>
+                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700 }}>{stat.value}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          {errorMsg && (
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--s3)', padding: 'var(--s3) var(--s4)', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.2)', marginBottom: 'var(--s5)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--danger)' }}>
-              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-          <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
-            <div>
-              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Nome completo</label>
-              <input className="input" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Nome do colaborador" required />
-            </div>
-            <div>
-              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>E-mail</label>
-              <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@empresa.com" required />
-            </div>
-            <div>
-              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Perfil</label>
-              <CustomSelect value={role} onChange={(v) => setRole(v as 'supervisor' | 'colaborador')} options={[{ value: 'colaborador', label: 'Colaborador' }, { value: 'supervisor', label: 'Supervisor' }]} />
-            </div>
-            <div>
-              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Turno</label>
-              <CustomSelect value={shift} onChange={setShift} options={[{ value: 'TURNO A', label: 'TURNO A' }, { value: 'TURNO B', label: 'TURNO B' }, { value: 'TURNO C', label: 'TURNO C' }, { value: 'TURNO D', label: 'TURNO D' }]} />
-            </div>
-            <div style={{ padding: 'var(--s4)', borderRadius: 'var(--r-xl)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s2)' }}>Senha temporária</div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s3)' }}>
-                <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 800, letterSpacing: '0.15em', color: 'var(--primary)' }}>{generatedPassword}</span>
-                <button type="button" onClick={() => setGeneratedPassword(generatePassword())} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 'var(--text-xs)' }}>
-                  <RefreshCcw size={13} /> Nova
+
+          <div className="admin-content-grid" style={{ flex: 1, overflowY: 'auto' }}>
+            <section className="card" style={{ padding: 'var(--s6)', alignSelf: 'start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', marginBottom: 'var(--s5)' }}>
+                <UserPlus size={20} color="var(--primary)" />
+                <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Criar novo usuário</h2>
+              </div>
+              {errorMsg && (
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--s3)', padding: 'var(--s3) var(--s4)', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.2)', marginBottom: 'var(--s5)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--danger)' }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+              <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
+                <div>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Nome completo</label>
+                  <input className="input" value={fullName} onChange={e => setFullName(e.target.value)} placeholder="Nome do colaborador" required />
+                </div>
+                <div>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>E-mail</label>
+                  <input className="input" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="usuario@empresa.com" required />
+                </div>
+                <div>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Perfil</label>
+                  <CustomSelect value={role} onChange={(v) => setRole(v as 'supervisor' | 'colaborador')} options={[{ value: 'colaborador', label: 'Colaborador' }, { value: 'supervisor', label: 'Supervisor' }]} />
+                </div>
+                <div>
+                  <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Turno</label>
+                  <CustomSelect value={shift} onChange={setShift} options={[{ value: 'TURNO A', label: 'TURNO A' }, { value: 'TURNO B', label: 'TURNO B' }, { value: 'TURNO C', label: 'TURNO C' }, { value: 'TURNO D', label: 'TURNO D' }]} />
+                </div>
+                <div style={{ padding: 'var(--s4)', borderRadius: 'var(--r-xl)', background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s2)' }}>Senha temporária</div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s3)' }}>
+                    <span style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 800, letterSpacing: '0.15em', color: 'var(--primary)' }}>{generatedPassword}</span>
+                    <button type="button" onClick={() => setGeneratedPassword(generatePassword())} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 12px', fontSize: 'var(--text-xs)' }}>
+                      <RefreshCcw size={13} /> Nova
+                    </button>
+                  </div>
+                </div>
+                <button type="submit" className="btn-primary" disabled={loading} style={{ width: '100%', height: 46 }}>
+                  {loading ? 'Processando...' : 'Criar acesso'}
+                </button>
+              </form>
+            </section>
+
+            <section className="card" style={{ padding: 'var(--s6)', minWidth: 0, alignSelf: 'start' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s4)', marginBottom: 'var(--s5)', flexWrap: 'wrap' }}>
+                <div>
+                  <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Usuários cadastrados</h2>
+                </div>
+                <button type="button" onClick={loadUsers} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
+                  <RefreshCcw size={15} /> Atualizar
                 </button>
               </div>
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 'var(--s2)' }}>O usuário deverá trocar esta senha no primeiro acesso.</p>
-            </div>
-            <button type="submit" className="btn-primary" disabled={loading} style={{ width: '100%', height: 46 }}>
-              {loading ? 'Processando...' : 'Criar acesso'}
-            </button>
-          </form>
-        </section>
-
-        {/* Lista */}
-        <section className="card" style={{ padding: 'var(--s6)', minWidth: 0, alignSelf: 'start' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s4)', marginBottom: 'var(--s5)', flexWrap: 'wrap' }}>
-            <div>
-              <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Usuários cadastrados</h2>
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 'var(--s1)' }}>Visualize acessos, redefina senhas ou exclua usuários.</p>
-            </div>
-            <button type="button" onClick={loadUsers} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
-              <RefreshCcw size={15} /> Atualizar
-            </button>
-          </div>
-          {loadingUsers ? (
-            <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando usuários...</div>
-          ) : users.length === 0 ? (
-            <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum usuário encontrado.</div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
-              {users.map(user => {
-                const pwd = user.temp_password;
-                const pwdVisible = visiblePasswords[user.id];
-                return (
-                  <div key={user.id} style={{ padding: 'var(--s4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--s3)', flexWrap: 'wrap' }}>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{user.full_name || 'Usuário sem nome'}</div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>{user.email}</div>
-                      </div>
-                      {user.role !== 'admin' ? (
-                        <div style={{ display: 'flex', gap: 'var(--s2)', flexShrink: 0 }}>
-                          <button type="button" onClick={() => openEditModal(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
-                            <UserPlus size={14} /> Editar
-                          </button>
-                          <button type="button" onClick={() => handleResetPassword(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
-                            <KeyRound size={14} /> Redefinir
-                          </button>
-                          <button type="button" onClick={() => setConfirmDelete(user)} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.25)', color: 'var(--danger)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
-                            <Trash2 size={14} />
-                          </button>
+              {loadingUsers ? (
+                <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando usuários...</div>
+              ) : users.length === 0 ? (
+                <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum usuário encontrado.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+                  {users.map(user => {
+                    const pwd = user.temp_password;
+                    const pwdVisible = visiblePasswords[user.id];
+                    return (
+                      <div key={user.id} style={{ padding: 'var(--s4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--s3)', flexWrap: 'wrap' }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{user.full_name || 'Usuário sem nome'}</div>
+                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>{user.email}</div>
+                          </div>
+                          {user.role !== 'admin' ? (
+                            <div style={{ display: 'flex', gap: 'var(--s2)', flexShrink: 0 }}>
+                              <button type="button" onClick={() => openEditModal(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
+                                <UserPlus size={14} /> Editar
+                              </button>
+                              <button type="button" onClick={() => handleResetPassword(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
+                                <KeyRound size={14} /> Redefinir
+                              </button>
+                              <button type="button" onClick={() => setConfirmDelete(user)} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.25)', color: 'var(--danger)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          ) : (
+                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Admin</span>
+                          )}
                         </div>
-                      ) : (
-                        <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Admin</span>
-                      )}
-                    </div>
-                    <div style={{ display: 'flex', gap: 'var(--s2)', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <span className="badge">{user.role}</span>
-                      <span className="badge">{user.shift || 'Sem turno'}</span>
-                      <StatusBadge user={user} />
-                    </div>
-                    {pwd && isPasswordPending(user) && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', padding: 'var(--s3) var(--s4)', borderRadius: 'var(--r-lg)', background: 'rgba(13,148,136,0.07)', border: '1px solid rgba(13,148,136,0.2)' }}>
-                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>Senha temporária:</span>
-                        <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'var(--text-md)', letterSpacing: '0.15em', color: 'var(--primary)', flex: 1 }}>
-                          {pwdVisible ? pwd : '••••••'}
-                        </span>
-                        <button type="button" onClick={() => togglePasswordVisible(user.id)} style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}>
-                          {pwdVisible ? <EyeOff size={14} /> : <Eye size={14} />}
-                        </button>
+                        <div style={{ display: 'flex', gap: 'var(--s2)', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <span className="badge">{user.role}</span>
+                          <span className="badge">{user.shift || 'Sem turno'}</span>
+                          <StatusBadge user={user} />
+                        </div>
+                        
+                        {/* --- BLOCO DE DATAS ADICIONADO AQUI --- */}
+                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', display: 'flex', gap: 'var(--s4)', flexWrap: 'wrap', marginTop: 'var(--s3)' }}>
+                          <span>Criado: {formatDate(user.created_at)}</span>
+                          <span>Último acesso: {formatDate(user.last_sign_in_at)}</span>
+                        </div>
+                        {/* -------------------------------------- */}
+
                       </div>
-                    )}
-                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', display: 'flex', gap: 'var(--s4)', flexWrap: 'wrap' }}>
-                      <span>Criado: {formatDate(user.created_at)}</span>
-                      <span>Último acesso: {formatDate(user.last_sign_in_at)}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </div>
-      </>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </div>
+        </>
       )}
 
       {activeTab === 'checklist' && (
@@ -572,11 +589,11 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
               </div>
               
               <div style={{ display: 'flex', gap: 'var(--s3)', marginTop: 'var(--s4)' }}>
-                <button type="button" onClick={() => setEditUser(null)} disabled={savingEdit} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: 600, fontSize: 'var(--text-sm)', cursor: savingEdit ? 'not-allowed' : 'pointer' }}>
+                <button type="button" onClick={() => setEditUser(null)} disabled={savingEdit} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
                   Cancelar
                 </button>
-                <button type="submit" disabled={savingEdit} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: savingEdit ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {savingEdit ? 'Salvando...' : 'Salvar Alterações'}
+                <button type="submit" disabled={savingEdit} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--primary)', color: '#fff', fontWeight: 700, fontSize: 'var(--text-sm)' }}>
+                  {savingEdit ? 'Salvando...' : 'Salvar'}
                 </button>
               </div>
             </form>
@@ -584,122 +601,22 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         </div>
       )}
 
-      {/* Modal exclusão — redesenhado */}
+      {/* Modal exclusão */}
       {confirmDelete && (
-        <div style={{
-          position: 'fixed', inset: 0,
-          background: 'rgba(2,6,23,0.92)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          zIndex: 2000, padding: 'var(--s4)',
-          animation: 'fadeIn 0.15s ease',
-        }}>
-          <div style={{
-            width: '100%', maxWidth: 440,
-            background: 'var(--surface)',
-            border: '1px solid rgba(220,38,38,0.25)',
-            borderRadius: 'var(--r-2xl)',
-            boxShadow: '0 25px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(220,38,38,0.1)',
-            overflow: 'hidden',
-            animation: 'slideUp 0.2s ease',
-          }}>
-            {/* Header vermelho */}
-            <div style={{
-              background: 'linear-gradient(135deg, rgba(220,38,38,0.15) 0%, rgba(185,28,28,0.08) 100%)',
-              borderBottom: '1px solid rgba(220,38,38,0.15)',
-              padding: 'var(--s6) var(--s6) var(--s5)',
-              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s4)' }}>
-                <div style={{
-                  width: 52, height: 52, borderRadius: '50%',
-                  background: 'rgba(220,38,38,0.15)',
-                  border: '2px solid rgba(220,38,38,0.3)',
-                  color: 'var(--danger)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                  boxShadow: '0 0 20px rgba(220,38,38,0.2)',
-                }}>
-                  <Trash2 size={24} />
-                </div>
-                <div>
-                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text)', lineHeight: 1.2 }}>Excluir usuário</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--danger)', fontWeight: 600, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ação irreversível</div>
-                </div>
-              </div>
-              <button
-                onClick={() => setConfirmDelete(null)}
-                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', color: 'var(--text-muted)', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', flexShrink: 0 }}
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            {/* Body */}
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.92)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 'var(--s4)' }}>
+          <div style={{ width: '100%', maxWidth: 440, background: 'var(--surface)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 'var(--r-2xl)' }}>
             <div style={{ padding: 'var(--s6)' }}>
-              {/* Card do usuário a ser excluído */}
-              <div style={{
-                padding: 'var(--s4)',
-                borderRadius: 'var(--r-xl)',
-                background: 'var(--surface-2)',
-                border: '1px solid var(--border)',
-                marginBottom: 'var(--s5)',
-                display: 'flex', alignItems: 'center', gap: 'var(--s4)',
-              }}>
-                <div style={{
-                  width: 44, height: 44, borderRadius: '50%',
-                  background: 'rgba(220,38,38,0.1)',
-                  border: '2px solid rgba(220,38,38,0.2)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  flexShrink: 0,
-                  fontSize: 18, fontWeight: 800, color: 'var(--danger)',
-                }}>
-                  {(confirmDelete.full_name || confirmDelete.email).charAt(0).toUpperCase()}
-                </div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text)' }}>{confirmDelete.full_name || 'Sem nome'}</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', wordBreak: 'break-word' }}>{confirmDelete.email}</div>
-                  <div style={{ marginTop: 4 }}><span className="badge">{confirmDelete.role}</span></div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s4)', marginBottom: 'var(--s5)' }}>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(220,38,38,0.15)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={24} /></div>
+                <div>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text)' }}>Excluir usuário</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--danger)', fontWeight: 600 }}>Ação irreversível</div>
                 </div>
               </div>
-
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: 'var(--s6)' }}>
-                Ao confirmar, o usuário perderá <strong style={{ color: 'var(--text)' }}>acesso imediato</strong> ao sistema e todos os seus dados serão removidos permanentemente.
-              </p>
-
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--s6)' }}>Ao confirmar, o usuário perderá acesso imediato ao sistema.</p>
               <div style={{ display: 'flex', gap: 'var(--s3)' }}>
-                <button
-                  type="button"
-                  onClick={() => setConfirmDelete(null)}
-                  disabled={deleting}
-                  style={{
-                    flex: 1, height: 46, borderRadius: 'var(--r-lg)',
-                    background: 'var(--surface-2)',
-                    border: '1px solid var(--border)',
-                    color: 'var(--text)', fontWeight: 600, fontSize: 'var(--text-sm)',
-                    cursor: deleting ? 'not-allowed' : 'pointer',
-                    opacity: deleting ? 0.5 : 1,
-                  }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDeleteUser}
-                  disabled={deleting}
-                  style={{
-                    flex: 1, height: 46, borderRadius: 'var(--r-lg)',
-                    background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
-                    border: '1px solid rgba(220,38,38,0.4)',
-                    color: '#fff', fontWeight: 700, fontSize: 'var(--text-sm)',
-                    cursor: deleting ? 'not-allowed' : 'pointer',
-                    opacity: deleting ? 0.7 : 1,
-                    boxShadow: deleting ? 'none' : '0 4px 14px rgba(220,38,38,0.35)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                  }}
-                >
-                  {deleting ? 'Excluindo...' : (<><Trash2 size={15} /> Sim, excluir</>)}
-                </button>
+                <button type="button" onClick={() => setConfirmDelete(null)} disabled={deleting} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: 600 }}>Cancelar</button>
+                <button type="button" onClick={handleDeleteUser} disabled={deleting} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: '#dc2626', color: '#fff', fontWeight: 700 }}>{deleting ? 'Excluindo...' : 'Sim, excluir'}</button>
               </div>
             </div>
           </div>
