@@ -6,7 +6,7 @@ interface HeaderProps {
   title: string;
   subtitle?: string;
   showSyncStatus?: boolean;
-  role?: 'supervisor' | 'colaborador';
+  role?: 'admin' | 'supervisor' | 'colaborador';
   onLogout?: () => void;
   useBiometrics?: boolean;
   onToggleBiometrics?: () => void;
@@ -38,7 +38,13 @@ export default function Header({
     .slice(0, 2)
     .join('');
 
+  const isAdmin = role === 'admin';
   const isSupervisor = role === 'supervisor';
+
+  const roleLabel = isAdmin ? 'Administrador' : isSupervisor ? 'Supervisor' : 'Colaborador';
+  const roleColor = isAdmin ? '#a78bfa' : isSupervisor ? '#fbbf24' : 'var(--primary)';
+  const roleBg = isAdmin ? 'rgba(167,139,250,0.12)' : isSupervisor ? 'rgba(251,191,36,0.12)' : 'rgba(13,148,136,0.15)';
+  const roleBorder = isAdmin ? 'rgba(167,139,250,0.25)' : isSupervisor ? 'rgba(251,191,36,0.2)' : 'rgba(13,148,136,0.25)';
 
   return (
     <header style={{
@@ -46,11 +52,7 @@ export default function Header({
       borderBottom: '1px solid var(--sidebar-border)',
       flexShrink: 0,
     }}>
-
-      {/* ── Top bar ── */}
       <div className="header-topbar">
-
-        {/* Logo + brand */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', flexShrink: 0 }}>
           <div style={{
             width: 34, height: 34, borderRadius: 'var(--r-lg)',
@@ -76,14 +78,11 @@ export default function Header({
               fontWeight: 600,
               letterSpacing: '0.04em',
               lineHeight: 1,
-            }}>Pro Platform</div>
+            }}>Plataforma Pro</div>
           </div>
         </div>
 
-        {/* Right side */}
         <div className="header-right">
-
-          {/* SYNC badge — oculto en mobile */}
           {showSyncStatus && (
             <div className="sync-badge">
               <div style={{
@@ -91,22 +90,20 @@ export default function Header({
                 animation: 'pulse-dot 2s ease-in-out infinite',
                 flexShrink: 0,
               }} />
-              SYNC ATIVO
+              SINCRONIZAÇÃO ATIVA
             </div>
           )}
 
-          {/* Role badge — solo en ≥600px */}
           {role && (
             <div className="role-badge" style={{
-              background: isSupervisor ? 'rgba(251,191,36,0.12)' : 'rgba(13,148,136,0.15)',
-              border: `1px solid ${isSupervisor ? 'rgba(251,191,36,0.2)' : 'rgba(13,148,136,0.25)'}`,
-              color: isSupervisor ? '#fbbf24' : 'var(--primary)',
+              background: roleBg,
+              border: `1px solid ${roleBorder}`,
+              color: roleColor,
             }}>
-              {isSupervisor ? 'Supervisor' : 'Colaborador'}
+              {roleLabel}
             </div>
           )}
 
-          {/* Avatar + nombre + hora */}
           <div style={{
             display: 'flex', alignItems: 'center', gap: 'var(--s2)',
             padding: '4px var(--s3)', borderRadius: 'var(--r-full)',
@@ -125,7 +122,6 @@ export default function Header({
               {initials || 'U'}
             </div>
 
-            {/* Nombre — oculto en mobile */}
             <span className="email-label" style={{
               fontSize: 'var(--text-xs)', fontWeight: 600,
               color: 'var(--sidebar-text)',
@@ -143,7 +139,6 @@ export default function Header({
             </span>
           </div>
 
-          {/* Botón biometría */}
           {onToggleBiometrics && typeof useBiometrics === 'boolean' && (
             <button
               onClick={onToggleBiometrics}
@@ -157,17 +152,16 @@ export default function Header({
                   : 'var(--sidebar-border)'}`,
                 color: useBiometrics ? 'var(--primary)' : 'var(--sidebar-muted)',
               }}
-              aria-label={useBiometrics ? 'Desativar digital' : 'Ativar digital'}
-              title={useBiometrics ? 'Digital ATIVADO — clique para desativar' : 'Digital DESATIVADO — clique para ativar'}
+              aria-label={useBiometrics ? 'Desativar biometria' : 'Ativar biometria'}
+              title={useBiometrics ? 'Biometria ativada — clique para desativar' : 'Biometria desativada — clique para ativar'}
             >
               <Fingerprint size={15} style={{ flexShrink: 0 }} />
               <span className="bio-label">
-                {useBiometrics ? 'Digital ON' : 'Digital OFF'}
+                {useBiometrics ? 'Biometria ON' : 'Biometria OFF'}
               </span>
             </button>
           )}
 
-          {/* Logout */}
           {onLogout && (
             <button
               onClick={onLogout}
@@ -181,7 +175,6 @@ export default function Header({
         </div>
       </div>
 
-      {/* ── Page title bar ── */}
       <div style={{
         padding: 'var(--s4) var(--s6)',
         borderTop: '1px solid var(--sidebar-border)',
@@ -211,8 +204,6 @@ export default function Header({
 
       <style>{`
         @keyframes pulse-dot { 0%,100%{opacity:1}50%{opacity:0.4} }
-
-        /* ── TOP BAR ── */
         .header-topbar {
           display: flex;
           align-items: center;
@@ -222,8 +213,6 @@ export default function Header({
           gap: var(--s3);
           overflow: hidden;
         }
-
-        /* ── RIGHT SIDE ── */
         .header-right {
           display: flex;
           align-items: center;
@@ -232,8 +221,6 @@ export default function Header({
           overflow: hidden;
           flex-shrink: 1;
         }
-
-        /* ── SYNC BADGE ── */
         .sync-badge {
           display: none;
           align-items: center;
@@ -249,11 +236,7 @@ export default function Header({
           white-space: nowrap;
           flex-shrink: 0;
         }
-        @media (min-width: 500px) {
-          .sync-badge { display: flex; }
-        }
-
-        /* ── ROLE BADGE ── */
+        @media (min-width: 500px) { .sync-badge { display: flex; } }
         .role-badge {
           display: none;
           padding: 4px var(--s3);
@@ -265,23 +248,13 @@ export default function Header({
           white-space: nowrap;
           flex-shrink: 0;
         }
-        @media (min-width: 600px) {
-          .role-badge { display: flex; }
-        }
-
-        /* ── EMAIL LABEL ── */
+        @media (min-width: 600px) { .role-badge { display: flex; } }
         .email-label {
           display: none;
           max-width: 160px;
         }
-        @media (min-width: 480px) {
-          .email-label { display: block; max-width: 120px; }
-        }
-        @media (min-width: 768px) {
-          .email-label { display: block; max-width: 200px; }
-        }
-
-        /* ── BIO BUTTON ── */
+        @media (min-width: 480px) { .email-label { display: block; max-width: 120px; } }
+        @media (min-width: 768px) { .email-label { display: block; max-width: 200px; } }
         .bio-toggle-btn {
           display: flex;
           align-items: center;
@@ -297,19 +270,9 @@ export default function Header({
           white-space: nowrap;
           flex-shrink: 0;
         }
-
-        /* Texto "Digital ON/OFF" — oculto en móvil muy pequeño */
         .bio-label { display: none; }
-        @media (min-width: 420px) {
-          .bio-label { display: inline; }
-        }
-
-        /* Ocultar botón bio en desktop grande (tiene sidebar propio) */
-        @media (min-width: 1024px) {
-          .bio-toggle-btn { display: none; }
-        }
-
-        /* ── LOGOUT BUTTON ── */
+        @media (min-width: 420px) { .bio-label { display: inline; } }
+        @media (min-width: 1024px) { .bio-toggle-btn { display: none; } }
         .logout-btn {
           display: flex;
           align-items: center;
@@ -329,11 +292,7 @@ export default function Header({
           color: #f87171;
           border-color: rgba(248,113,113,0.25);
         }
-
-        /* ── PADDING LATERAL responsivo ── */
-        @media (min-width: 768px) {
-          .header-topbar { padding: 0 var(--s6); }
-        }
+        @media (min-width: 768px) { .header-topbar { padding: 0 var(--s6); } }
       `}</style>
     </header>
   );

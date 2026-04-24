@@ -10,6 +10,7 @@ import SupervisorScreen from './components/SupervisorScreen';
 import ColaboradorScreen from './components/ColaboradorScreen';
 import LockScreen from './components/LockScreen';
 import ChangePasswordScreen from './components/ChangePasswordScreen';
+import AdminScreen from './components/AdminScreen';
 import { OccurrenceData } from './types';
 import { supabase } from './supabase';
 import { INITIAL_OCCURRENCES } from './constants';
@@ -23,7 +24,7 @@ interface AuthUser {
 const OCCURRENCES_TABLE = 'occurrences';
 const CHECKLISTS_TABLE = 'checklists';
 
-const fetchRoleFromDB = async (userId: string): Promise<'supervisor' | 'colaborador'> => {
+const fetchRoleFromDB = async (userId: string): Promise<'admin' | 'supervisor' | 'colaborador'> => {
   try {
     const result = await Promise.race([
       supabase.from('profiles').select('role').eq('id', userId).single(),
@@ -37,7 +38,11 @@ const fetchRoleFromDB = async (userId: string): Promise<'supervisor' | 'colabora
       return 'colaborador';
     }
 
-    return result.data.role === 'supervisor' ? 'supervisor' : 'colaborador';
+    return result.data.role === 'admin'
+      ? 'admin'
+      : result.data.role === 'supervisor'
+        ? 'supervisor'
+        : 'colaborador';
   } catch (err) {
     console.warn('Erro ao buscar role, usando padrão: colaborador', err);
     return 'colaborador';
@@ -46,7 +51,7 @@ const fetchRoleFromDB = async (userId: string): Promise<'supervisor' | 'colabora
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
-  const [role, setRole] = useState<'login' | 'supervisor' | 'colaborador'>('login');
+  const [role, setRole] = useState<'login' | 'admin' | 'supervisor' | 'colaborador'>('login');
   const [authLoading, setAuthLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
   const [mustChangePassword, setMustChangePassword] = useState(false);
@@ -104,7 +109,7 @@ export default function App() {
       }
     }
 
-    if (role !== 'login') {
+    if (role === 'supervisor' || role === 'colaborador') {
       loadData();
     }
   }, [role]);
@@ -115,10 +120,9 @@ export default function App() {
     if (user) {
       setCurrentUser({ id: user.id, email: user.email, user_metadata: user.user_metadata });
 
-      // Verificar si debe cambiar contraseña
       if (user.user_metadata?.force_password_change === true) {
         setMustChangePassword(true);
-        setRole('colaborador'); // rol temporal, no importa porque se intercepta antes
+        setRole('colaborador');
         setAuthLoading(false);
         return;
       }
@@ -132,7 +136,9 @@ export default function App() {
       setRole(dbRole);
 
       if (user.user_metadata?.name) setReporterName(user.user_metadata.name);
+      if (user.user_metadata?.full_name) setReporterName(user.user_metadata.full_name);
       if (user.user_metadata?.shift) setShift(user.user_metadata.shift);
+      if (user.user_metadata?.turno) setShift(user.user_metadata.turno);
     } else {
       setCurrentUser(null);
       setRole('login');
@@ -242,13 +248,11 @@ export default function App() {
     );
   }
 
-  // 🔐 Intercept: usuario autenticado pero debe cambiar contraseña
   if (mustChangePassword && currentUser) {
     return (
       <ChangePasswordScreen
         userEmail={currentUser.email || ''}
         onPasswordChanged={async () => {
-          // Refrescar sesión para obtener metadata actualizada
           const { data: { session } } = await supabase.auth.getSession();
           await applySession(session);
         }}
@@ -266,6 +270,17 @@ export default function App() {
         onUnlock={() => setIsLocked(false)}
         onLogout={handleLogout}
         userEmail={currentUser?.email || ''}
+      />
+    );
+  }
+
+  if (role === 'admin') {
+    return (
+      <AdminScreen
+        onLogout={handleLogout}
+        currentUserEmail={currentUser?.email || ''}
+        useBiometrics={useBiometrics}
+        onToggleBiometrics={toggleBiometrics}
       />
     );
   }
