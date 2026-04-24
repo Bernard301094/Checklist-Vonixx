@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, CheckCircle2, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import Header from './Header';
 import CustomSelect from './CustomSelect';
 import { supabase } from '../supabase';
@@ -214,20 +214,18 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
 
       <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s6)', display: 'grid', gridTemplateColumns: 'minmax(320px, 420px) minmax(0, 1fr)', gap: 'var(--s6)' }}>
 
-        {/* Formulário criar usuário */}
+        {/* Formulário */}
         <section className="card" style={{ padding: 'var(--s6)', alignSelf: 'start' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', marginBottom: 'var(--s5)' }}>
             <UserPlus size={20} color="var(--primary)" />
             <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Criar novo usuário</h2>
           </div>
-
           {errorMsg && (
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--s3)', padding: 'var(--s3) var(--s4)', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.2)', marginBottom: 'var(--s5)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--danger)' }}>
               <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
               <span>{errorMsg}</span>
             </div>
           )}
-
           <form onSubmit={handleCreateUser} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
             <div>
               <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Nome completo</label>
@@ -261,7 +259,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
           </form>
         </section>
 
-        {/* Lista de usuários */}
+        {/* Lista */}
         <section className="card" style={{ padding: 'var(--s6)', minWidth: 0, alignSelf: 'start' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--s4)', marginBottom: 'var(--s5)', flexWrap: 'wrap' }}>
             <div>
@@ -272,7 +270,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
               <RefreshCcw size={15} /> Atualizar
             </button>
           </div>
-
           {loadingUsers ? (
             <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando usuários...</div>
           ) : users.length === 0 ? (
@@ -291,10 +288,10 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                       </div>
                       {user.role !== 'admin' ? (
                         <div style={{ display: 'flex', gap: 'var(--s2)', flexShrink: 0 }}>
-                          <button type="button" onClick={() => handleResetPassword(user)} className="btn-secondary" disabled={loading} title="Redefinir senha" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
+                          <button type="button" onClick={() => handleResetPassword(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
                             <KeyRound size={14} /> Redefinir
                           </button>
-                          <button type="button" onClick={() => setConfirmDelete(user)} disabled={loading} title="Excluir usuário" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.25)', color: 'var(--danger)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+                          <button type="button" onClick={() => setConfirmDelete(user)} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.25)', color: 'var(--danger)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                             <Trash2 size={14} />
                           </button>
                         </div>
@@ -302,17 +299,13 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Admin</span>
                       )}
                     </div>
-
                     <div style={{ display: 'flex', gap: 'var(--s2)', flexWrap: 'wrap', alignItems: 'center' }}>
                       <span className="badge">{user.role}</span>
                       <span className="badge">{user.shift || 'Sem turno'}</span>
                       <StatusBadge user={user} />
                     </div>
-
-                    {/* Senha temporária persistida no banco */}
                     {pwd && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', padding: 'var(--s3) var(--s4)', borderRadius: 'var(--r-lg)', background: 'rgba(13,148,136,0.07)', border: '1px solid rgba(13,148,136,0.2)' }}>
-                        <CheckCircle2 size={14} color="var(--success)" style={{ flexShrink: 0 }} />
                         <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600, flexShrink: 0 }}>Senha temporária:</span>
                         <span style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 'var(--text-md)', letterSpacing: '0.15em', color: 'var(--primary)', flex: 1 }}>
                           {pwdVisible ? pwd : '••••••'}
@@ -322,7 +315,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                         </button>
                       </div>
                     )}
-
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', display: 'flex', gap: 'var(--s4)', flexWrap: 'wrap' }}>
                       <span>Criado: {formatDate(user.created_at)}</span>
                       <span>Último acesso: {formatDate(user.last_sign_in_at)}</span>
@@ -335,26 +327,123 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         </section>
       </div>
 
-      {/* Modal confirmação exclusão */}
+      {/* Modal exclusão — redesenhado */}
       {confirmDelete && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(2,6,23,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: 'var(--s4)' }}>
-          <div className="card animate-in" style={{ width: '100%', maxWidth: 420, padding: 'var(--s7)', position: 'relative' }}>
-            <button onClick={() => setConfirmDelete(null)} style={{ position: 'absolute', top: 'var(--s4)', right: 'var(--s4)', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
-              <X size={20} />
-            </button>
-            <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'var(--danger-hl)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--s5)' }}>
-              <Trash2 size={24} />
-            </div>
-            <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, marginBottom: 'var(--s2)' }}>Confirmar exclusão</h2>
-            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 'var(--s6)' }}>
-              Tem certeza que deseja excluir <strong style={{ color: 'var(--text)' }}>{confirmDelete.full_name || confirmDelete.email}</strong>?<br />
-              Esta ação <strong style={{ color: 'var(--danger)' }}>não pode ser desfeita</strong>.
-            </p>
-            <div style={{ display: 'flex', gap: 'var(--s3)' }}>
-              <button type="button" onClick={() => setConfirmDelete(null)} className="btn-secondary" style={{ flex: 1, height: 44 }} disabled={deleting}>Cancelar</button>
-              <button type="button" onClick={handleDeleteUser} disabled={deleting} style={{ flex: 1, height: 44, borderRadius: 'var(--r-lg)', background: 'var(--danger)', border: 'none', color: '#fff', fontWeight: 700, fontSize: 'var(--text-sm)', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1 }}>
-                {deleting ? 'Excluindo...' : 'Sim, excluir'}
+        <div style={{
+          position: 'fixed', inset: 0,
+          background: 'rgba(2,6,23,0.92)',
+          backdropFilter: 'blur(6px)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 2000, padding: 'var(--s4)',
+          animation: 'fadeIn 0.15s ease',
+        }}>
+          <div style={{
+            width: '100%', maxWidth: 440,
+            background: 'var(--surface)',
+            border: '1px solid rgba(220,38,38,0.25)',
+            borderRadius: 'var(--r-2xl)',
+            boxShadow: '0 25px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(220,38,38,0.1)',
+            overflow: 'hidden',
+            animation: 'slideUp 0.2s ease',
+          }}>
+            {/* Header vermelho */}
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(220,38,38,0.15) 0%, rgba(185,28,28,0.08) 100%)',
+              borderBottom: '1px solid rgba(220,38,38,0.15)',
+              padding: 'var(--s6) var(--s6) var(--s5)',
+              display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s4)' }}>
+                <div style={{
+                  width: 52, height: 52, borderRadius: '50%',
+                  background: 'rgba(220,38,38,0.15)',
+                  border: '2px solid rgba(220,38,38,0.3)',
+                  color: 'var(--danger)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                  boxShadow: '0 0 20px rgba(220,38,38,0.2)',
+                }}>
+                  <Trash2 size={24} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text)', lineHeight: 1.2 }}>Excluir usuário</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--danger)', fontWeight: 600, marginTop: 2, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Ação irreversível</div>
+                </div>
+              </div>
+              <button
+                onClick={() => setConfirmDelete(null)}
+                style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', color: 'var(--text-muted)', cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', flexShrink: 0 }}
+              >
+                <X size={16} />
               </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: 'var(--s6)' }}>
+              {/* Card do usuário a ser excluído */}
+              <div style={{
+                padding: 'var(--s4)',
+                borderRadius: 'var(--r-xl)',
+                background: 'var(--surface-2)',
+                border: '1px solid var(--border)',
+                marginBottom: 'var(--s5)',
+                display: 'flex', alignItems: 'center', gap: 'var(--s4)',
+              }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: '50%',
+                  background: 'rgba(220,38,38,0.1)',
+                  border: '2px solid rgba(220,38,38,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                  fontSize: 18, fontWeight: 800, color: 'var(--danger)',
+                }}>
+                  {(confirmDelete.full_name || confirmDelete.email).charAt(0).toUpperCase()}
+                </div>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 'var(--text-sm)', color: 'var(--text)' }}>{confirmDelete.full_name || 'Sem nome'}</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', wordBreak: 'break-word' }}>{confirmDelete.email}</div>
+                  <div style={{ marginTop: 4 }}><span className="badge">{confirmDelete.role}</span></div>
+                </div>
+              </div>
+
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', lineHeight: 1.65, marginBottom: 'var(--s6)' }}>
+                Ao confirmar, o usuário perderá <strong style={{ color: 'var(--text)' }}>acesso imediato</strong> ao sistema e todos os seus dados serão removidos permanentemente.
+              </p>
+
+              <div style={{ display: 'flex', gap: 'var(--s3)' }}>
+                <button
+                  type="button"
+                  onClick={() => setConfirmDelete(null)}
+                  disabled={deleting}
+                  style={{
+                    flex: 1, height: 46, borderRadius: 'var(--r-lg)',
+                    background: 'var(--surface-2)',
+                    border: '1px solid var(--border)',
+                    color: 'var(--text)', fontWeight: 600, fontSize: 'var(--text-sm)',
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                    opacity: deleting ? 0.5 : 1,
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteUser}
+                  disabled={deleting}
+                  style={{
+                    flex: 1, height: 46, borderRadius: 'var(--r-lg)',
+                    background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
+                    border: '1px solid rgba(220,38,38,0.4)',
+                    color: '#fff', fontWeight: 700, fontSize: 'var(--text-sm)',
+                    cursor: deleting ? 'not-allowed' : 'pointer',
+                    opacity: deleting ? 0.7 : 1,
+                    boxShadow: deleting ? 'none' : '0 4px 14px rgba(220,38,38,0.35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  {deleting ? 'Excluindo...' : (<><Trash2 size={15} /> Sim, excluir</>)}
+                </button>
+              </div>
             </div>
           </div>
         </div>
