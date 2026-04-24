@@ -1,10 +1,11 @@
 import React, { useMemo, useState } from 'react';
-import { Camera, AlertTriangle, X, CheckCircle2, ChevronDown, User2, Clock3, ImagePlus, Loader2 } from 'lucide-react';
+import { Camera, AlertTriangle, X, CheckCircle2, ChevronDown, User2, Clock3, ImagePlus, Loader2, Factory } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
 import Header from './Header';
 import { uploadPhoto } from '../lib/uploadPhoto';
 import { ToastContainer, useToast } from './Toast';
+import CustomSelect from './CustomSelect';
 
 interface ColaboradorScreenProps {
   onLogout: () => void;
@@ -21,6 +22,7 @@ interface ColaboradorScreenProps {
 export default function ColaboradorScreen({ onLogout, checklistState, onCheck, onSaveOccurrence, userEmail, reporterName, shift, useBiometrics, onToggleBiometrics }: ColaboradorScreenProps) {
   const { toasts, removeToast, toast } = useToast();
 
+  const [machine, setMachine] = useState<string>(() => localStorage.getItem('selectedMachine') || '');
   const [activeOccurrence, setActiveOccurrence] = useState<{ section: string; item: string } | null>(null);
   const [currentComment, setCurrentComment] = useState('');
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
@@ -38,7 +40,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
-    const files = Array.from(e.target.files);
+    const files = Array.from(e.target.files) as File[];
     setCurrentFiles(prev => [...prev, ...files]);
     setPreviewUrls(prev => [...prev, ...files.map(f => URL.createObjectURL(f))]);
   };
@@ -85,7 +87,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
       item: activeOccurrence.item,
       comment: currentComment,
       photos: driveUrls.length > 0 ? driveUrls : [...previewUrls],
-      reporter: `${reporterName.trim()} (${shift}) - Auth: ${userEmail}`,
+      reporter: `${reporterName.trim()} (${shift}) | Máquina: ${machine} - Auth: ${userEmail}`,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
 
@@ -157,7 +159,7 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
           }}
           style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s6)' }}
         >
-          <section className="card" style={{ padding: 'var(--s6)', position: 'relative', overflow: 'hidden' }}>
+          <section className="card" style={{ padding: 'var(--s6)', position: 'relative', overflow: 'visible' }}>
             <div style={{ position: 'absolute', insetInline: 0, top: 0, height: 2, background: 'linear-gradient(90deg, var(--primary), #06b6d4)' }} />
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--s5)', flexWrap: 'wrap', gap: 'var(--s3)' }}>
               <div>
@@ -186,9 +188,37 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                 </div>
               </div>
             </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)', marginTop: 'var(--s4)' }}>
+              <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text)' }}>
+                Máquina Selecionada
+              </label>
+              <CustomSelect
+                value={machine}
+                onChange={val => {
+                  setMachine(val);
+                  localStorage.setItem('selectedMachine', val);
+                }}
+                options={[
+                  { value: 'ROMI 01', label: 'ROMI 01' },
+                  { value: 'ROMI 02', label: 'ROMI 02' }
+                ]}
+                placeholder="Selecione a Máquina"
+                icon={<Factory size={16} style={{ color: 'var(--text-muted)' }} />}
+              />
+            </div>
           </section>
 
-          {CHECKLIST_DATA.map(section => {
+          {!machine ? (
+            <div className="card" style={{ padding: 'var(--s6)', textAlign: 'center', background: 'var(--surface-2)', border: '1px dashed var(--border)' }}>
+              <div style={{ display: 'inline-flex', width: 48, height: 48, borderRadius: '50%', background: 'var(--warning-hl)', color: 'var(--warning)', alignItems: 'center', justifyContent: 'center', marginBottom: 'var(--s4)' }}>
+                <AlertTriangle size={24} />
+              </div>
+              <h3 style={{ fontSize: 'var(--text-lg)', fontWeight: 700, color: 'var(--text)', marginBottom: 'var(--s2)' }}>Selecione a Máquina</h3>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>Por favor, selecione qual máquina (ROMI 01 ou ROMI 02) você irá operar antes de iniciar o preenchimento do checklist.</p>
+            </div>
+          ) : (
+            CHECKLIST_DATA.map(section => {
             const stats = getSectionProgress(section.id, section.items.length);
             const isOpen = openSections[section.id];
             return (
@@ -231,11 +261,13 @@ export default function ColaboradorScreen({ onLogout, checklistState, onCheck, o
                 )}
               </section>
             );
-          })}
+          }))}
 
-          <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="submit" className="btn-primary" style={{ minWidth: 220 }}>Sincronizar checklist</button>
-          </div>
+          {machine && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button type="submit" className="btn-primary" style={{ minWidth: 220 }}>Sincronizar checklist</button>
+            </div>
+          )}
         </form>
       </div>
 
