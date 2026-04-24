@@ -9,18 +9,20 @@ import LoginScreen from './components/LoginScreen';
 import SupervisorScreen from './components/SupervisorScreen';
 import ColaboradorScreen from './components/ColaboradorScreen';
 import LockScreen from './components/LockScreen';
+import ChangePasswordScreen from './components/ChangePasswordScreen';
 import { OccurrenceData } from './types';
 import { supabase } from './supabase';
 import { INITIAL_OCCURRENCES } from './constants';
 
 interface AuthUser {
+  id: string;
   email?: string;
+  user_metadata?: Record<string, any>;
 }
 
 const OCCURRENCES_TABLE = 'occurrences';
 const CHECKLISTS_TABLE = 'checklists';
 
-// ✅ FIX 1: Timeout para fetchRoleFromDB — evita colgar si la tabla profiles no responde
 const fetchRoleFromDB = async (userId: string): Promise<'supervisor' | 'colaborador'> => {
   try {
     const result = await Promise.race([
@@ -47,6 +49,7 @@ export default function App() {
   const [role, setRole] = useState<'login' | 'supervisor' | 'colaborador'>('login');
   const [authLoading, setAuthLoading] = useState(true);
   const [isLocked, setIsLocked] = useState(false);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const [useBiometrics, setUseBiometrics] = useState<boolean>(() => {
     return localStorage.getItem('useBiometrics') === 'true';
   });
@@ -62,21 +65,16 @@ export default function App() {
         setIsLocked(true);
       }
     });
-
-    return () => {
-      listener.then(l => l.remove());
-    };
+    return () => { listener.then(l => l.remove()); };
   }, [role, useBiometrics]);
 
-  // En App.tsx, reemplaza toggleBiometrics por esto:
-const toggleBiometrics = () => {
-  setUseBiometrics(prev => {
-    const next = !prev;
-    localStorage.setItem('useBiometrics', String(next));
-    // Sin alert() — el Header ya muestra visualmente ON/OFF en el botón
-    return next;
-  });
-};
+  const toggleBiometrics = () => {
+    setUseBiometrics(prev => {
+      const next = !prev;
+      localStorage.setItem('useBiometrics', String(next));
+      return next;
+    });
+  };
 
   useEffect(() => {
     async function loadData() {
@@ -111,36 +109,41 @@ const toggleBiometrics = () => {
     }
   }, [role]);
 
-  // ✅ FIX 2: useCallback para evitar re-creación innecesaria de applySession
   const applySession = useCallback(async (session: any) => {
     const user = session?.user;
-    setCurrentUser(user ? { email: user.email } : null);
 
     if (user) {
-      const isBioEnabled = localStorage.getItem('useBiometrics') === 'true';
-      if (isBioEnabled) {
-        setIsLocked(true);
+      setCurrentUser({ id: user.id, email: user.email, user_metadata: user.user_metadata });
+
+      // Verificar si debe cambiar contraseña
+      if (user.user_metadata?.force_password_change === true) {
+        setMustChangePassword(true);
+        setRole('colaborador'); // rol temporal, no importa porque se intercepta antes
+        setAuthLoading(false);
+        return;
       }
+
+      setMustChangePassword(false);
+
+      const isBioEnabled = localStorage.getItem('useBiometrics') === 'true';
+      if (isBioEnabled) setIsLocked(true);
 
       const dbRole = await fetchRoleFromDB(user.id);
       setRole(dbRole);
 
-      if (user.user_metadata?.name) {
-        setReporterName(user.user_metadata.name);
-      }
-      if (user.user_metadata?.shift) {
-        setShift(user.user_metadata.shift);
-      }
+      if (user.user_metadata?.name) setReporterName(user.user_metadata.name);
+      if (user.user_metadata?.shift) setShift(user.user_metadata.shift);
     } else {
+      setCurrentUser(null);
       setRole('login');
       setIsLocked(false);
+      setMustChangePassword(false);
     }
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    // ✅ FIX 3: Timeout de seguridad — si Supabase no responde en 8s, muestra login
     const safetyTimeout = setTimeout(() => {
       if (!cancelled) {
         console.warn('Auth timeout: Supabase demorou demais, exibindo tela de login.');
@@ -154,7 +157,6 @@ const toggleBiometrics = () => {
       await applySession(session);
       setAuthLoading(false);
     }).catch((err) => {
-      // ✅ FIX 4: Captura errores de red en getSession
       if (cancelled) return;
       clearTimeout(safetyTimeout);
       console.error('Erro ao obter sessão:', err);
@@ -178,6 +180,7 @@ const toggleBiometrics = () => {
     await supabase.auth.signOut();
     setReporterName('');
     setShift('TURNO A');
+    setMustChangePassword(false);
   };
 
   const handleAddOccurrence = async (occurrence: Omit<OccurrenceData, 'id'>) => {
@@ -219,47 +222,42 @@ const toggleBiometrics = () => {
     }
   };
 
-  // ✅ FIX 5: Mensaje de carga mejorado con indicador visual y mensaje de error si tarda mucho
   if (authLoading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: '12px',
-          height: '100dvh',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: 'var(--bg)',
-          color: 'var(--text-muted)',
-          fontSize: 'var(--text-sm)',
-        }}
-      >
-        <div
-          style={{
-            width: '32px',
-            height: '32px',
-            border: '3px solid rgba(255,255,255,0.15)',
-            borderTop: '3px solid var(--accent, #6366f1)',
-            borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-          }}
-        />
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: '12px',
+        height: '100dvh', alignItems: 'center', justifyContent: 'center',
+        background: 'var(--bg)', color: 'var(--text-muted)', fontSize: 'var(--text-sm)',
+      }}>
+        <div style={{
+          width: '32px', height: '32px',
+          border: '3px solid rgba(255,255,255,0.15)',
+          borderTop: '3px solid var(--accent, #6366f1)',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
         <span>Carregando conta...</span>
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
-  if (role === 'login') {
+  // 🔐 Intercept: usuario autenticado pero debe cambiar contraseña
+  if (mustChangePassword && currentUser) {
     return (
-      <LoginScreen
-        onSetReporterName={setReporterName}
-        onSetShift={setShift}
-        reporterName={reporterName}
-        shift={shift}
+      <ChangePasswordScreen
+        userEmail={currentUser.email || ''}
+        onPasswordChanged={async () => {
+          // Refrescar sesión para obtener metadata actualizada
+          const { data: { session } } = await supabase.auth.getSession();
+          await applySession(session);
+        }}
       />
     );
+  }
+
+  if (role === 'login') {
+    return <LoginScreen />;
   }
 
   if (isLocked) {
