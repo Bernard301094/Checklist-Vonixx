@@ -249,16 +249,7 @@ export default function LoginScreen() {
           </div>
         </div>
 
-        <div style={{
-          padding: 'var(--s4)', borderRadius: 'var(--r-lg)',
-          background: 'var(--primary-hl)',
-          border: '1px solid rgba(13,148,136,0.15)',
-          fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
-          lineHeight: 1.6,
-        }}>
-          <span style={{ fontWeight: 700, color: 'var(--primary)' }}>Dica de acesso:</span>
-          {' '}E-mails com <strong style={{ color: 'var(--text)' }}>supervisor</strong> no endereço acessam o painel gerencial completo. Demais usuários acessam a tela de operação e checklists.
-        </div>
+
       </div>
 
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
