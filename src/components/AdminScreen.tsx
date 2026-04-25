@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo, CheckCircle2 } from 'lucide-react';
+import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo, CheckCircle2, FileText } from 'lucide-react';
 import Header from './Header';
 import CustomSelect from './CustomSelect';
 import DashboardView from './DashboardView';
+import ReportModal from './ReportModal';
 import { supabase } from '../supabase';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
@@ -57,6 +58,7 @@ function formatDate(iso: string | null | undefined): string {
 
 export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics, onToggleBiometrics, occurrences = [], checklistState = {} }: AdminScreenProps) {
   const [activeTab, setActiveTab] = useState<'users' | 'dashboard' | 'checklist'>('users');
+  const [showReportModal, setShowReportModal] = useState(false);
   const [email, setEmail] = useState('');
   const [fullName, setFullName] = useState('');
   const [role, setRole] = useState<'supervisor' | 'colaborador'>('colaborador');
@@ -82,7 +84,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   });
   const [saveChecklistSuccess, setSaveChecklistSuccess] = useState(false);
 
-  // Cargar checklist de la base de datos al montar (Opcional pero recomendado)
   useEffect(() => {
     async function loadTemplate() {
       const { data, error } = await supabase
@@ -138,7 +139,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setChecklistTemplate(newTemplate);
   };
 
-  // --- FUNCIÓN ACTUALIZADA PARA GUARDAR EN SUPABASE ---
   const handleSaveChecklistTemplate = async () => {
     try {
       const { error } = await supabase
@@ -175,7 +175,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setEditShift(user.shift || 'TURNO A');
   };
 
-  // --- FUNCIÓN ACTUALIZADA PARA ENVIAR EL USER_ID A LA EDGE FUNCTION ---
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUser) return;
@@ -187,7 +186,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          user_id: editUser.id, // ID exacto del usuario
+          user_id: editUser.id,
           email: editUser.email,
           full_name: editFullName.trim(),
           role: editRole,
@@ -336,24 +335,58 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         useBiometrics={useBiometrics} onToggleBiometrics={onToggleBiometrics}
       />
 
+      {/* Tab Bar */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>
-        <button 
-          onClick={() => setActiveTab('users')} 
+        <button
+          onClick={() => setActiveTab('users')}
           style={{ flex: 1, padding: 'var(--s3)', fontWeight: 600, color: activeTab === 'users' ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === 'users' ? '2px solid var(--primary)' : '2px solid transparent' }}
         >
           <Users size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} /> Usuários
         </button>
-        <button 
-          onClick={() => setActiveTab('dashboard')} 
+        <button
+          onClick={() => setActiveTab('dashboard')}
           style={{ flex: 1, padding: 'var(--s3)', fontWeight: 600, color: activeTab === 'dashboard' ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === 'dashboard' ? '2px solid var(--primary)' : '2px solid transparent' }}
         >
           <LayoutDashboard size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} /> Dashboard
         </button>
-        <button 
-          onClick={() => setActiveTab('checklist')} 
+        <button
+          onClick={() => setActiveTab('checklist')}
           style={{ flex: 1, padding: 'var(--s3)', fontWeight: 600, color: activeTab === 'checklist' ? 'var(--primary)' : 'var(--text-muted)', borderBottom: activeTab === 'checklist' ? '2px solid var(--primary)' : '2px solid transparent' }}
         >
           <ListTodo size={18} style={{ display: 'inline', marginRight: 8, verticalAlign: 'middle' }} /> Checklist
+        </button>
+      </div>
+
+      {/* Botão de Relatório flutuante — visível em qualquer aba */}
+      <div style={{
+        position: 'fixed', bottom: 24, right: 20, zIndex: 100,
+      }}>
+        <button
+          onClick={() => setShowReportModal(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '12px 20px',
+            borderRadius: 'var(--r-full)',
+            background: 'var(--primary)',
+            color: '#fff',
+            fontWeight: 700,
+            fontSize: 'var(--text-sm)',
+            boxShadow: '0 8px 24px rgba(1,105,111,0.45)',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'transform 0.15s, box-shadow 0.15s',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 12px 32px rgba(1,105,111,0.55)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 24px rgba(1,105,111,0.45)';
+          }}
+        >
+          <FileText size={18} />
+          Gerar Relatório
         </button>
       </div>
 
@@ -475,14 +508,10 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                           <span className="badge">{user.shift || 'Sem turno'}</span>
                           <StatusBadge user={user} />
                         </div>
-                        
-                        {/* --- BLOCO DE DATAS ADICIONADO AQUI --- */}
                         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', display: 'flex', gap: 'var(--s4)', flexWrap: 'wrap', marginTop: 'var(--s3)' }}>
                           <span>Criado: {formatDate(user.created_at)}</span>
                           <span>Último acesso: {formatDate(user.last_sign_in_at)}</span>
                         </div>
-                        {/* -------------------------------------- */}
-
                       </div>
                     );
                   })}
@@ -520,9 +549,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
               {checklistTemplate.map((section, sIdx) => (
                 <div key={section.id} style={{ background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', padding: 'var(--s5)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', marginBottom: 'var(--s4)' }}>
-                    <input 
-                      value={section.title} 
-                      onChange={(e) => handleUpdateSectionTitle(sIdx, e.target.value)} 
+                    <input
+                      value={section.title}
+                      onChange={(e) => handleUpdateSectionTitle(sIdx, e.target.value)}
                       style={{ flex: 1, background: 'transparent', border: 'none', borderBottom: '1px dashed var(--border)', fontSize: 'var(--text-md)', fontWeight: 700, color: 'var(--text)', padding: '4px 0' }}
                     />
                     <button onClick={() => handleDeleteSection(sIdx)} style={{ color: 'var(--danger)', background: 'rgba(220,38,38,0.1)', padding: 6, borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center' }} title="Excluir Seção">
@@ -533,10 +562,10 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                     {section.items.map((item, iIdx) => (
                       <div key={iIdx} style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
                         <div style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
-                        <input 
-                          value={item} 
-                          onChange={(e) => handleUpdateItem(sIdx, iIdx, e.target.value)} 
-                          className="input" 
+                        <input
+                          value={item}
+                          onChange={(e) => handleUpdateItem(sIdx, iIdx, e.target.value)}
+                          className="input"
                           style={{ flex: 1, height: 40 }}
                         />
                         <button onClick={() => handleDeleteItem(sIdx, iIdx)} style={{ color: 'var(--text-muted)', padding: 6, display: 'flex', alignItems: 'center' }} title="Remover item">
@@ -573,7 +602,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                 <X size={16} />
               </button>
             </div>
-            
             <form onSubmit={handleSaveEdit} style={{ padding: 'var(--s6)', display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
               <div>
                 <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Nome completo</label>
@@ -587,7 +615,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                 <label style={{ fontSize: 'var(--text-sm)', fontWeight: 600, display: 'block', marginBottom: 'var(--s2)' }}>Turno</label>
                 <CustomSelect value={editShift} onChange={setEditShift} options={[{ value: 'TURNO A', label: 'TURNO A' }, { value: 'TURNO B', label: 'TURNO B' }, { value: 'TURNO C', label: 'TURNO C' }, { value: 'TURNO D', label: 'TURNO D' }]} />
               </div>
-              
               <div style={{ display: 'flex', gap: 'var(--s3)', marginTop: 'var(--s4)' }}>
                 <button type="button" onClick={() => setEditUser(null)} disabled={savingEdit} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
                   Cancelar
@@ -621,6 +648,16 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Relatório */}
+      {showReportModal && (
+        <ReportModal
+          onClose={() => setShowReportModal(false)}
+          occurrences={occurrences}
+          checklistState={checklistState}
+          currentUserEmail={currentUserEmail}
+        />
       )}
     </div>
   );
