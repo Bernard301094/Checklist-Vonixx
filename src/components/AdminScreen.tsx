@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo, CheckCircle2 } from 'lucide-react';
+import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo, CheckCircle2, UserX } from 'lucide-react';
 import Header from './Header';
 import CustomSelect from './CustomSelect';
 import DashboardView from './DashboardView';
@@ -28,6 +28,8 @@ interface ManagedUser {
   temp_password?: string | null;
   user_metadata?: any;
   app_metadata?: any;
+  // ✅ NOVO: campo de demissão para soft delete
+  demitido_em?: string | null;
 }
 
 interface ChecklistSection {
@@ -74,6 +76,8 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [editRole, setEditRole] = useState<'admin' | 'supervisor' | 'colaborador'>('colaborador');
   const [editShift, setEditShift] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+  // ✅ NOVO: controla se mostra também os demitidos
+  const [showDemitidos, setShowDemitidos] = useState(false);
 
   // --- Checklist Management State ---
   const [checklistTemplate, setChecklistTemplate] = useState<ChecklistSection[]>(() => {
@@ -82,7 +86,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   });
   const [saveChecklistSuccess, setSaveChecklistSuccess] = useState(false);
 
-  // Cargar checklist de la base de datos al montar (Opcional pero recomendado)
   useEffect(() => {
     async function loadTemplate() {
       const { data, error } = await supabase
@@ -138,7 +141,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setChecklistTemplate(newTemplate);
   };
 
-  // --- FUNCIÓN ACTUALIZADA PARA GUARDAR EN SUPABASE ---
   const handleSaveChecklistTemplate = async () => {
     try {
       const { error } = await supabase
@@ -175,7 +177,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setEditShift(user.shift || 'TURNO A');
   };
 
-  // --- FUNCIÓN ACTUALIZADA PARA ENVIAR EL USER_ID A LA EDGE FUNCTION ---
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUser) return;
@@ -187,7 +188,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
-          user_id: editUser.id, // ID exacto del usuario
+          user_id: editUser.id,
           email: editUser.email,
           full_name: editFullName.trim(),
           role: editRole,
@@ -213,7 +214,26 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Erro ao carregar usuários');
-      setUsers(data.users as ManagedUser[]);
+
+      // ✅ Carrega também os registros de demissão da tabela profiles
+      const { data: profiles } = await supabase
+        .from('profiles')
+        .select('id, demitido_em');
+
+      const profileMap: Record<string, string | null> = {};
+      if (profiles) {
+        profiles.forEach((p: { id: string; demitido_em: string | null }) => {
+          profileMap[p.id] = p.demitido_em ?? null;
+        });
+      }
+
+      // Mescla a informação de demitido_em nos usuários
+      const enrichedUsers = (data.users as ManagedUser[]).map(u => ({
+        ...u,
+        demitido_em: profileMap[u.id] ?? null,
+      }));
+
+      setUsers(enrichedUsers);
     } catch (err: any) {
       setErrorMsg('Erro ao carregar usuários: ' + err.message);
     } finally {
@@ -286,12 +306,23 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
+  // ✅ NOVO: Soft delete — marca demitido_em no profiles E bloqueia o login via Auth
   const handleDeleteUser = async () => {
     if (!confirmDelete) return;
     setDeleting(true);
     setErrorMsg('');
     try {
       const token = await getToken();
+
+      // Passo 1: Marca demitido_em na tabela profiles (preserva histórico)
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ demitido_em: new Date().toISOString() })
+        .eq('id', confirmDelete.id);
+
+      if (profileError) throw new Error('Erro ao registrar demissão: ' + profileError.message);
+
+      // Passo 2: Deleta o usuário do Supabase Auth (revoga o login)
       const response = await fetch(functionUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -299,6 +330,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao excluir usuário');
+
       setConfirmDelete(null);
       await loadUsers();
     } catch (err: any) {
@@ -308,7 +340,18 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
+  // ✅ Usuários ativos (sem data de demissão) vs demitidos
+  const activeUsers = users.filter(u => !u.demitido_em);
+  const demitidoUsers = users.filter(u => !!u.demitido_em);
+  const displayedUsers = showDemitidos ? users : activeUsers;
+
   const StatusBadge = ({ user }: { user: ManagedUser }) => {
+    // ✅ NOVO: badge especial para demitidos
+    if (user.demitido_em) return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.3)', fontSize: 11, fontWeight: 700, color: '#dc2626' }}>
+        <UserX size={11} /> Demitido em {formatDate(user.demitido_em)}
+      </span>
+    );
     if (!user.last_sign_in_at) return (
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 8px', borderRadius: 999, background: 'rgba(251,191,36,0.12)', border: '1px solid rgba(251,191,36,0.3)', fontSize: 11, fontWeight: 700, color: '#fbbf24' }}>
         <Clock size={11} /> Aguardando 1º acesso
@@ -363,12 +406,18 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
 
       {activeTab === 'users' && (
         <>
+          {/* ✅ Stats agora usam apenas activeUsers para refletir o quadro atual */}
           <div className="admin-stats-grid">
             {[
-              { label: 'Total de usuários', value: String(users.length), icon: Users, tone: 'var(--primary)', bg: 'var(--primary-hl)' },
-              { label: 'Supervisores', value: String(users.filter(u => u.role === 'supervisor').length), icon: Shield, tone: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
-              { label: 'Colaboradores', value: String(users.filter(u => u.role === 'colaborador').length), icon: Users, tone: 'var(--success)', bg: 'var(--success-hl)' },
-              { label: 'Ativos', value: String(users.filter(u => u.last_sign_in_at && !isPasswordPending(u)).length), icon: ShieldCheck, tone: 'var(--success)', bg: 'var(--success-hl)' },
+              { label: 'Ativos hoje', value: String(activeUsers.length), icon: Users, tone: 'var(--primary)', bg: 'var(--primary-hl)' },
+              { label: 'Supervisores', value: String(activeUsers.filter(u => u.role === 'supervisor').length), icon: Shield, tone: '#fbbf24', bg: 'rgba(251,191,36,0.12)' },
+              { label: 'Colaboradores', value: String(activeUsers.filter(u => u.role === 'colaborador').length), icon: Users, tone: 'var(--success)', bg: 'var(--success-hl)' },
+              { label: 'Demitidos (mês)', value: String(demitidoUsers.filter(u => {
+                if (!u.demitido_em) return false;
+                const d = new Date(u.demitido_em);
+                const now = new Date();
+                return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+              }).length), icon: UserX, tone: 'var(--danger)', bg: 'var(--danger-hl)' },
             ].map(stat => {
               const Icon = stat.icon;
               return (
@@ -434,27 +483,37 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                 <div>
                   <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Usuários cadastrados</h2>
                 </div>
-                <button type="button" onClick={loadUsers} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
-                  <RefreshCcw size={15} /> Atualizar
-                </button>
+                <div style={{ display: 'flex', gap: 'var(--s2)', flexWrap: 'wrap' }}>
+                  {/* ✅ Toggle para mostrar/ocultar demitidos */}
+                  <button
+                    type="button"
+                    onClick={() => setShowDemitidos(v => !v)}
+                    className="btn-secondary"
+                    style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', color: showDemitidos ? 'var(--danger)' : 'var(--text-muted)' }}
+                  >
+                    <UserX size={15} /> {showDemitidos ? 'Ocultar demitidos' : `Ver demitidos (${demitidoUsers.length})`}
+                  </button>
+                  <button type="button" onClick={loadUsers} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
+                    <RefreshCcw size={15} /> Atualizar
+                  </button>
+                </div>
               </div>
               {loadingUsers ? (
                 <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Carregando usuários...</div>
-              ) : users.length === 0 ? (
+              ) : displayedUsers.length === 0 ? (
                 <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum usuário encontrado.</div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
-                  {users.map(user => {
-                    const pwd = user.temp_password;
-                    const pwdVisible = visiblePasswords[user.id];
+                  {displayedUsers.map(user => {
+                    const isDemitido = !!user.demitido_em;
                     return (
-                      <div key={user.id} style={{ padding: 'var(--s4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+                      <div key={user.id} style={{ padding: 'var(--s4)', background: isDemitido ? 'rgba(220,38,38,0.04)' : 'var(--surface-2)', border: `1px solid ${isDemitido ? 'rgba(220,38,38,0.2)' : 'var(--border)'}`, borderRadius: 'var(--r-xl)', display: 'flex', flexDirection: 'column', gap: 'var(--s3)', opacity: isDemitido ? 0.7 : 1 }}>
                         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--s3)', flexWrap: 'wrap' }}>
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{user.full_name || 'Usuário sem nome'}</div>
+                            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, textDecoration: isDemitido ? 'line-through' : 'none' }}>{user.full_name || 'Usuário sem nome'}</div>
                             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>{user.email}</div>
                           </div>
-                          {user.role !== 'admin' ? (
+                          {user.role !== 'admin' && !isDemitido ? (
                             <div style={{ display: 'flex', gap: 'var(--s2)', flexShrink: 0 }}>
                               <button type="button" onClick={() => openEditModal(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
                                 <UserPlus size={14} /> Editar
@@ -466,9 +525,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                                 <Trash2 size={14} />
                               </button>
                             </div>
-                          ) : (
+                          ) : user.role === 'admin' ? (
                             <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Admin</span>
-                          )}
+                          ) : null}
                         </div>
                         <div style={{ display: 'flex', gap: 'var(--s2)', flexWrap: 'wrap', alignItems: 'center' }}>
                           <span className="badge">{user.role}</span>
@@ -476,13 +535,11 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                           <StatusBadge user={user} />
                         </div>
                         
-                        {/* --- BLOCO DE DATAS ADICIONADO AQUI --- */}
                         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', display: 'flex', gap: 'var(--s4)', flexWrap: 'wrap', marginTop: 'var(--s3)' }}>
                           <span>Criado: {formatDate(user.created_at)}</span>
                           <span>Último acesso: {formatDate(user.last_sign_in_at)}</span>
+                          {isDemitido && <span style={{ color: '#dc2626', fontWeight: 700 }}>Demitido: {formatDate(user.demitido_em)}</span>}
                         </div>
-                        {/* -------------------------------------- */}
-
                       </div>
                     );
                   })}
@@ -607,16 +664,18 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
           <div style={{ width: '100%', maxWidth: 440, background: 'var(--surface)', border: '1px solid rgba(220,38,38,0.25)', borderRadius: 'var(--r-2xl)' }}>
             <div style={{ padding: 'var(--s6)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s4)', marginBottom: 'var(--s5)' }}>
-                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(220,38,38,0.15)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Trash2 size={24} /></div>
+                <div style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(220,38,38,0.15)', color: 'var(--danger)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><UserX size={24} /></div>
                 <div>
-                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text)' }}>Excluir usuário</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--danger)', fontWeight: 600 }}>Ação irreversível</div>
+                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: 'var(--text)' }}>Registrar demissão</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--danger)', fontWeight: 600 }}>O acesso será revogado e o histórico preservado</div>
                 </div>
               </div>
-              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--s6)' }}>Ao confirmar, o usuário perderá acesso imediato ao sistema.</p>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginBottom: 'var(--s6)' }}>
+                O colaborador <strong>{confirmDelete.full_name}</strong> perderá o acesso imediato, mas seus registros anteriores continuarão visíveis no histórico com a data de demissão.
+              </p>
               <div style={{ display: 'flex', gap: 'var(--s3)' }}>
                 <button type="button" onClick={() => setConfirmDelete(null)} disabled={deleting} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: 'var(--surface-2)', border: '1px solid var(--border)', color: 'var(--text)', fontWeight: 600 }}>Cancelar</button>
-                <button type="button" onClick={handleDeleteUser} disabled={deleting} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: '#dc2626', color: '#fff', fontWeight: 700 }}>{deleting ? 'Excluindo...' : 'Sim, excluir'}</button>
+                <button type="button" onClick={handleDeleteUser} disabled={deleting} style={{ flex: 1, height: 46, borderRadius: 'var(--r-lg)', background: '#dc2626', color: '#fff', fontWeight: 700 }}>{deleting ? 'Processando...' : 'Confirmar demissão'}</button>
               </div>
             </div>
           </div>
