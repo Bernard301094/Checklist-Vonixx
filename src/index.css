@@ -121,7 +121,6 @@ html {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
-  /* Evita zoom automático de iOS/Android ao focar inputs */
   -moz-text-size-adjust: none;
   -webkit-text-size-adjust: none;
   text-size-adjust: none;
@@ -134,7 +133,6 @@ body {
   color: var(--text);
   background-color: var(--bg);
   line-height: 1.6;
-  /* Previne overscroll bounce no iOS */
   overscroll-behavior: none;
 }
 
@@ -197,7 +195,7 @@ a, button, [role="button"], input, textarea, select {
   min-height: 44px;
 }
 .btn-primary:hover { background: var(--primary-h); transform: translateY(-1px); box-shadow: 0 4px 12px rgba(13,148,136,0.35); }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:active { transform: translateY(0); background: var(--primary-h); }
 .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; transform: none; }
 
 /* Btn Ghost */
@@ -213,6 +211,7 @@ a, button, [role="button"], input, textarea, select {
   min-height: 44px;
 }
 .btn-ghost:hover { background: var(--surface-2); color: var(--text); border-color: var(--text-faint); }
+.btn-ghost:active { background: var(--surface-3); }
 
 /* Input base */
 .input {
@@ -221,7 +220,6 @@ a, button, [role="button"], input, textarea, select {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  /* Mínimo 16px em mobile para evitar zoom automático no iOS */
   font-size: max(16px, var(--text-sm));
   font-weight: 500;
   color: var(--text);
@@ -273,7 +271,6 @@ select:hover {
   background-color: var(--surface);
 }
 
-/* Option theming */
 select option {
   background-color: var(--surface);
   color: var(--text);
@@ -358,136 +355,205 @@ select option:hover {
   }
 }
 
-/* ── RESPONSIVE — GALAXY A55 & MOBILE GENERAL ─────────────── */
-/* Galaxy A55: 412 × 915px, device pixel ratio 2.625            */
-/* Breakpoints aplicados: ≤480px (mobile), ≤412px (small phone) */
+/* ══════════════════════════════════════════════════════════════
+   RESPONSIVE — Galaxy A55 (412×915px) & Mobile General
+   Breakpoints: ≤640px (tablet/mobile), ≤480px (phone), ≤400px (small phone)
+   ══════════════════════════════════════════════════════════════ */
 
-/* ── Layout principal mobile ── */
-@media (max-width: 480px) {
-
-  /* Padding global reduzido */
-  .card { border-radius: var(--r-lg); }
-
-  /* Grids de estatísticas: 2 colunas em vez de 4 */
-  [style*="repeat(auto-fit, minmax(200px"] {
-    grid-template-columns: repeat(2, 1fr) !important;
-  }
-
-  /* Sections: padding lateral menor */
-  [style*="padding: var(--s6)"],
-  [style*="padding: var(--s5) var(--s6)"] {
-    padding-inline: var(--s4) !important;
-  }
-}
-
-/* ── Checklist mobile ── */
-@media (max-width: 480px) {
-  /* Itens do checklist: layout de coluna em vez de row */
-  .checklist-item-row {
-    flex-direction: column !important;
-    align-items: flex-start !important;
-    gap: var(--s2) !important;
-    padding: var(--s3) var(--s4) !important;
-  }
-
-  /* Foto thumbnail menor em mobile */
-  .occurrence-photo-thumb {
-    width: 64px !important;
-    height: 64px !important;
-  }
-
-  /* Cards de ocorrência: grid simples */
-  .occurrence-card-grid {
-    grid-template-columns: 1fr !important;
-  }
-
-  /* KPIs do dashboard: 2 colunas */
-  .dashboard-kpi-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: var(--s3) !important;
-    padding: var(--s4) !important;
-  }
-}
-
-/* ── Header mobile compacto ── */
-@media (max-width: 480px) {
-  .header-page-title {
-    font-size: clamp(1.1rem, 4vw, 1.4rem) !important;
-  }
-
-  .header-topbar {
-    height: 52px !important;
-    padding: 0 var(--s3) !important;
-  }
-}
-
-/* ── Tabs/Nav mobile ── */
-@media (max-width: 480px) {
-  /* Tabs: scroll horizontal se necessário */
-  .mobile-tabs {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .mobile-tabs::-webkit-scrollbar { display: none; }
-
-  /* Botões de tab: compactos */
-  .mobile-tab-btn {
-    padding: var(--s3) var(--s4) !important;
-    font-size: 12px !important;
-    white-space: nowrap;
-  }
-}
-
-/* ── Modal/overlay mobile: bottom sheet ── */
-@media (max-width: 480px) {
-  /* Occurrence modal: ocupa tela toda de baixo para cima */
-  .occurrence-modal {
-    align-items: flex-end !important;
-    padding: 0 !important;
-  }
-  .occurrence-modal-inner {
-    border-bottom-left-radius: 0 !important;
-    border-bottom-right-radius: 0 !important;
-    max-height: 95dvh !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-}
-
-/* ── Grids de fotos mobile ── */
-@media (max-width: 480px) {
-  /* Grid de evidências fotográficas: 2 colunas */
-  .photos-evidence-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: var(--s2) !important;
-  }
-}
-
-/* ── Form controls mobile ── */
-@media (max-width: 480px) {
-  /* Inputs: tamanho mínimo 16px para evitar zoom iOS/Android */
-  .input,
+/* ── 1. ALL INPUTS: prevent iOS auto-zoom (font-size must be ≥16px) ── */
+@media (max-width: 640px) {
+  input,
   input[type="text"],
   input[type="email"],
   input[type="password"],
   input[type="date"],
-  select,
-  textarea {
+  input[type="number"],
+  input[type="search"],
+  input[type="tel"],
+  input[type="url"],
+  textarea,
+  select {
     font-size: 16px !important;
-  }
-
-  /* Botões: altura mínima de toque confortável */
-  .btn-primary,
-  .btn-ghost,
-  button[type="submit"] {
-    min-height: 48px;
+    /* Habilita tap highlight correto */
+    -webkit-tap-highlight-color: rgba(13,148,136,0.15);
   }
 }
 
-/* ── Supervisor/Admin: table cards mobile ── */
+/* ── 2. CARDS: raio menor em telas pequenas ── */
 @media (max-width: 480px) {
-  /* Cards de ocorrências agrupados por data */
+  .card {
+    border-radius: var(--r-lg);
+  }
+}
+
+/* ── 3. BOTÕES: tap targets mínimos 48px ── */
+@media (max-width: 640px) {
+  .btn-primary,
+  .btn-ghost,
+  button[type="submit"],
+  button[type="button"] {
+    min-height: 48px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Active state visível no toque */
+  .btn-primary:active { opacity: 0.85; transform: scale(0.98); }
+  .btn-ghost:active   { opacity: 0.75; }
+}
+
+/* ── 4. HEADER: compacto no mobile ── */
+@media (max-width: 480px) {
+  .header-topbar {
+    height: 52px !important;
+    padding: 0 var(--s3) !important;
+    gap: var(--s2) !important;
+  }
+  /* Título da página abaixo do topbar */
+  .header-page-section {
+    padding: var(--s3) var(--s4) !important;
+  }
+  .header-page-section h1 {
+    font-size: clamp(1.1rem, 5vw, 1.35rem) !important;
+  }
+}
+
+/* ── 5. TABS / NAVEGAÇÃO HORIZONTAL ── */
+@media (max-width: 640px) {
+  /* Wrapper das tabs: scroll horizontal fluido */
+  .collab-tabs-bar,
+  [class*="tabs-bar"],
+  [class*="tab-nav"] {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    scroll-snap-type: x mandatory;
+  }
+  .collab-tabs-bar::-webkit-scrollbar,
+  [class*="tabs-bar"]::-webkit-scrollbar { display: none; }
+
+  /* Cada botão de tab */
+  .collab-tab-btn {
+    flex-shrink: 0;
+    padding: var(--s2) var(--s4) !important;
+    font-size: 12px !important;
+    white-space: nowrap;
+    scroll-snap-align: start;
+    min-height: 44px;
+  }
+}
+
+/* ── 6. MODAIS: bottom sheet no mobile ── */
+@media (max-width: 640px) {
+  /* Overlay: alinha no fundo */
+  .occurrence-modal {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  /* Container: ocupa toda a largura, sem radius embaixo */
+  .occurrence-modal-inner {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: 92dvh !important;
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    border-top-left-radius: var(--r-2xl) !important;
+    border-top-right-radius: var(--r-2xl) !important;
+  }
+  /* Handle visual (drag indicator) */
+  .occurrence-modal-inner::before {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 4px;
+    background: var(--border);
+    border-radius: var(--r-full);
+    margin: var(--s3) auto var(--s2);
+    flex-shrink: 0;
+  }
+}
+
+/* ── 7. CHECKLIST ITEMS: layout adaptado ── */
+@media (max-width: 480px) {
+  /* Itens do checklist — espaçamento reduzido */
+  .checklist-item-row {
+    gap: var(--s2) !important;
+    padding: var(--s3) !important;
+  }
+  /* Checkbox maior para toque */
+  .checklist-item-row input[type="checkbox"] {
+    width: 20px !important;
+    height: 20px !important;
+    margin-top: 2px !important;
+  }
+  /* Botão de ocorrência: texto menor */
+  .checklist-occurrence-btn {
+    font-size: 11px !important;
+    padding: var(--s2) var(--s3) !important;
+    min-height: 36px !important;
+  }
+}
+
+/* ── 8. GRIDS DE STATS / KPIs ── */
+@media (max-width: 640px) {
+  /* Dashboard KPIs: máximo 2 colunas */
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--s3) !important;
+    padding: var(--s3) !important;
+  }
+  /* Stats de admin: 2 colunas */
+  .admin-stats-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    padding: var(--s3) var(--s3) !important;
+    gap: var(--s3) !important;
+  }
+  /* Grid genérico de 4 colunas → 2 */
+  .stats-grid-4 {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ── 9. CONTEÚDO PRINCIPAL: padding lateral reduzido ── */
+@media (max-width: 480px) {
+  /* Área principal do colaborador */
+  .colaborador-main,
+  .main-content-area {
+    padding: var(--s3) !important;
+  }
+  /* Seções de card: padding interno compacto */
+  .section-card-body {
+    padding: var(--s3) var(--s3) !important;
+  }
+  /* Progress container */
+  .progress-container {
+    padding: var(--s3) var(--s4) !important;
+  }
+  /* Section headers do checklist */
+  .checklist-section-header {
+    padding: var(--s3) var(--s4) !important;
+  }
+}
+
+/* ── 10. FOTOS / EVIDÊNCIAS ── */
+@media (max-width: 480px) {
+  /* Grid de fotos: 2 colunas */
+  .photos-evidence-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--s2) !important;
+  }
+  /* Thumbnail de ocorrência: compacto */
+  .occurrence-photo-thumb {
+    width: 60px !important;
+    height: 60px !important;
+    border-radius: var(--r-md) !important;
+  }
+}
+
+/* ── 11. CARDS DE OCORRÊNCIA ── */
+@media (max-width: 480px) {
+  .occurrence-card-grid {
+    grid-template-columns: 1fr !important;
+  }
+  /* Grupos por data/reporter: padding compacto */
   .occurrence-date-group {
     padding-inline: var(--s3) !important;
   }
@@ -498,41 +564,106 @@ select option:hover {
   .occurrence-item-card {
     margin-left: 0 !important;
   }
-  /* Badge dentro de cards: tamanho reduzido */
+  /* Badges: tamanho reduzido */
   .badge {
     font-size: 10px !important;
-    padding: 2px var(--s1) !important;
+    padding: 2px 6px !important;
   }
 }
 
-/* ── ColaboradorScreen: seção de checklist mobile ── */
-@media (max-width: 480px) {
-  /* Padding da área principal do colaborador */
-  .colaborador-main {
+/* ── 12. REPORT MODAL: já é bottom sheet por inline style,
+         garantir que preview grid fique legível ── */
+@media (max-width: 400px) {
+  .report-preview-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+/* ── 13. ADMIN CONTENT GRID ── */
+@media (max-width: 640px) {
+  .admin-content-grid {
+    grid-template-columns: 1fr !important;
+    padding: var(--s3) !important;
+    gap: var(--s4) !important;
+  }
+}
+
+/* ── 14. MY RECORDS VIEW: filtros empilhados ── */
+@media (max-width: 640px) {
+  .records-filter-row {
+    flex-direction: column !important;
+    gap: var(--s3) !important;
+  }
+  .records-filter-row > * {
+    width: 100% !important;
+  }
+}
+
+/* ── 15. DASHBOARD: charts full-width ── */
+@media (max-width: 640px) {
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--s3) !important;
     padding: var(--s3) !important;
   }
-  /* Section headers do checklist: compacto */
-  .checklist-section-header {
-    padding: var(--s3) var(--s4) !important;
-    font-size: var(--text-xs) !important;
+  /* Tabelas → scroll horizontal */
+  .dashboard-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
-  /* Container do progresso */
-  .progress-container {
-    padding: var(--s3) var(--s4) !important;
+  .dashboard-table-wrapper table {
+    min-width: 480px;
   }
 }
 
-/* ── Safe area para celulares com notch/barra de navegação ── */
+/* ── 16. SAFE AREA (notch / barra de navegação Android) ── */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   body {
     padding-bottom: env(safe-area-inset-bottom);
   }
-  /* Bottom navigation bar nativa do Android */
   .app-bottom-safe {
     padding-bottom: max(var(--s4), env(safe-area-inset-bottom));
   }
 }
 
+/* ── 17. HOVER: desabilitar em touch para evitar stuck states ── */
+@media (hover: none) and (pointer: coarse) {
+  .btn-primary:hover,
+  .btn-ghost:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  /* Tooltips não funcionam em touch */
+  [title]:hover::after {
+    display: none;
+  }
+}
+
+/* ── 18. LOGIN / LOCK SCREEN: centralizado no mobile ── */
+@media (max-width: 480px) {
+  .login-card {
+    margin: var(--s4);
+    padding: var(--s5) !important;
+    border-radius: var(--r-xl);
+  }
+  .login-logo {
+    width: 52px !important;
+    height: 52px !important;
+  }
+}
+
+/* ── 19. SUPERVISOR SCREEN ── */
+@media (max-width: 480px) {
+  .supervisor-filter-row {
+    flex-direction: column !important;
+    gap: var(--s2) !important;
+  }
+  .supervisor-filter-row > * {
+    width: 100% !important;
+  }
+}
+
+/* ── UTILITY ──────────────────────────────────────────────── */
 .animate-in { animation: fadeInUp 0.35s cubic-bezier(0.16,1,0.3,1) both; }
 
 @media (prefers-reduced-motion: reduce) {

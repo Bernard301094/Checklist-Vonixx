@@ -53,17 +53,22 @@ export default function Header({
       flexShrink: 0,
     }}>
       <div className="header-topbar">
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', flexShrink: 0 }}>
+        {/* Logo + marca */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', flexShrink: 0 }}>
           <div style={{
-            width: 34, height: 34, borderRadius: 'var(--r-lg)',
+            width: 32,
+            height: 32,
+            borderRadius: 'var(--r-lg)',
             background: 'var(--primary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
             boxShadow: '0 4px 12px rgba(13,148,136,0.4)',
             flexShrink: 0,
           }}>
-            <Factory size={18} color="#fff" strokeWidth={1.5} />
+            <Factory size={16} color="#fff" strokeWidth={1.5} />
           </div>
-          <div>
+          <div className="header-brand-text">
             <div style={{
               fontFamily: 'var(--font-display)',
               fontSize: 'var(--text-sm)',
@@ -82,6 +87,7 @@ export default function Header({
           </div>
         </div>
 
+        {/* Right side */}
         <div className="header-right">
           {showSyncStatus && (
             <div className="sync-badge">
@@ -104,14 +110,8 @@ export default function Header({
             </div>
           )}
 
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 'var(--s2)',
-            padding: '4px var(--s3)', borderRadius: 'var(--r-full)',
-            background: 'var(--sidebar-surface)',
-            border: '1px solid var(--sidebar-border)',
-            minWidth: 0,
-            overflow: 'hidden',
-          }}>
+          {/* User pill */}
+          <div className="header-user-pill">
             <div style={{
               width: 26, height: 26, borderRadius: '50%',
               background: 'linear-gradient(135deg, var(--primary), #06b6d4)',
@@ -130,7 +130,7 @@ export default function Header({
               {label}
             </span>
 
-            <span style={{
+            <span className="time-label" style={{
               fontSize: 10, fontWeight: 700, color: 'var(--sidebar-muted)',
               fontVariantNumeric: 'tabular-nums', letterSpacing: '0.03em',
               flexShrink: 0,
@@ -157,7 +157,7 @@ export default function Header({
             >
               <Fingerprint size={15} style={{ flexShrink: 0 }} />
               <span className="bio-label">
-                {useBiometrics ? 'Biometria ON' : 'Biometria OFF'}
+                {useBiometrics ? 'Bio ON' : 'Bio OFF'}
               </span>
             </button>
           )}
@@ -175,11 +175,15 @@ export default function Header({
         </div>
       </div>
 
-      <div style={{
-        padding: 'var(--s4) var(--s6)',
-        borderTop: '1px solid var(--sidebar-border)',
-        background: 'var(--surface)',
-      }}>
+      {/* Page title bar */}
+      <div
+        className="header-page-section"
+        style={{
+          padding: 'var(--s4) var(--s6)',
+          borderTop: '1px solid var(--sidebar-border)',
+          background: 'var(--surface)',
+        }}
+      >
         <h1 style={{
           fontFamily: 'var(--font-display)',
           fontSize: 'var(--text-xl)',
@@ -204,6 +208,8 @@ export default function Header({
 
       <style>{`
         @keyframes pulse-dot { 0%,100%{opacity:1}50%{opacity:0.4} }
+
+        /* ── Topbar ── */
         .header-topbar {
           display: flex;
           align-items: center;
@@ -213,6 +219,11 @@ export default function Header({
           gap: var(--s3);
           overflow: hidden;
         }
+        @media (min-width: 768px) {
+          .header-topbar { padding: 0 var(--s6); }
+        }
+
+        /* ── Right group ── */
         .header-right {
           display: flex;
           align-items: center;
@@ -221,6 +232,16 @@ export default function Header({
           overflow: hidden;
           flex-shrink: 1;
         }
+
+        /* ── Brand text: hide on very small screens ── */
+        .header-brand-text {
+          display: none;
+        }
+        @media (min-width: 360px) {
+          .header-brand-text { display: block; }
+        }
+
+        /* ── Sync badge ── */
         .sync-badge {
           display: none;
           align-items: center;
@@ -236,7 +257,9 @@ export default function Header({
           white-space: nowrap;
           flex-shrink: 0;
         }
-        @media (min-width: 500px) { .sync-badge { display: flex; } }
+        @media (min-width: 560px) { .sync-badge { display: flex; } }
+
+        /* ── Role badge ── */
         .role-badge {
           display: none;
           padding: 4px var(--s3);
@@ -249,12 +272,39 @@ export default function Header({
           flex-shrink: 0;
         }
         @media (min-width: 600px) { .role-badge { display: flex; } }
+
+        /* ── User pill ── */
+        .header-user-pill {
+          display: flex;
+          align-items: center;
+          gap: var(--s2);
+          padding: 4px var(--s3);
+          border-radius: var(--r-full);
+          background: var(--sidebar-surface);
+          border: 1px solid var(--sidebar-border);
+          min-width: 0;
+          overflow: hidden;
+          max-width: 180px;
+        }
+        @media (min-width: 768px) {
+          .header-user-pill { max-width: 260px; }
+        }
+
+        /* ── Email label ── */
         .email-label {
           display: none;
-          max-width: 160px;
+          max-width: 120px;
         }
         @media (min-width: 480px) { .email-label { display: block; max-width: 120px; } }
         @media (min-width: 768px) { .email-label { display: block; max-width: 200px; } }
+
+        /* ── Time label: ocultar em telas muito pequenas ── */
+        .time-label {
+          display: none;
+        }
+        @media (min-width: 380px) { .time-label { display: block; } }
+
+        /* ── Bio toggle ── */
         .bio-toggle-btn {
           display: flex;
           align-items: center;
@@ -270,9 +320,13 @@ export default function Header({
           white-space: nowrap;
           flex-shrink: 0;
         }
+        /* Em desktop (≥1024px) ocultar — usa biometria nativa */
+        @media (min-width: 1024px) { .bio-toggle-btn { display: none; } }
+
         .bio-label { display: none; }
         @media (min-width: 420px) { .bio-label { display: inline; } }
-        @media (min-width: 1024px) { .bio-toggle-btn { display: none; } }
+
+        /* ── Logout btn ── */
         .logout-btn {
           display: flex;
           align-items: center;
@@ -286,13 +340,31 @@ export default function Header({
           cursor: pointer;
           transition: all var(--t);
           flex-shrink: 0;
+          /* tap target ≥44px usando padding virtual */
+          padding: 4px;
         }
         .logout-btn:hover {
           background: rgba(248,113,113,0.1);
           color: #f87171;
           border-color: rgba(248,113,113,0.25);
         }
-        @media (min-width: 768px) { .header-topbar { padding: 0 var(--s6); } }
+        .logout-btn:active {
+          background: rgba(248,113,113,0.2);
+        }
+
+        /* ── Page section: compacto no mobile ── */
+        @media (max-width: 480px) {
+          .header-page-section {
+            padding: var(--s3) var(--s4) !important;
+          }
+          .header-page-section h1 {
+            font-size: clamp(1.1rem, 5vw, 1.35rem) !important;
+          }
+          .header-topbar {
+            height: 52px !important;
+            padding: 0 var(--s3) !important;
+          }
+        }
       `}</style>
     </header>
   );
