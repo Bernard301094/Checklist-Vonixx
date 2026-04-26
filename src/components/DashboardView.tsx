@@ -203,18 +203,17 @@ function ConformSectionGroup({
           }}
         >
           <Layers size={13} style={{ color }} />
-          <span>{groupLabel}</span>
-          <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#94a3b8', display: 'inline-block' }} />
-          <span style={{ color }}>{pct}%</span>
-          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          {groupLabel}
+          <span style={{ fontSize: 11, fontWeight: 900, color, marginLeft: 4 }}>{pct}%</span>
+          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
-        <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
+        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
       </div>
 
       {open && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {sections.map(sec => (
-            <ConformSectionCard key={sec.sectionId} section={sec} />
+          {sections.map(section => (
+            <ConformSectionCard key={section.sectionId} section={section} />
           ))}
         </div>
       )}
@@ -222,7 +221,7 @@ function ConformSectionGroup({
   );
 }
 
-/** Card de una sección con sus ítems */
+/** Tarjeta individual por sección */
 function ConformSectionCard({ section }: { section: ConformSectionData }) {
   const [open, setOpen] = useState(false);
   const pct = section.totalCount > 0 ? Math.round((section.checkedCount / section.totalCount) * 100) : 0;
@@ -280,9 +279,9 @@ function ConformSectionCard({ section }: { section: ConformSectionData }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', lineHeight: 1.4 }}>{item.itemText}</div>
-                {item.reporter && (
+                {(item.reporter || item.time) && (
                   <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <User size={10} /> {item.reporter}
+                    <User size={10} /> {item.reporter || 'Colaborador não identificado'}
                     {item.time && <><Clock size={10} style={{ marginLeft: 4 }} /> {item.time}</>}
                   </div>
                 )}
@@ -298,99 +297,74 @@ function ConformSectionCard({ section }: { section: ConformSectionData }) {
 /* ======================================================
    COMPONENTE PRINCIPAL
    ====================================================== */
-export default function DashboardView({ occurrences, checklistState, checklistEntries = [], checklistSessions = [] }: DashboardViewProps) {
-  const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
-  const [activeTab, setActiveTab] = useState<'timeline' | 'conformidades'>('timeline');
-  const [searchQuery, setSearchQuery] = useState('');
 
-  const verifiedCount = useMemo(() => {
-    let count = 0;
-    CHECKLIST_DATA.forEach(section => {
-      section.items.forEach((_, idx) => {
-        if (checklistState[`${section.id}-${idx}`] === true) count++;
-      });
-    });
-    return count;
-  }, [checklistState]);
+const SECTION_GROUPS = [
+  {
+    label: 'Equipamentos e Transporte',
+    sectionIds: ['perifericos', 'esteiras'],
+  },
+  {
+    label: 'Moinho e Componentes Mecânicos',
+    sectionIds: ['moinho', 'componentes'],
+  },
+  {
+    label: 'Operação, Molde e Lubrificação',
+    sectionIds: ['operacao', 'molde', 'lubrificacao'],
+  },
+  {
+    label: 'Parâmetros e Documentação',
+    sectionIds: ['parametros', 'documentacao'],
+  },
+];
 
-  const maxChecks = CHECKLIST_DATA.reduce((acc, s) => acc + s.items.length, 0);
-  const validationProgress = maxChecks > 0 ? Math.round((verifiedCount / maxChecks) * 100) : 0;
-  const totalPhotos = occurrences.reduce((acc, o) => acc + o.photos.length, 0);
+export default function DashboardView({
+  occurrences,
+  checklistState,
+  checklistEntries = [],
+  checklistSessions = [],
+}: DashboardViewProps) {
+  const [activeTab, setActiveTab] = useState<'alertas' | 'conformidades'>('alertas');
+  const [photoModal, setPhotoModal] = useState<{ photos: string[]; index: number } | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredOccs = useMemo(() => {
-    let list = occurrences;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(o =>
-        o.section.toLowerCase().includes(q) ||
-        o.item.toLowerCase().includes(q) ||
-        reporterLabel(o.reporter).toLowerCase().includes(q) ||
-        machineLabel(o.reporter).toLowerCase().includes(q)
-      );
-    }
-    return list;
-  }, [occurrences, searchQuery]);
-
-  /* Grupos de ALERTAS por fecha → colaborador */
-  const dateGroups = useMemo(() => {
-    const map: Record<string, OccurrenceData[]> = {};
-    filteredOccs.forEach(o => {
-      const dateStr = o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : '1970-01-01';
-      if (!map[dateStr]) map[dateStr] = [];
-      map[dateStr].push(o);
-    });
-    return Object.entries(map)
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([dateStr, dayOccs]) => {
-        const dateLabel = dateStr !== '1970-01-01' ? formatDateLabel(dateStr) : 'Data não registrada';
-        const collabMap: Record<string, OccurrenceData[]> = {};
-        dayOccs.forEach(o => { const r = reporterLabel(o.reporter); if (!collabMap[r]) collabMap[r] = []; collabMap[r].push(o); });
-        const collabs = Object.entries(collabMap).sort(([, a], [, b]) => b.length - a.length);
-        return { dateStr, dateLabel, collabs };
-      });
-  }, [filteredOccs]);
-
-  /* -------------------------------------------------------
-     Grupos de CONFORMIDADES — construidos desde checklistState
-     + checklistEntries, sin depender de checklistSessions.
-     
-     Usamos la fecha de "updated_at" (o "checked_at") de cada
-     entrada para agrupar por día. Si no hay fecha, cae en hoy.
-     ------------------------------------------------------- */
-
-  /** Grupos de categorías para el pill divisor */
-  const SECTION_GROUPS = [
-    { label: 'Equipamentos e Transporte', sectionIds: ['perifericos', 'esteiras'] },
-    { label: 'Moinho e Componentes Mecânicos', sectionIds: ['moinho', 'componentes'] },
-    { label: 'Operação, Molde e Lubrificação', sectionIds: ['operacao', 'molde', 'lubrificacao'] },
-    { label: 'Parâmetros e Documentação', sectionIds: ['parametros', 'documentacao'] },
-  ];
-
-  /** Mapa rápido: item_key → ChecklistEntry */
+  /* ---- entryMap: item_key → ChecklistEntry ---- */
   const entryMap = useMemo(() => {
-    const m: Record<string, ChecklistEntry> = {};
-    checklistEntries.forEach(e => { m[e.item_key] = e; });
-    return m;
+    const map: Record<string, ChecklistEntry> = {};
+    checklistEntries.forEach(e => { if (e.item_key) map[e.item_key] = e; });
+    return map;
   }, [checklistEntries]);
 
-  /** Fecha más reciente de actualización del checklist (para el encabezado) */
-  const lastUpdateDate = useMemo(() => {
-    const dates = checklistEntries
-      .map(e => e.updated_at || e.checked_at)
-      .filter(Boolean) as string[];
-    if (!dates.length) return null;
-    return dates.sort().reverse()[0];
-  }, [checklistEntries]);
+  /* ---- Alertas agrupadas por fecha → colaborador ---- */
+  const occurrencesByDate = useMemo(() => {
+    const filtered = occurrences.filter(o =>
+      !searchTerm ||
+      o.section.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.reporter.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-  /**
-   * Construye los datos de conformidades agrupados por SECTION_GROUPS.
-   * Cada sección muestra sus ítems con estado checked/unchecked.
-   */
+    const dateMap: Record<string, Record<string, OccurrenceData[]>> = {};
+    filtered.forEach(o => {
+      const dateKey = o.time ? todayISO() : todayISO();
+      if (!dateMap[dateKey]) dateMap[dateKey] = {};
+      const rep = reporterLabel(o.reporter);
+      if (!dateMap[dateKey][rep]) dateMap[dateKey][rep] = [];
+      dateMap[dateKey][rep].push(o);
+    });
+
+    return Object.entries(dateMap)
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([date, reporters]) => ({
+        date,
+        reporters: Object.entries(reporters),
+      }));
+  }, [occurrences, searchTerm]);
+
+  /* ---- Conformidades agrupadas por grupos ---- */
   const conformGroups = useMemo(() => {
     return SECTION_GROUPS.map(group => {
       const sections: ConformSectionData[] = CHECKLIST_DATA
         .map((sec, sIdx) => {
-          // Incluir si el id encaja con el grupo o si no hay grupos definidos
           const inGroup = group.sectionIds.some(sid =>
             sec.id.toLowerCase().includes(sid) ||
             sec.title.toLowerCase().includes(sid)
@@ -416,168 +390,147 @@ export default function DashboardView({ occurrences, checklistState, checklistEn
             items,
             checkedCount,
             totalCount: items.length,
-          } as ConformSectionData;
+          };
         })
         .filter((s): s is ConformSectionData => s !== null);
 
-      return { groupLabel: group.label, sections };
-    }).filter(g => g.sections.length > 0);
+      return { label: group.label, sections };
+    });
   }, [checklistState, entryMap]);
 
-  /**
-   * Si ningún sectionId del grupo encaja con los ids reales del CHECKLIST_DATA,
-   * hacemos un fallback: dividimos el array equitativamente en 4 grupos.
-   */
-  const usesFallbackGroups = conformGroups.every(g => g.sections.length === 0);
+  /* ---- Estadísticas generales ---- */
+  const totalItems = useMemo(() =>
+    CHECKLIST_DATA.reduce((a, s) => a + s.items.length, 0),
+    []
+  );
+  const checkedItems = useMemo(() =>
+    Object.values(checklistState).filter(Boolean).length,
+    [checklistState]
+  );
+  const overallPct = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
 
-  const fallbackGroups = useMemo(() => {
-    if (!usesFallbackGroups) return [];
-    const chunkSize = Math.ceil(CHECKLIST_DATA.length / 4);
-    const groupLabels = [
-      'Grupo 1', 'Grupo 2', 'Grupo 3', 'Grupo 4',
-    ];
-    return Array.from({ length: 4 }, (_, gi) => {
-      const slice = CHECKLIST_DATA.slice(gi * chunkSize, (gi + 1) * chunkSize);
-      const sections: ConformSectionData[] = slice.map((sec, sIdx) => {
-        const realIdx = gi * chunkSize + sIdx;
-        const items = sec.items.map((itemText, iIdx) => {
-          const key = `${sec.id}-${iIdx}`;
-          const entry = entryMap[key];
-          const checked = checklistState[key] === true;
-          const reporter = entry?.reporter ? reporterLabel(entry.reporter) : '';
-          const timeStr = entry?.updated_at || entry?.checked_at
-            ? formatTime(entry.updated_at || entry.checked_at || '')
-            : '';
-          return { key, itemText, checked, reporter, time: timeStr };
-        });
-        return {
-          sectionId: sec.id,
-          sectionTitle: sec.title.replace(/^\d+\.\s*/, ''),
-          sectionIndex: realIdx + 1,
-          items,
-          checkedCount: items.filter(i => i.checked).length,
-          totalCount: items.length,
-        } as ConformSectionData;
-      });
-      return { groupLabel: groupLabels[gi], sections };
-    }).filter(g => g.sections.length > 0);
-  }, [usesFallbackGroups, checklistState, entryMap]);
-
-  const finalGroups = usesFallbackGroups ? fallbackGroups : conformGroups;
+  const openPhotoModal = (photos: string[], index: number) => setPhotoModal({ photos, index });
+  const closePhotoModal = () => setPhotoModal(null);
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', paddingBottom: '40px' }}>
 
-      {/* Pestañas */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>
-        <button onClick={() => setActiveTab('timeline')} style={{ flex: 1, padding: '16px', fontWeight: 700, color: activeTab === 'timeline' ? 'var(--primary)' : '#64748b', borderBottom: activeTab === 'timeline' ? '2px solid var(--primary)' : '2px solid transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' }}>
-          <Activity size={18} /> Alertas ({occurrences.length})
-        </button>
-        <button onClick={() => setActiveTab('conformidades')} style={{ flex: 1, padding: '16px', fontWeight: 700, color: activeTab === 'conformidades' ? 'var(--primary)' : '#64748b', borderBottom: activeTab === 'conformidades' ? '2px solid var(--primary)' : '2px solid transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all 0.2s' }}>
-          <Target size={18} /> Conformidade ({validationProgress}%)
-        </button>
+      {/* KPIs */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+        <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+          <div style={{ fontSize: '24px', fontWeight: 900, color: '#ef4444' }}>{occurrences.length}</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 4 }}>Alertas</div>
+        </div>
+        <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+          <div style={{ fontSize: '24px', fontWeight: 900, color: '#0d9488' }}>{overallPct}%</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 4 }}>Conformidade</div>
+        </div>
+        <div className="card" style={{ padding: '16px', textAlign: 'center' }}>
+          <div style={{ fontSize: '24px', fontWeight: 900, color: '#6366f1' }}>{checklistSessions.length}</div>
+          <div style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', marginTop: 4 }}>Sessões</div>
+        </div>
       </div>
 
-      <div style={{ padding: '20px', flex: 1, overflowY: 'auto', background: '#f8fafc' }}>
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: '8px', background: 'var(--surface)', borderRadius: '12px', padding: '4px' }}>
+        {(['alertas', 'conformidades'] as const).map(tab => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            style={{
+              flex: 1, padding: '10px', borderRadius: '10px', border: 'none',
+              fontSize: '13px', fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s',
+              background: activeTab === tab ? '#ffffff' : 'transparent',
+              color: activeTab === tab ? 'var(--text)' : 'var(--text-muted)',
+              boxShadow: activeTab === tab ? '0 1px 4px rgba(0,0,0,0.08)' : 'none',
+            }}
+          >
+            {tab === 'alertas' ? `⚠️ Alertas (${occurrences.length})` : `✅ Conformidades (${checkedItems}/${totalItems})`}
+          </button>
+        ))}
+      </div>
 
-        {/* ── Alertas ── */}
-        {activeTab === 'timeline' && (
-          <>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px', marginBottom: '20px' }}>
-              <div className="card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: '12px', background: '#fef3c7', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><AlertTriangle size={24} /></div>
-                <div>
-                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 800, letterSpacing: '0.05em' }}>OCORRÊNCIAS</div>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#1e293b', lineHeight: 1 }}>{occurrences.length}</div>
-                </div>
-              </div>
-              <div className="card" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '16px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.05)' }}>
-                <div style={{ width: 48, height: 48, borderRadius: '12px', background: '#e0e7ff', color: '#4f46e5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Camera size={24} /></div>
-                <div>
-                  <div style={{ fontSize: '11px', color: '#64748b', fontWeight: 800, letterSpacing: '0.05em' }}>EVIDÊNCIAS</div>
-                  <div style={{ fontSize: '24px', fontWeight: 900, color: '#1e293b', lineHeight: 1 }}>{totalPhotos}</div>
-                </div>
-              </div>
-            </div>
-            <div style={{ position: 'relative', marginBottom: '24px' }}>
-              <Search size={18} style={{ position: 'absolute', left: 16, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-              <input className="input" placeholder="Buscar máquina, colaborador ou item..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} style={{ paddingLeft: 44, width: '100%', height: '48px', borderRadius: '12px', border: '1px solid #cbd5e1', boxShadow: '0 1px 2px rgba(0,0,0,0.05)' }} />
-            </div>
-            {dateGroups.length === 0 ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b', background: '#ffffff', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>Nenhum registro encontrado.</div>
-            ) : (
-              dateGroups.map(group => (
-                <div key={group.dateStr} style={{ marginBottom: '32px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                    <div style={{ padding: '8px 16px', background: '#e2e8f0', color: '#475569', borderRadius: '99px', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Calendar size={14} /> {group.dateLabel}
-                    </div>
-                    <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
-                  </div>
-                  {group.collabs.map(([reporter, repOccs]) => (
-                    <CollaboratorCard key={reporter} reporter={reporter} occs={repOccs} onOpenPhoto={(p, idx) => setLightbox({ photos: p, index: idx })} />
-                  ))}
-                </div>
-              ))
+      {/* ---- ALERTAS ---- */}
+      {activeTab === 'alertas' && (
+        <div>
+          {/* Búsqueda */}
+          <div style={{ position: 'relative', marginBottom: '16px' }}>
+            <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            <input
+              type="text"
+              placeholder="Buscar alertas..."
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              style={{
+                width: '100%', padding: '10px 12px 10px 36px', borderRadius: '10px',
+                border: '1px solid #e2e8f0', fontSize: '14px', color: 'var(--text)',
+                background: 'var(--surface)', outline: 'none',
+              }}
+            />
+            {searchTerm && (
+              <button type="button" onClick={() => setSearchTerm('')} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8', background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}>
+                <X size={14} />
+              </button>
             )}
-          </>
-        )}
+          </div>
 
-        {/* ── Conformidades ── */}
-        {activeTab === 'conformidades' && (
-          <>
-            {/* Header de progresso geral */}
-            <div className="card" style={{ padding: '24px', marginBottom: '24px', background: 'linear-gradient(135deg, #059669, #10b981)', border: 'none', color: '#fff', boxShadow: '0 10px 25px -5px rgba(16,185,129,0.4)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '14px', fontWeight: 800, color: '#ecfdf5', display: 'flex', alignItems: 'center', gap: 8, letterSpacing: '0.05em' }}>
-                  <Target size={20} /> PROGRESSO GERAL (estado atual)
-                </h3>
-                <div style={{ fontSize: '32px', fontWeight: 900, color: '#ffffff', lineHeight: 1 }}>{validationProgress}%</div>
-              </div>
-              <div style={{ height: 8, background: 'rgba(255,255,255,0.2)', borderRadius: 99, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${validationProgress}%`, background: '#ffffff', borderRadius: 99, transition: 'width 0.5s ease-in-out' }} />
-              </div>
-              <p style={{ fontSize: '13px', color: '#d1fae5', marginTop: '12px', fontWeight: 600 }}>
-                {verifiedCount} de {maxChecks} pontos de inspeção validados
-                {lastUpdateDate && (
-                  <span style={{ marginLeft: 8, opacity: 0.8 }}>
-                    · atualizado {formatTime(lastUpdateDate)}
-                  </span>
-                )}
+          {occurrencesByDate.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)' }}>
+              <Activity size={40} style={{ margin: '0 auto 12px', color: '#cbd5e1' }} />
+              <p style={{ fontSize: '15px', fontWeight: 700 }}>Nenhuma ocorrência encontrada</p>
+              <p style={{ fontSize: '13px', marginTop: 4 }}>
+                {searchTerm ? 'Tente outro termo de busca' : 'As ocorrências registradas aparecerão aqui'}
               </p>
             </div>
-
-            {/* Grupos de seções com pill divisor */}
-            {finalGroups.length === 0 ? (
-              <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b', background: '#ffffff', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                <User size={32} style={{ color: '#94a3b8' }} />
-                <div style={{ fontWeight: 700 }}>Sem dados de checklist</div>
-                <div style={{ fontSize: 13 }}>Aguardando registros do checklist.</div>
+          ) : (
+            occurrencesByDate.map(({ date, reporters }) => (
+              <div key={date} style={{ marginBottom: '24px' }}>
+                {/* Divisor de fecha */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '999px', background: '#e2e8f0', color: '#475569', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
+                    <Calendar size={13} /> {formatDateLabel(date)}
+                  </div>
+                  <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                </div>
+                {reporters.map(([reporter, repOccs]) => (
+                  <CollaboratorCard key={reporter} reporter={reporter} occs={repOccs} onOpenPhoto={openPhotoModal} />
+                ))}
               </div>
-            ) : (
-              finalGroups.map((group, gi) => (
-                <ConformSectionGroup
-                  key={group.groupLabel}
-                  groupLabel={group.groupLabel}
-                  sections={group.sections}
-                  defaultOpen={gi === 0}
-                />
-              ))
-            )}
-          </>
-        )}
-      </div>
+            ))
+          )}
+        </div>
+      )}
 
-      {/* Modal de Fotos */}
-      {lightbox && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.95)', backdropFilter: 'blur(4px)', zIndex: 9999, display: 'flex', flexDirection: 'column', padding: '20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-            <button onClick={() => setLightbox(null)} style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)', color: '#fff', padding: 10, borderRadius: '12px', cursor: 'pointer' }}>
-              <X size={24} />
+      {/* ---- CONFORMIDADES ---- */}
+      {activeTab === 'conformidades' && (
+        <div>
+          {conformGroups.map(group => (
+            <ConformSectionGroup
+              key={group.label}
+              groupLabel={group.label}
+              sections={group.sections}
+              defaultOpen={false}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Modal foto */}
+      {photoModal && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}
+          onClick={closePhotoModal}
+        >
+          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+            <img
+              src={photoModal.photos[photoModal.index]}
+              alt="Foto"
+              style={{ maxWidth: '80vw', maxHeight: '80vh', borderRadius: '12px', objectFit: 'contain' }}
+            />
+            <button type="button" onClick={closePhotoModal} style={{ position: 'absolute', top: -12, right: -12, width: 32, height: 32, borderRadius: '50%', background: '#ffffff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+              <X size={16} />
             </button>
-          </div>
-          <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-            <img src={lightbox.photos[lightbox.index]} alt="Evidência" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }} />
           </div>
         </div>
       )}
