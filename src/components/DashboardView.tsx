@@ -153,72 +153,21 @@ function CollaboratorCard({ reporter, occs, onOpenPhoto }: { reporter: string; o
    CONFORMIDADES — tipos e componentes
    ====================================================== */
 
+interface ConformItem {
+  key: string;
+  itemText: string;
+  checked: boolean;
+  reporter: string;
+  time: string;
+}
+
 interface ConformSectionData {
   sectionId: string;
   sectionTitle: string;
   sectionIndex: number;
-  items: {
-    key: string;
-    itemText: string;
-    checked: boolean;
-    reporter: string;
-    time: string;
-  }[];
+  items: ConformItem[];
   checkedCount: number;
   totalCount: number;
-}
-
-/** Grupo de secciones colapsable con pill divisor */
-function ConformSectionGroup({
-  groupLabel,
-  sections,
-  defaultOpen,
-}: {
-  groupLabel: string;
-  sections: ConformSectionData[];
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen ?? false);
-
-  const totalItems = sections.reduce((a, s) => a + s.totalCount, 0);
-  const checkedItems = sections.reduce((a, s) => a + s.checkedCount, 0);
-  const pct = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
-  const color = pct === 100 ? '#10b981' : pct >= 60 ? '#0d9488' : '#d97706';
-
-  return (
-    <div style={{ marginBottom: '16px' }}>
-      {/* Pill divisor — mismo estilo que Alertas */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: open ? '12px' : 0 }}>
-        <button
-          type="button"
-          onClick={() => setOpen(o => !o)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '7px 14px', borderRadius: 999,
-            background: '#e2e8f0', color: '#475569',
-            border: '1px solid #cbd5e1',
-            fontSize: '12px', fontWeight: 800,
-            textTransform: 'uppercase', letterSpacing: '0.05em',
-            cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
-          }}
-        >
-          <Layers size={13} style={{ color }} />
-          {groupLabel}
-          <span style={{ fontSize: 11, fontWeight: 900, color, marginLeft: 4 }}>{pct}%</span>
-          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-        </button>
-        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
-      </div>
-
-      {open && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {sections.map(section => (
-            <ConformSectionCard key={section.sectionId} section={section} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 /** Tarjeta individual por sección */
@@ -294,27 +243,65 @@ function ConformSectionCard({ section }: { section: ConformSectionData }) {
   );
 }
 
+/** Grupo de categoría con pill divisor — mismo estilo que el divisor de fecha de Alertas */
+function ConformCategoryGroup({
+  groupLabel,
+  sections,
+}: {
+  groupLabel: string;
+  sections: ConformSectionData[];
+}) {
+  const [open, setOpen] = useState(false);
+  const totalItems = sections.reduce((a, s) => a + s.totalCount, 0);
+  const checkedItems = sections.reduce((a, s) => a + s.checkedCount, 0);
+  const pct = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
+  const color = pct === 100 ? '#10b981' : pct >= 60 ? '#0d9488' : '#d97706';
+
+  return (
+    <div style={{ marginBottom: '16px' }}>
+      {/* Pill divisor — idéntico al de Alertas pero con ícono Layers */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: open ? '12px' : 0 }}>
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '7px',
+            padding: '6px 12px', borderRadius: 999,
+            background: '#e2e8f0', color: '#475569',
+            border: 'none',
+            fontSize: '12px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.05em',
+            cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+          }}
+        >
+          <Layers size={13} style={{ color }} />
+          {groupLabel}
+          <span style={{ fontSize: 11, fontWeight: 900, color, marginLeft: 2 }}>{pct}%</span>
+          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+        <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+      </div>
+
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {sections.map(section => (
+            <ConformSectionCard key={section.sectionId} section={section} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ======================================================
    COMPONENTE PRINCIPAL
    ====================================================== */
 
 const SECTION_GROUPS = [
-  {
-    label: 'Equipamentos e Transporte',
-    sectionIds: ['perifericos', 'esteiras'],
-  },
-  {
-    label: 'Moinho e Componentes Mecânicos',
-    sectionIds: ['moinho', 'componentes'],
-  },
-  {
-    label: 'Operação, Molde e Lubrificação',
-    sectionIds: ['operacao', 'molde', 'lubrificacao'],
-  },
-  {
-    label: 'Parâmetros e Documentação',
-    sectionIds: ['parametros', 'documentacao'],
-  },
+  { label: 'Equipamentos e Transporte', sectionIds: ['perifericos', 'esteiras'] },
+  { label: 'Moinho e Componentes Mecânicos', sectionIds: ['moinho', 'componentes'] },
+  { label: 'Operação, Molde e Lubrificação', sectionIds: ['operacao', 'molde', 'lubrificacao'] },
+  { label: 'Parâmetros e Documentação', sectionIds: ['parametros', 'documentacao'] },
 ];
 
 export default function DashboardView({
@@ -345,7 +332,7 @@ export default function DashboardView({
 
     const dateMap: Record<string, Record<string, OccurrenceData[]>> = {};
     filtered.forEach(o => {
-      const dateKey = o.time ? todayISO() : todayISO();
+      const dateKey = todayISO();
       if (!dateMap[dateKey]) dateMap[dateKey] = {};
       const rep = reporterLabel(o.reporter);
       if (!dateMap[dateKey][rep]) dateMap[dateKey][rep] = [];
@@ -360,53 +347,67 @@ export default function DashboardView({
       }));
   }, [occurrences, searchTerm]);
 
-  /* ---- Conformidades agrupadas por grupos ---- */
-  const conformGroups = useMemo(() => {
-    return SECTION_GROUPS.map(group => {
-      const sections: ConformSectionData[] = CHECKLIST_DATA
-        .map((sec, sIdx) => {
-          const inGroup = group.sectionIds.some(sid =>
-            sec.id.toLowerCase().includes(sid) ||
-            sec.title.toLowerCase().includes(sid)
-          );
-          if (!inGroup) return null;
-
-          const items = sec.items.map((itemText, iIdx) => {
-            const key = `${sec.id}-${iIdx}`;
-            const entry = entryMap[key];
-            const checked = checklistState[key] === true;
-            const reporter = entry?.reporter ? reporterLabel(entry.reporter) : '';
-            const timeStr = entry?.updated_at || entry?.checked_at
-              ? formatTime(entry.updated_at || entry.checked_at || '')
-              : '';
-            return { key, itemText, checked, reporter, time: timeStr };
-          });
-
-          const checkedCount = items.filter(i => i.checked).length;
-          return {
-            sectionId: sec.id,
-            sectionTitle: sec.title.replace(/^\d+\.\s*/, ''),
-            sectionIndex: sIdx + 1,
-            items,
-            checkedCount,
-            totalCount: items.length,
-          };
-        })
-        .filter((s): s is ConformSectionData => s !== null);
-
-      return { label: group.label, sections };
+  /* ---- Conformidades agrupadas por día → categoría ---- */
+  const conformByDay = useMemo(() => {
+    // Determinar qué días existen
+    const daySet = new Set<string>();
+    checklistEntries.forEach(e => {
+      const iso = e.updated_at || e.checked_at;
+      if (iso) daySet.add(isoDateKey(iso));
     });
-  }, [checklistState, entryMap]);
+    if (daySet.size === 0) daySet.add(todayISO());
+
+    const days = Array.from(daySet).sort((a, b) => b.localeCompare(a));
+
+    return days.map(day => {
+      const groups = SECTION_GROUPS.map(group => {
+        const sections: ConformSectionData[] = CHECKLIST_DATA
+          .map((sec, sIdx) => {
+            const inGroup = group.sectionIds.some(sid =>
+              sec.id.toLowerCase().includes(sid) ||
+              sec.title.toLowerCase().includes(sid)
+            );
+            if (!inGroup) return null;
+
+            const items: ConformItem[] = sec.items.map((itemText, iIdx) => {
+              const key = `${sec.id}-${iIdx}`;
+              const entry = entryMap[key];
+              const entryDateKey = (entry?.updated_at || entry?.checked_at)
+                ? isoDateKey(entry.updated_at || entry.checked_at || '')
+                : '';
+              const belongsToDay = entryDateKey === day || (!entryDateKey && day === todayISO());
+              const checked = belongsToDay ? (checklistState[key] === true) : false;
+              const reporter = belongsToDay && entry?.reporter ? reporterLabel(entry.reporter) : '';
+              const timeStr = belongsToDay && (entry?.updated_at || entry?.checked_at)
+                ? formatTime(entry.updated_at || entry.checked_at || '')
+                : '';
+              return { key, itemText, checked, reporter, time: timeStr };
+            });
+
+            const checkedCount = items.filter(i => i.checked).length;
+            return {
+              sectionId: sec.id,
+              sectionTitle: sec.title.replace(/^\d+\.\s*/, ''),
+              sectionIndex: sIdx + 1,
+              items,
+              checkedCount,
+              totalCount: items.length,
+            };
+          })
+          .filter((s): s is ConformSectionData => s !== null);
+
+        return { label: group.label, sections };
+      }).filter(g => g.sections.length > 0);
+
+      return { date: day, groups };
+    });
+  }, [checklistEntries, checklistState, entryMap]);
 
   /* ---- Estadísticas generales ---- */
   const totalItems = useMemo(() =>
-    CHECKLIST_DATA.reduce((a, s) => a + s.items.length, 0),
-    []
-  );
+    CHECKLIST_DATA.reduce((a, s) => a + s.items.length, 0), []);
   const checkedItems = useMemo(() =>
-    Object.values(checklistState).filter(Boolean).length,
-    [checklistState]
-  );
+    Object.values(checklistState).filter(Boolean).length, [checklistState]);
   const overallPct = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
 
   const openPhotoModal = (photos: string[], index: number) => setPhotoModal({ photos, index });
@@ -454,7 +455,6 @@ export default function DashboardView({
       {/* ---- ALERTAS ---- */}
       {activeTab === 'alertas' && (
         <div>
-          {/* Búsqueda */}
           <div style={{ position: 'relative', marginBottom: '16px' }}>
             <Search size={16} style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input
@@ -486,7 +486,6 @@ export default function DashboardView({
           ) : (
             occurrencesByDate.map(({ date, reporters }) => (
               <div key={date} style={{ marginBottom: '24px' }}>
-                {/* Divisor de fecha */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '999px', background: '#e2e8f0', color: '#475569', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
                     <Calendar size={13} /> {formatDateLabel(date)}
@@ -505,14 +504,32 @@ export default function DashboardView({
       {/* ---- CONFORMIDADES ---- */}
       {activeTab === 'conformidades' && (
         <div>
-          {conformGroups.map(group => (
-            <ConformSectionGroup
-              key={group.label}
-              groupLabel={group.label}
-              sections={group.sections}
-              defaultOpen={false}
-            />
-          ))}
+          {conformByDay.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '48px 24px', color: 'var(--text-muted)' }}>
+              <CheckCircle2 size={40} style={{ margin: '0 auto 12px', color: '#cbd5e1' }} />
+              <p style={{ fontSize: '15px', fontWeight: 700 }}>Nenhuma conformidade registrada</p>
+            </div>
+          ) : (
+            conformByDay.map(({ date, groups }) => (
+              <div key={date} style={{ marginBottom: '28px' }}>
+                {/* Divisor de fecha — idéntico al de Alertas */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '999px', background: '#e2e8f0', color: '#475569', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
+                    <Calendar size={13} /> {formatDateLabel(date)}
+                  </div>
+                  <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
+                </div>
+                {/* Categorías del día */}
+                {groups.map(group => (
+                  <ConformCategoryGroup
+                    key={group.label}
+                    groupLabel={group.label}
+                    sections={group.sections}
+                  />
+                ))}
+              </div>
+            ))
+          )}
         </div>
       )}
 
