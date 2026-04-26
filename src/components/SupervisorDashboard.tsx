@@ -24,7 +24,21 @@ function toLocalDateKey(iso: string | undefined): string {
   const d = new Date(iso);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
-function todayKey() { return new Date().toISOString().slice(0, 10); }
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function yesterdayKey() {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function dateLabel(dk: string): string {
+  if (dk === todayKey()) return 'Hoje';
+  if (dk === yesterdayKey()) return 'Ontem';
+  const [y, m, day] = dk.split('-');
+  return `${day}/${m}/${y}`;
+}
 function initials(name: string) {
   return name.split(' - Auth:')[0].trim().split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase().slice(0, 2);
 }
@@ -37,6 +51,75 @@ function avatarColor(name: string) {
   let h = 0;
   for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % AVATAR_COLORS.length;
   return AVATAR_COLORS[h];
+}
+
+/* ─── Group occurrences by date ───────────────────────── */
+function groupByDate(occs: OccurrenceData[]): { dateKey: string; items: OccurrenceData[] }[] {
+  const sorted = [...occs].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''));
+  const groups: { dateKey: string; items: OccurrenceData[] }[] = [];
+  const seen = new Map<string, OccurrenceData[]>();
+  sorted.forEach(o => {
+    const dk = toLocalDateKey(o.created_at);
+    if (!seen.has(dk)) { seen.set(dk, []); groups.push({ dateKey: dk, items: seen.get(dk)! }); }
+    seen.get(dk)!.push(o);
+  });
+  return groups;
+}
+
+/* ─── Date Separator ─────────────────────────────────── */
+function DateSeparator({ dateKey, count }: { dateKey: string; count: number }) {
+  const isToday = dateKey === todayKey();
+  const isYesterday = dateKey === yesterdayKey();
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0',
+    }}>
+      <div style={{ flex: 1, height: 1, background: 'var(--divider)' }} />
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '3px 10px',
+        borderRadius: 999,
+        background: isToday ? 'var(--primary-hl)' : isYesterday ? 'var(--surface-offset, var(--surface-2))' : 'var(--surface-2)',
+        border: `1px solid ${isToday ? 'rgba(1,105,111,0.25)' : 'var(--border)'}`,
+        flexShrink: 0,
+      }}>
+        <Calendar size={10} style={{ color: isToday ? 'var(--primary)' : 'var(--text-muted)' }} />
+        <span style={{
+          fontSize: 11, fontWeight: 800, letterSpacing: '0.04em',
+          color: isToday ? 'var(--primary)' : 'var(--text-muted)',
+          whiteSpace: 'nowrap',
+        }}>{dateLabel(dateKey)}</span>
+        <span style={{
+          fontSize: 10, fontWeight: 700,
+          color: isToday ? 'var(--primary)' : 'var(--text-faint)',
+        }}>{count}</span>
+      </div>
+      <div style={{ flex: 1, height: 1, background: 'var(--divider)' }} />
+    </div>
+  );
+}
+
+/* ─── Timeline with date groups ───────────────────────── */
+function GroupedTimeline({ occs, onSelect, limit }: { occs: OccurrenceData[]; onSelect: (o: OccurrenceData) => void; limit?: number }) {
+  const groups = useMemo(() => groupByDate(occs), [occs]);
+  let rendered = 0;
+  const limited = limit != null;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+      {groups.map(({ dateKey, items }) => {
+        if (limited && rendered >= limit!) return null;
+        const toShow = limited ? items.slice(0, limit! - rendered) : items;
+        rendered += toShow.length;
+        return (
+          <div key={dateKey} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <DateSeparator dateKey={dateKey} count={items.length} />
+            {toShow.map(o => <FeedItem key={o.id} occ={o} onSelect={() => onSelect(o)} />)}
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 /* ─── Lightbox ────────────────────────────────────────── */
@@ -278,12 +361,12 @@ export default function SupervisorDashboard({ occurrences, checklistState }: Pro
     return Array.from({ length: 7 }, (_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (6 - i));
-      const dk = d.toISOString().slice(0, 10);
+      const dk = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const dayOccs = occurrences.filter(o => toLocalDateKey(o.created_at) === dk);
       return {
         day: days[d.getDay()],
         occs: dayOccs.length,
-        confs: 0, // conformidades não têm timestamp por dia; usamos 0
+        confs: 0,
       };
     });
   }, [occurrences]);
@@ -411,7 +494,7 @@ export default function SupervisorDashboard({ occurrences, checklistState }: Pro
                   <CheckCircle2 size={32} style={{ margin: '0 auto 10px', color: 'var(--success)' }} />
                   <p style={{ fontWeight: 700, fontSize: 13 }}>Nenhuma ocorrência encontrada</p>
                 </div>
-              ) : filteredOccs.map(o => <FeedItem key={o.id} occ={o} onSelect={() => setSelectedOcc(o)} />)}
+              ) : <GroupedTimeline occs={filteredOccs} onSelect={setSelectedOcc} />}
             </div>
           )}
           {mobileTab === 'conformidades' && (
@@ -422,15 +505,13 @@ export default function SupervisorDashboard({ occurrences, checklistState }: Pro
             </div>
           )}
           {mobileTab === 'timeline' && (
-            <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div style={{ padding: '12px 14px' }}>
               {occurrences.length === 0 ? (
                 <div style={{ textAlign: 'center', padding: 32, color: 'var(--text-muted)' }}>
                   <Activity size={32} style={{ margin: '0 auto 10px', color: 'var(--text-faint)' }} />
                   <p style={{ fontWeight: 700, fontSize: 13 }}>Nenhuma atividade registrada</p>
                 </div>
-              ) : [...occurrences].sort((a, b) => (b.created_at || '').localeCompare(a.created_at || '')).map(o => (
-                <FeedItem key={o.id} occ={o} onSelect={() => setSelectedOcc(o)} />
-              ))}
+              ) : <GroupedTimeline occs={occurrences} onSelect={setSelectedOcc} />}
             </div>
           )}
         </div>
@@ -457,7 +538,7 @@ export default function SupervisorDashboard({ occurrences, checklistState }: Pro
                   <p style={{ fontWeight: 700, fontSize: 13 }}>Nenhuma ocorrência</p>
                   <p style={{ fontSize: 11, marginTop: 4 }}>Operação dentro da normalidade</p>
                 </div>
-              ) : filteredOccs.map(o => <FeedItem key={o.id} occ={o} onSelect={() => setSelectedOcc(o)} />)}
+              ) : <GroupedTimeline occs={filteredOccs} onSelect={setSelectedOcc} />}
             </div>
           </div>
 
@@ -517,7 +598,7 @@ export default function SupervisorDashboard({ occurrences, checklistState }: Pro
           </div>
         </div>
 
-        {/* ── Timeline Feed (all occurrences, desktop) ─ */}
+        {/* ── Timeline Feed (all occurrences, desktop + mobile) ─ */}
         <div style={{ borderBottom: '1px solid var(--divider)' }}>
           <div style={{ padding: '12px 18px', background: 'var(--surface)', borderBottom: '1px solid var(--divider)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Activity size={14} style={{ color: 'var(--primary)' }} />
@@ -531,14 +612,15 @@ export default function SupervisorDashboard({ occurrences, checklistState }: Pro
                 <p style={{ fontWeight: 700, fontSize: 13 }}>Operação limpa</p>
                 <p style={{ fontSize: 11, marginTop: 4 }}>Nenhuma ocorrência registrada ainda</p>
               </div>
-            ) : [...occurrences]
-                .sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))
-                .slice(0, 20)
-                .map(o => <FeedItem key={o.id} occ={o} onSelect={() => setSelectedOcc(o)} />)}
-            {occurrences.length > 20 && (
-              <div style={{ textAlign: 'center', padding: 8 }}>
-                <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Mostrando os 20 mais recentes de {occurrences.length} no total</span>
-              </div>
+            ) : (
+              <>
+                <GroupedTimeline occs={occurrences.slice(0, 20)} onSelect={setSelectedOcc} limit={20} />
+                {occurrences.length > 20 && (
+                  <div style={{ textAlign: 'center', padding: 8 }}>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Mostrando os 20 mais recentes de {occurrences.length} no total</span>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
