@@ -171,6 +171,17 @@ a, button, [role="button"], input, textarea, select {
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
 }
 
+/*
+ * app-content-wrapper
+ * Envuelve el contenido debajo del Header con max-width centrado.
+ * Evita que tablas, modales y tarjetas se estiren en ultrawide/4K (>1440px).
+ */
+.app-content-wrapper {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+}
+
 /* Card base */
 .card {
   background: var(--surface);
@@ -325,9 +336,15 @@ select option:hover {
 }
 
 /* ── ADMIN GRID ───────────────────────────────────────────── */
+/*
+ * FIX ultra-small screens (<360px, Galaxy Fold):
+ * Antes: minmax(320px, 420px) — desbordaba en pantallas <320px.
+ * Ahora: minmax(min(100%, 320px), 420px) — el primer carril nunca
+ * supera el 100% del viewport. El segundo carril cede con minmax(0,1fr).
+ */
 .admin-content-grid {
   display: grid;
-  grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
+  grid-template-columns: minmax(min(100%, 320px), 420px) minmax(0, 1fr);
   gap: var(--s6);
   padding: var(--s6);
 }
@@ -355,9 +372,28 @@ select option:hover {
   }
 }
 
+/*
+ * employee-detail-grid
+ * Reemplaza el inline style rígido gridTemplateColumns:'repeat(3,1fr)'
+ * en OccurrenceDetailModal. Apila a 1 columna en móviles pequeños
+ * (<480px) y pasa a 3 columnas en pantallas medianas (≥480px).
+ */
+.employee-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--border);
+}
+@media (min-width: 480px) {
+  .employee-detail-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════
    RESPONSIVE — Galaxy A55 (412×915px) & Mobile General
-   Breakpoints: ≤640px (tablet/mobile), ≤480px (phone), ≤400px (small phone)
+   Breakpoints: ≤640px (tablet/mobile), ≤480px (phone), ≤360px (ultra-small)
    ══════════════════════════════════════════════════════════════ */
 
 /* ── 1. ALL INPUTS: prevent iOS auto-zoom (font-size must be ≥16px) ── */
@@ -374,7 +410,6 @@ select option:hover {
   textarea,
   select {
     font-size: 16px !important;
-    /* Habilita tap highlight correto */
     -webkit-tap-highlight-color: rgba(13,148,136,0.15);
   }
 }
@@ -395,7 +430,6 @@ select option:hover {
     min-height: 48px;
     -webkit-tap-highlight-color: transparent;
   }
-  /* Active state visível no toque */
   .btn-primary:active { opacity: 0.85; transform: scale(0.98); }
   .btn-ghost:active   { opacity: 0.75; }
 }
@@ -407,7 +441,6 @@ select option:hover {
     padding: 0 var(--s3) !important;
     gap: var(--s2) !important;
   }
-  /* Título da página abaixo do topbar */
   .header-page-section {
     padding: var(--s3) var(--s4) !important;
   }
@@ -418,7 +451,6 @@ select option:hover {
 
 /* ── 5. TABS / NAVEGAÇÃO HORIZONTAL ── */
 @media (max-width: 640px) {
-  /* Wrapper das tabs: scroll horizontal fluido */
   .collab-tabs-bar,
   [class*="tabs-bar"],
   [class*="tab-nav"] {
@@ -430,7 +462,6 @@ select option:hover {
   .collab-tabs-bar::-webkit-scrollbar,
   [class*="tabs-bar"]::-webkit-scrollbar { display: none; }
 
-  /* Cada botão de tab */
   .collab-tab-btn {
     flex-shrink: 0;
     padding: var(--s2) var(--s4) !important;
@@ -443,12 +474,10 @@ select option:hover {
 
 /* ── 6. MODAIS: bottom sheet no mobile ── */
 @media (max-width: 640px) {
-  /* Overlay: alinha no fundo */
   .occurrence-modal {
     align-items: flex-end !important;
     padding: 0 !important;
   }
-  /* Container: ocupa toda a largura, sem radius embaixo */
   .occurrence-modal-inner {
     width: 100% !important;
     max-width: 100% !important;
@@ -458,7 +487,6 @@ select option:hover {
     border-top-left-radius: var(--r-2xl) !important;
     border-top-right-radius: var(--r-2xl) !important;
   }
-  /* Handle visual (drag indicator) */
   .occurrence-modal-inner::before {
     content: '';
     display: block;
@@ -471,20 +499,65 @@ select option:hover {
   }
 }
 
+/* ── 6b. MODAIS: modo landscape en móvil ─────────────────────────────────────
+ * En móviles en horizontal (height ≤500px):
+ *   • El modal ocupa 100dvh en lugar de max-height: 92dvh
+ *   • Sin border-radius masivo (se aplana a 0)
+ *   • Paddings verticales reducidos para maximizar el área de lectura
+ *   • Elementos no esenciales (.modal-section-label) ocultos
+ *   • .header-page-section oculto para ganar espacio vertical
+ * ─────────────────────────────────────────────────────────────────────────── */
+@media (orientation: landscape) and (max-height: 500px) {
+  .occ-detail-overlay,
+  .conf-detail-overlay {
+    align-items: stretch !important;
+    padding: 0 !important;
+  }
+  .occ-detail-box,
+  .conf-detail-box {
+    max-height: 100dvh !important;
+    height: 100dvh !important;
+    border-radius: 0 !important;
+    max-width: 100% !important;
+  }
+  /* Reducir padding vertical en headers de modal */
+  .occ-detail-box > div:first-child,
+  .conf-detail-box > div:first-child {
+    padding-block: var(--s2) !important;
+  }
+  /* Ocultar subtítulos/labels no esenciales en landscape */
+  .modal-section-label {
+    display: none;
+  }
+  /* Header topbar más compacto */
+  .header-topbar {
+    height: 44px !important;
+  }
+  /* Ocultar page title section para ganar espacio vertical */
+  .header-page-section {
+    display: none !important;
+  }
+  /* Ocultar bottom sheet handle en landscape */
+  .occurrence-modal-inner::before {
+    display: none;
+  }
+  /* employee-detail-grid: en landscape forzar 3 cols aunque sean pequeñas */
+  .employee-detail-grid {
+    grid-template-columns: repeat(3, 1fr) !important;
+  }
+}
+
 /* ── 7. CHECKLIST ITEMS: layout adaptado ── */
 @media (max-width: 480px) {
-  /* Itens do checklist — espaçamento reduzido */
   .checklist-item-row {
     gap: var(--s2) !important;
     padding: var(--s3) !important;
   }
-  /* Checkbox maior para toque */
   .checklist-item-row input[type="checkbox"] {
     width: 20px !important;
     height: 20px !important;
     margin-top: 2px !important;
   }
-  /* Botão de ocorrência: texto menor */
   .checklist-occurrence-btn {
     font-size: 11px !important;
     padding: var(--s2) var(--s3) !important;
@@ -494,19 +567,16 @@ select option:hover {
 
 /* ── 8. GRIDS DE STATS / KPIs ── */
 @media (max-width: 640px) {
-  /* Dashboard KPIs: máximo 2 colunas */
   .dashboard-kpi-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: var(--s3) !important;
     padding: var(--s3) !important;
   }
-  /* Stats de admin: 2 colunas */
   .admin-stats-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     padding: var(--s3) var(--s3) !important;
     gap: var(--s3) !important;
   }
-  /* Grid genérico de 4 colunas → 2 */
   .stats-grid-4 {
     grid-template-columns: repeat(2, 1fr) !important;
   }
@@ -514,20 +584,16 @@ select option:hover {
 
 /* ── 9. CONTEÚDO PRINCIPAL: padding lateral reduzido ── */
 @media (max-width: 480px) {
-  /* Área principal do colaborador */
   .colaborador-main,
   .main-content-area {
     padding: var(--s3) !important;
   }
-  /* Seções de card: padding interno compacto */
   .section-card-body {
     padding: var(--s3) var(--s3) !important;
   }
-  /* Progress container */
   .progress-container {
     padding: var(--s3) var(--s4) !important;
   }
-  /* Section headers do checklist */
   .checklist-section-header {
     padding: var(--s3) var(--s4) !important;
   }
@@ -535,12 +601,10 @@ select option:hover {
 
 /* ── 10. FOTOS / EVIDÊNCIAS ── */
 @media (max-width: 480px) {
-  /* Grid de fotos: 2 colunas */
   .photos-evidence-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: var(--s2) !important;
   }
-  /* Thumbnail de ocorrência: compacto */
   .occurrence-photo-thumb {
     width: 60px !important;
     height: 60px !important;
@@ -553,7 +617,6 @@ select option:hover {
   .occurrence-card-grid {
     grid-template-columns: 1fr !important;
   }
-  /* Grupos por data/reporter: padding compacto */
   .occurrence-date-group {
     padding-inline: var(--s3) !important;
   }
@@ -564,15 +627,13 @@ select option:hover {
   .occurrence-item-card {
     margin-left: 0 !important;
   }
-  /* Badges: tamanho reduzido */
   .badge {
     font-size: 10px !important;
     padding: 2px 6px !important;
   }
 }
 
-/* ── 12. REPORT MODAL: já é bottom sheet por inline style,
-         garantir que preview grid fique legível ── */
+/* ── 12. REPORT MODAL ── */
 @media (max-width: 400px) {
   .report-preview-grid {
     grid-template-columns: repeat(2, 1fr) !important;
@@ -606,7 +667,6 @@ select option:hover {
     gap: var(--s3) !important;
     padding: var(--s3) !important;
   }
-  /* Tabelas → scroll horizontal */
   .dashboard-table-wrapper {
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
@@ -633,13 +693,12 @@ select option:hover {
     transform: none;
     box-shadow: none;
   }
-  /* Tooltips não funcionam em touch */
   [title]:hover::after {
     display: none;
   }
 }
 
-/* ── 18. LOGIN / LOCK SCREEN: centralizado no mobile ── */
+/* ── 18. LOGIN / LOCK SCREEN ── */
 @media (max-width: 480px) {
   .login-card {
     margin: var(--s4);
