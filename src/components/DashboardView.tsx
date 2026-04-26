@@ -1,8 +1,8 @@
 /**
- * DashboardView v8 — Admin & Supervisor Dashboard
+ * DashboardView v9 — Admin & Supervisor Dashboard
  * Hierarchy: Date → Collaborator → Occurrences
  * Fully responsive, mobile-first, touch-friendly.
- * Fix: same collaborator on multiple machines is now grouped as one person.
+ * v9: show machine name inside CollaboratorCard and OccurrenceDetailModal.
  */
 import { useState, useMemo } from 'react';
 import {
@@ -11,7 +11,7 @@ import {
   Clock, Camera, Calendar, Activity,
   Users, Shield, Zap, Star,
   ArrowRight, Flame, Target, Search,
-  BarChart2, UserCheck, Eye
+  BarChart2, UserCheck, Eye, Cpu
 } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
@@ -45,21 +45,23 @@ function formatDateFull(dateKey: string): string {
 }
 
 /**
- * Normalizes the reporter field to just the person's name + shift,
- * stripping the machine info so the same person on different machines
- * is treated as ONE collaborator.
- *
- * Input examples:
- *   "João Silva (Turno A) | Máquina: ROMI 01 - Auth: user@email.com"
- *   "João Silva (Turno A) | Máquina: ROMI 02 - Auth: user@email.com"
- * Output: "João Silva (Turno A)"
+ * Returns just the person's name + shift, stripping machine and auth.
+ * "João Silva (Turno A) | Máquina: ROMI 01 - Auth: ..." → "João Silva (Turno A)"
  */
 function reporterLabel(raw: string): string {
-  // Strip auth part first
   const withoutAuth = raw.split(' - Auth:')[0].trim();
-  // Strip machine part (anything after " | Máquina:")
-  const withoutMachine = withoutAuth.split(' | Máquina:')[0].split(' | maquina:')[0].trim();
-  return withoutMachine;
+  return withoutAuth.split(' | Máquina:')[0].split(' | maquina:')[0].trim();
+}
+
+/**
+ * Extracts the machine name from the reporter string.
+ * "João Silva (Turno A) | Máquina: ROMI 01 - Auth: ..." → "ROMI 01"
+ * Returns null if not present.
+ */
+function machineLabel(raw: string): string | null {
+  const withoutAuth = raw.split(' - Auth:')[0].trim();
+  const machineMatch = withoutAuth.match(/\|\s*[Mm]á?quina:\s*(.+)$/);
+  return machineMatch ? machineMatch[1].trim() : null;
 }
 
 function initials(name: string): string {
@@ -84,6 +86,7 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: {
   occurrence: OccurrenceData; onClose: ()=>void; onOpenPhoto: (p:string[], i:number)=>void;
 }) {
   const reporter = reporterLabel(occurrence.reporter);
+  const machine  = machineLabel(occurrence.reporter);
   const dateStr = occurrence.created_at
     ? new Date(occurrence.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
   const av = getAvatarColor(reporter);
@@ -118,11 +121,20 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: {
             </button>
           </div>
           <div className="occ-scroll">
+            {/* Reporter row */}
             <div style={{display:'flex',alignItems:'center',gap:'clamp(10px,3vw,14px)',padding:'clamp(14px,3vw,18px) clamp(14px,3vw,20px)',background:'rgba(255,255,255,0.03)',borderRadius:18,border:'1px solid rgba(255,255,255,0.06)',marginBottom:20}}>
               <div style={{width:48,height:48,borderRadius:'50%',background:av.bg,border:`2px solid ${av.fg}44`,color:av.fg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:900,flexShrink:0,boxShadow:`0 4px 16px ${av.glow}`}}>{initials(reporter)}</div>
               <div style={{flex:1,minWidth:0}}>
                 <div style={{fontSize:15,fontWeight:800,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reporter}</div>
-                <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:3,fontWeight:600}}>Operador responsável</div>
+                {machine && (
+                  <div style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:5,padding:'2px 10px',borderRadius:99,background:'rgba(99,102,241,0.15)',border:'1px solid rgba(99,102,241,0.25)',color:'#818cf8'}}>
+                    <Cpu size={10}/>
+                    <span style={{fontSize:11,fontWeight:800,whiteSpace:'nowrap'}}>{machine}</span>
+                  </div>
+                )}
+                {!machine && (
+                  <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:3,fontWeight:600}}>Operador responsável</div>
+                )}
               </div>
               <div style={{textAlign:'right',flexShrink:0}}>
                 <div style={{fontSize:14,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{occurrence.time}</div>
@@ -303,6 +315,13 @@ function CollaboratorCard({ reporter, occs, onSelectOcc }:{
   const av = getAvatarColor(reporter);
   const photoCount = occs.reduce((a,o)=>a+o.photos.length,0);
 
+  // Collect unique machines for this collaborator across all their occurrences
+  const machines = useMemo(()=>{
+    const set = new Set<string>();
+    occs.forEach(o=>{ const m=machineLabel(o.reporter); if(m) set.add(m); });
+    return [...set];
+  },[occs]);
+
   return (
     <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:20,overflow:'hidden',boxShadow:'0 4px 16px rgba(0,0,0,0.06)',transition:'box-shadow 0.2s'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)',background:'linear-gradient(90deg,var(--surface-2) 0%,var(--surface) 100%)',borderBottom:expanded?'1px solid var(--border)':'none',gap:10}}>
@@ -315,9 +334,19 @@ function CollaboratorCard({ reporter, occs, onSelectOcc }:{
               <AlertTriangle size={7} color="#fff"/>
             </div>
           </div>
-          <div style={{minWidth:0}}>
+          <div style={{minWidth:0,flex:1}}>
             <div style={{fontSize:'clamp(13px,3.5vw,15px)',fontWeight:800,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reporter}</div>
-            <div style={{display:'flex',alignItems:'center',gap:6,marginTop:5,flexWrap:'wrap' as const}}>
+            {/* Machine badges */}
+            {machines.length>0&&(
+              <div style={{display:'flex',flexWrap:'wrap' as const,gap:4,marginTop:4}}>
+                {machines.map(m=>(
+                  <span key={m} style={{display:'inline-flex',alignItems:'center',gap:4,height:20,padding:'0 8px',borderRadius:99,fontSize:10,fontWeight:800,background:'rgba(99,102,241,0.12)',color:'#818cf8',border:'1px solid rgba(99,102,241,0.2)',whiteSpace:'nowrap' as const}}>
+                    <Cpu size={8}/> {m}
+                  </span>
+                ))}
+              </div>
+            )}
+            <div style={{display:'flex',alignItems:'center',gap:6,marginTop:machines.length>0?4:5,flexWrap:'wrap' as const}}>
               <span style={{display:'inline-flex',alignItems:'center',gap:4,height:22,padding:'0 10px',borderRadius:99,fontSize:10,fontWeight:900,background:'rgba(217,119,6,0.1)',color:'#d97706',border:'1px solid rgba(217,119,6,0.15)',whiteSpace:'nowrap' as const}}>
                 <AlertTriangle size={9}/> {occs.length} {occs.length===1?'alerta':'alertas'}
               </span>
@@ -446,8 +475,8 @@ function DateSection({ dateKey, occs, onSelectOcc }:{
 }
 
 /* ─── Collaborator Summary Row ──────────────────────────────── */
-function CollaboratorSummaryRow({ reporter, totalOccs, totalPhotos, activeDays, onFilter }:{
-  reporter:string; totalOccs:number; totalPhotos:number; activeDays:number; onFilter:()=>void;
+function CollaboratorSummaryRow({ reporter, totalOccs, totalPhotos, activeDays, machines, onFilter }:{
+  reporter:string; totalOccs:number; totalPhotos:number; activeDays:number; machines:string[]; onFilter:()=>void;
 }) {
   const av = getAvatarColor(reporter);
   return (
@@ -460,6 +489,15 @@ function CollaboratorSummaryRow({ reporter, totalOccs, totalPhotos, activeDays, 
       </div>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:'clamp(12px,3.5vw,14px)',fontWeight:800,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reporter}</div>
+        {machines.length>0&&(
+          <div style={{display:'flex',flexWrap:'wrap' as const,gap:3,marginTop:3}}>
+            {machines.map(m=>(
+              <span key={m} style={{display:'inline-flex',alignItems:'center',gap:3,padding:'1px 7px',borderRadius:99,fontSize:9,fontWeight:800,background:'rgba(99,102,241,0.1)',color:'#818cf8',border:'1px solid rgba(99,102,241,0.18)',whiteSpace:'nowrap' as const}}>
+                <Cpu size={7}/> {m}
+              </span>
+            ))}
+          </div>
+        )}
         <div style={{display:'flex',gap:'clamp(6px,2vw,10px)',marginTop:4,flexWrap:'wrap' as const}}>
           <span style={{fontSize:10,fontWeight:700,color:'#d97706',display:'flex',alignItems:'center',gap:3}}><AlertTriangle size={9}/>{totalOccs} alertas</span>
           {totalPhotos>0&&<span style={{fontSize:10,fontWeight:700,color:'var(--primary)',display:'flex',alignItems:'center',gap:3}}><Camera size={9}/>{totalPhotos} fotos</span>}
@@ -485,7 +523,6 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
   const validationProgress = maxChecks>0?Math.round((verifiedCount/maxChecks)*100):0;
   const totalPhotos        = occurrences.reduce((acc,o)=>acc+o.photos.length,0);
 
-  // Deduplicate collaborators by normalized name (ignores machine differences)
   const uniqueCollabs = useMemo(()=>[...new Set(occurrences.map(o=>reporterLabel(o.reporter)))],[occurrences]);
 
   const filteredOccs = useMemo(()=>{
@@ -497,7 +534,8 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
         o.section.toLowerCase().includes(q)||
         o.item.toLowerCase().includes(q)||
         (o.comment||'').toLowerCase().includes(q)||
-        reporterLabel(o.reporter).toLowerCase().includes(q)
+        reporterLabel(o.reporter).toLowerCase().includes(q)||
+        (machineLabel(o.reporter)||'').toLowerCase().includes(q)
       );
     }
     return list;
@@ -509,17 +547,18 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
     return Object.entries(map).sort(([a],[b])=>b.localeCompare(a));
   },[filteredOccs]);
 
-  // Aggregate stats per normalized collaborator name
+  // Aggregate stats per normalized collaborator name (includes machines list)
   const collabStats = useMemo(()=>{
-    const map: Record<string,{occs:number;photos:number;days:Set<string>}> = {};
+    const map: Record<string,{occs:number;photos:number;days:Set<string>;machines:Set<string>}> = {};
     occurrences.forEach(o=>{
       const r=reporterLabel(o.reporter);
-      if(!map[r])map[r]={occs:0,photos:0,days:new Set()};
+      if(!map[r])map[r]={occs:0,photos:0,days:new Set(),machines:new Set()};
       map[r].occs++;
       map[r].photos+=o.photos.length;
       map[r].days.add(toLocalDateKey(o.created_at));
+      const m=machineLabel(o.reporter); if(m) map[r].machines.add(m);
     });
-    return Object.entries(map).sort(([,a],[,b])=>b.occs-a.occs).map(([r,s])=>({reporter:r,...s,activeDays:s.days.size}));
+    return Object.entries(map).sort(([,a],[,b])=>b.occs-a.occs).map(([r,s])=>({reporter:r,...s,activeDays:s.days.size,machines:[...s.machines]}));
   },[occurrences]);
 
   const conformSections = CHECKLIST_DATA.map(s=>({section:s,conformItems:s.items.filter(i=>checklistState[`${s.id}__${i}`]===true)})).filter(({conformItems})=>conformItems.length>0);
@@ -599,7 +638,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
             <div className="search-row">
               <div className="search-input-wrap">
                 <Search size={14} style={{position:'absolute',left:11,top:'50%',transform:'translateY(-50%)',color:'var(--text-muted)',pointerEvents:'none'}}/>
-                <input className="search-input" placeholder="Buscar seção, item, colaborador…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/>
+                <input className="search-input" placeholder="Buscar seção, item, máquina, colaborador…" value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/>
               </div>
               {filterCollab&&(
                 <button className="filter-chip" onClick={()=>setFilterCollab(null)}>
@@ -653,6 +692,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
                     totalOccs={c.occs}
                     totalPhotos={c.photos}
                     activeDays={c.activeDays}
+                    machines={c.machines}
                     onFilter={()=>{ setFilterCollab(c.reporter); setActiveTab('timeline'); }}
                   />
                 ))}
