@@ -16,3 +16,12 @@ export interface ChecklistEntry {
   checked_at?: string;
   updated_at?: string;
 }
+
+export interface ChecklistSession {
+  id: string;
+  reporter: string;
+  machine: string;
+  shift: string;
+  submitted_at: string;
+  items: { key: string; checked: boolean }[];
+}
