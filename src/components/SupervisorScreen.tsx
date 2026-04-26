@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { FileText } from 'lucide-react';
-import { OccurrenceData } from '../types';
+import { OccurrenceData, ChecklistEntry, ChecklistSession } from '../types';
 import Header from './Header';
 import DashboardView from './DashboardView';
 import ReportModal from './ReportModal';
@@ -9,6 +9,8 @@ interface SupervisorScreenProps {
   onLogout: () => void;
   occurrences: OccurrenceData[];
   checklistState: Record<string, boolean>;
+  checklistEntries?: ChecklistEntry[];
+  checklistSessions?: ChecklistSession[];
   useBiometrics?: boolean;
   onToggleBiometrics?: () => void;
   userEmail?: string;
@@ -18,6 +20,8 @@ export default function SupervisorScreen({
   onLogout,
   occurrences,
   checklistState,
+  checklistEntries = [],
+  checklistSessions = [],
   useBiometrics,
   onToggleBiometrics,
   userEmail = 'Supervisor',
@@ -37,8 +41,12 @@ export default function SupervisorScreen({
         onToggleBiometrics={onToggleBiometrics}
       />
 
-      {/* Dashboard com hierarquia data → colaborador */}
-      <DashboardView occurrences={occurrences} checklistState={checklistState} />
+      <DashboardView
+        occurrences={occurrences}
+        checklistState={checklistState}
+        checklistEntries={checklistEntries}
+        checklistSessions={checklistSessions}
+      />
 
       {/* Botão flutuante de relatório */}
       <div className="report-btn-fixed">
