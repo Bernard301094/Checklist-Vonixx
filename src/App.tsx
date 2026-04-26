@@ -64,24 +64,16 @@ export default function App() {
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
   const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
 
-  // ── Ref para rastrear o userId já processado ──
-  // Evita rebuscar o role quando o onAuthStateChange dispara eventos
-  // duplicados (TOKEN_REFRESHED, USER_UPDATED) para o mesmo usuário.
   const resolvedUserIdRef = useRef<string | null>(null);
 
-  // --- SOLUCIÓN APLICADA AQUÍ ---
   useEffect(() => {
     const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
       if (!isActive && role !== 'login' && useBiometrics) {
-        
-        // Verificamos si la app se fue a segundo plano porque abrimos la cámara
         const skip = localStorage.getItem('skipBiometric');
         if (skip === 'true') {
-          // Borramos la bandera para que la próxima vez sí se bloquee normalmente
           localStorage.removeItem('skipBiometric');
-          return; // No bloqueamos la pantalla
+          return;
         }
-        
         setIsLocked(true);
       }
     });
@@ -133,7 +125,6 @@ export default function App() {
     const user = session?.user;
 
     if (!user) {
-      // Sem sessão → volta para login, reseta tudo
       resolvedUserIdRef.current = null;
       setCurrentUser(null);
       setRole('login');
@@ -144,7 +135,6 @@ export default function App() {
 
     setCurrentUser({ id: user.id, email: user.email, user_metadata: user.user_metadata });
 
-    // ── Verifica troca obrigatória de senha ──
     if (user.user_metadata?.force_password_change === true) {
       resolvedUserIdRef.current = user.id;
       setMustChangePassword(true);
@@ -154,12 +144,10 @@ export default function App() {
 
     setMustChangePassword(false);
 
-    // ── Evita rebuscar role para o mesmo usuário ──
     if (resolvedUserIdRef.current === user.id) {
       return;
     }
 
-    // Primeiro acesso deste userId nesta sessão
     resolvedUserIdRef.current = user.id;
 
     const isBioEnabled = localStorage.getItem('useBiometrics') === 'true';
@@ -241,6 +229,25 @@ export default function App() {
     }
   };
 
+  // ── Editar ocorrência existente ──────────────────────────────
+  const handleUpdateOccurrence = async (id: string, patch: { comment?: string; photos?: string[] }) => {
+    const { data, error } = await supabase
+      .from(OCCURRENCES_TABLE)
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao atualizar ocorrência:', error.message);
+      throw error;
+    }
+
+    if (data) {
+      setOccurrences(prev => prev.map(o => o.id === id ? (data as OccurrenceData) : o));
+    }
+  };
+
   const handleCheck = async (key: string, checked: boolean) => {
     setChecklistState(prev => ({ ...prev, [key]: checked }));
 
@@ -281,7 +288,7 @@ export default function App() {
       <ChangePasswordScreen
         userEmail={currentUser.email || ''}
         onPasswordChanged={async () => {
-          resolvedUserIdRef.current = null; // força nova leitura de role
+          resolvedUserIdRef.current = null;
           const { data: { session } } = await supabase.auth.getSession();
           await applySession(session);
         }}
@@ -334,6 +341,8 @@ export default function App() {
       checklistState={checklistState}
       onCheck={handleCheck}
       onSaveOccurrence={handleAddOccurrence}
+      onUpdateOccurrence={handleUpdateOccurrence}
+      occurrences={occurrences}
       userEmail={currentUser?.email || ''}
       reporterName={reporterName}
       shift={shift}
