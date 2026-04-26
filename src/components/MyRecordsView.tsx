@@ -51,7 +51,6 @@ function EditModal({
   onSaved: (patch: { comment: string; photos: string[] }) => Promise<void>;
 }) {
   const [comment, setComment] = useState(occ.comment || '');
-  // existing = URLs ya guardadas, newFiles = archivos nuevos a subir
   const [existingPhotos, setExistingPhotos] = useState<string[]>(occ.photos || []);
   const [newFiles, setNewFiles] = useState<File[]>([]);
   const [newPreviews, setNewPreviews] = useState<string[]>([]);
@@ -130,7 +129,7 @@ function EditModal({
             </button>
           </div>
 
-          {/* Info do item (somente leitura) */}
+          {/* Info del item (solo lectura) */}
           <div style={{ padding: 'var(--s3) var(--s5)', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 'var(--s3)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600 }}>Seção: <strong style={{ color: 'var(--text)' }}>{occ.section}</strong></span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600 }}>Hora: <strong style={{ color: 'var(--text)' }}>{occ.time}</strong></span>
@@ -187,7 +186,6 @@ function EditModal({
                 </div>
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 'var(--s2)' }}>
-                  {/* Fotos existentes */}
                   {existingPhotos.map((url, i) => (
                     <div key={`ex-${i}`} style={{ position: 'relative', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid var(--border)', aspectRatio: '1' }}>
                       <img src={url} alt={`Foto ${i+1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} loading="lazy" />
@@ -199,7 +197,6 @@ function EditModal({
                       )}
                     </div>
                   ))}
-                  {/* Fotos novas (preview local) */}
                   {newPreviews.map((url, i) => (
                     <div key={`new-${i}`} style={{ position: 'relative', borderRadius: 'var(--r-lg)', overflow: 'hidden', border: '1px solid rgba(251,191,36,0.4)', aspectRatio: '1' }}>
                       <img src={url} alt={`Nova foto ${i+1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -369,7 +366,8 @@ function DayGroup({ dateKey, occs, onSelect, isToday }: { dateKey: string; occs:
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', padding: 'var(--s2) var(--s3)', background: isToday ? 'var(--primary-hl)' : 'var(--surface-2)', border: `1px solid ${isToday ? 'rgba(13,148,136,0.25)' : 'var(--border)'}`, borderRadius: 'var(--r-full)' }}>
           <Calendar size={12} style={{ color: isToday ? 'var(--primary)' : 'var(--text-muted)' }} />
           <span style={{ fontSize: 'var(--text-xs)', fontWeight: 800, color: isToday ? 'var(--primary)' : 'var(--text)' }}>{formatFullDate(dateKey)}</span>
-          {isToday && <span style={{ fontSize: 10, fontWeight: 800, color: 'var(--primary)', background: 'var(--primary)', color: '#fff', padding: '1px 6px', borderRadius: 999 }}>hoje</span>}
+          {/* FIX: removed duplicate color key — kept only color:'#fff' */}
+          {isToday && <span style={{ fontSize: 10, fontWeight: 800, background: 'var(--primary)', color: '#fff', padding: '1px 6px', borderRadius: 999 }}>hoje</span>}
         </div>
         <div style={{ flex: 1, height: 1, background: 'var(--divider)' }} />
         <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
@@ -425,7 +423,6 @@ export default function MyRecordsView({ occurrences, checklistState, reporterNam
 
   const today = todayKey();
 
-  // Filtra apenas as ocorrências do próprio colaborador
   const myOccs = useMemo(() => {
     return occurrences.filter(o => {
       const rep = reporterLabel(o.reporter).toLowerCase();
@@ -510,7 +507,6 @@ export default function MyRecordsView({ occurrences, checklistState, reporterNam
             <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
               style={{ flex: 1, padding: 'var(--s3) var(--s4)', fontSize: 'var(--text-sm)', fontWeight: 700, color: isActive ? tab.active : 'var(--text-muted)', borderBottom: isActive ? `2px solid ${tab.active}` : '2px solid transparent', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--s2)', cursor: 'pointer', transition: 'color 150ms ease' }}>
               <Icon size={14} />
-              <span style={{ display: 'none' }}>_</span>
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 18, height: 18, borderRadius: 999, fontSize: 11, fontWeight: 700, background: isActive ? tab.hl : 'var(--surface-2)', color: isActive ? tab.active : 'var(--text-muted)', padding: '0 5px' }}>
                 {tab.count}
