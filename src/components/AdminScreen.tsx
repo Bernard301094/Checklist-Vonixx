@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo, CheckCircle2, FileText } from 'lucide-react';
 import Header from './Header';
 import CustomSelect from './CustomSelect';
-import DashboardView from './DashboardView';
+import SupervisorDashboard from './SupervisorDashboard';
 import ReportModal from './ReportModal';
 import { supabase } from '../supabase';
 import { OccurrenceData } from '../types';
@@ -390,8 +390,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         </button>
       </div>
 
+      {/* Dashboard tab — now uses SupervisorDashboard (same as supervisor role) */}
       {activeTab === 'dashboard' && (
-        <DashboardView occurrences={occurrences} checklistState={checklistState} />
+        <SupervisorDashboard occurrences={occurrences} checklistState={checklistState} />
       )}
 
       {activeTab === 'users' && (
