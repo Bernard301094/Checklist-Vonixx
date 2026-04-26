@@ -1,9 +1,11 @@
 /**
  * MyRecordsView — Vista de registros del colaborador con edición
- * - Solo muestra registros del propio usuario
- * - Permite editar comentario y agregar/quitar fotos
- * - Solo ocurrencias del día actual son editables
- * - Otros colaboradores NO pueden ver registros ajenos
+ *
+ * FIXES v2:
+ * 1. myOccs filter: strict email match via "Auth:" field (primary),
+ *    exact name match (fallback). No more fuzzy .includes() leaking data.
+ * 2. myConforms: now uses `${section.id}-${idx}` key to match
+ *    ColaboradorScreen's checklistState format (was `${section.id}__${item}`).
  */
 import { useState, useMemo, useRef } from 'react';
 import {
@@ -34,8 +36,25 @@ function formatFullDate(dk: string): string {
   return d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
+/**
+ * Strips everything from " - Auth:" onward AND the machine segment,
+ * returning just the human-readable reporter name + shift, e.g.:
+ *   "João Silva (Manhã) | Máquina: ROMI 01 - Auth: joao@ex.com"
+ *   → "João Silva (Manhã)"
+ */
 function reporterLabel(raw: string): string {
-  return raw.split(' - Auth:')[0].trim();
+  return raw.split(' - Auth:')[0].split(' | Máquina:')[0].split(' | maquina:')[0].trim();
+}
+
+/** Extracts the auth email embedded by ColaboradorScreen */
+function reporterEmail(raw: string): string | null {
+  const m = raw.match(/ - Auth:\s*(.+)$/);
+  return m ? m[1].trim() : null;
+}
+
+/** Strips the (shift) parenthetical to get the bare name */
+function stripShift(label: string): string {
+  return label.replace(/\s*\(.*?\)\s*$/, '').trim();
 }
 
 function todayKey(): string {
@@ -129,7 +148,7 @@ function EditModal({
             </button>
           </div>
 
-          {/* Info del item (solo lectura) */}
+          {/* Info */}
           <div style={{ padding: 'var(--s3) var(--s5)', background: 'var(--surface-2)', borderBottom: '1px solid var(--border)', display: 'flex', gap: 'var(--s3)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600 }}>Seção: <strong style={{ color: 'var(--text)' }}>{occ.section}</strong></span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600 }}>Hora: <strong style={{ color: 'var(--text)' }}>{occ.time}</strong></span>
@@ -140,8 +159,6 @@ function EditModal({
 
           {/* Body */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s5)', display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
-
-            {/* Comentário */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', fontWeight: 700 }}>
                 <MessageSquare size={14} style={{ color: 'var(--primary)' }} />
@@ -158,7 +175,6 @@ function EditModal({
               />
             </div>
 
-            {/* Fotos */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--s2)' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-sm)', fontWeight: 700 }}>
@@ -366,7 +382,6 @@ function DayGroup({ dateKey, occs, onSelect, isToday }: { dateKey: string; occs:
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)', padding: 'var(--s2) var(--s3)', background: isToday ? 'var(--primary-hl)' : 'var(--surface-2)', border: `1px solid ${isToday ? 'rgba(13,148,136,0.25)' : 'var(--border)'}`, borderRadius: 'var(--r-full)' }}>
           <Calendar size={12} style={{ color: isToday ? 'var(--primary)' : 'var(--text-muted)' }} />
           <span style={{ fontSize: 'var(--text-xs)', fontWeight: 800, color: isToday ? 'var(--primary)' : 'var(--text)' }}>{formatFullDate(dateKey)}</span>
-          {/* FIX: removed duplicate color key — kept only color:'#fff' */}
           {isToday && <span style={{ fontSize: 10, fontWeight: 800, background: 'var(--primary)', color: '#fff', padding: '1px 6px', borderRadius: 999 }}>hoje</span>}
         </div>
         <div style={{ flex: 1, height: 1, background: 'var(--divider)' }} />
@@ -415,7 +430,7 @@ function DayGroup({ dateKey, occs, onSelect, isToday }: { dateKey: string; occs:
 }
 
 /* ─── Main Export ────────────────────────────────────────────── */
-export default function MyRecordsView({ occurrences, checklistState, reporterName, reporterEmail, onUpdateOccurrence }: MyRecordsViewProps) {
+export default function MyRecordsView({ occurrences, checklistState, reporterName, reporterEmail: myEmail, onUpdateOccurrence }: MyRecordsViewProps) {
   const [selectedOcc, setSelectedOcc] = useState<OccurrenceData | null>(null);
   const [editingOcc, setEditingOcc] = useState<OccurrenceData | null>(null);
   const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
@@ -423,13 +438,28 @@ export default function MyRecordsView({ occurrences, checklistState, reporterNam
 
   const today = todayKey();
 
+  /**
+   * FIX: Strict filtering — primary match by Auth email, fallback by exact name.
+   * The reporter string format is:
+   *   "${reporterName} (${shift}) | Máquina: ${machine} - Auth: ${userEmail}"
+   * We extract the email after "- Auth:" and compare it strictly.
+   * This prevents "Op. Silva" from seeing "Op. Silvano"'s records.
+   */
   const myOccs = useMemo(() => {
+    const normalEmail = myEmail?.trim().toLowerCase() ?? '';
+    const normalName  = reporterName.trim().toLowerCase();
+
     return occurrences.filter(o => {
-      const rep = reporterLabel(o.reporter).toLowerCase();
-      const me = reporterName.trim().toLowerCase();
-      return rep.includes(me) || me.includes(rep);
+      // Primary: match by email (Auth field) — most reliable
+      const embeddedEmail = reporterEmail(o.reporter);
+      if (embeddedEmail && normalEmail) {
+        return embeddedEmail.toLowerCase() === normalEmail;
+      }
+      // Fallback: exact name match after stripping shift parenthetical
+      const labelName = stripShift(reporterLabel(o.reporter)).toLowerCase();
+      return labelName === normalName;
     });
-  }, [occurrences, reporterName]);
+  }, [occurrences, reporterName, myEmail]);
 
   const byDay = useMemo(() => {
     const map: Record<string, OccurrenceData[]> = {};
@@ -441,9 +471,15 @@ export default function MyRecordsView({ occurrences, checklistState, reporterNam
     return Object.entries(map).sort((a, b) => b[0].localeCompare(a[0]));
   }, [myOccs]);
 
+  /**
+   * FIX: use "${section.id}-${idx}" to match ColaboradorScreen's key format.
+   * Previously used `${section.id}__${item}` which never matched anything.
+   */
   const myConforms = useMemo(() => {
     return CHECKLIST_DATA.map(section => {
-      const items = section.items.filter(item => checklistState[`${section.id}__${item}`] === true);
+      const items = section.items.filter(
+        (_, idx) => checklistState[`${section.id}-${idx}`] === true
+      );
       return { section, items };
     }).filter(({ items }) => items.length > 0);
   }, [checklistState]);
@@ -498,8 +534,8 @@ export default function MyRecordsView({ occurrences, checklistState, reporterNam
       {/* Tabs */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)', overflowX: 'auto', scrollbarWidth: 'none' }}>
         {[
-          { id: 'ocorrencias' as const, label: 'Ocorrências', count: myOccs.length, icon: AlertTriangle, active: 'var(--warning)', hl: 'var(--warning-hl)' },
-          { id: 'conformidades' as const, label: 'Conformidades', count: totalConforms, icon: CheckCircle2, active: 'var(--success)', hl: 'var(--success-hl)' },
+          { id: 'ocorrencias'   as const, label: 'Ocorrências',  count: myOccs.length,   icon: AlertTriangle, active: 'var(--warning)', hl: 'var(--warning-hl)' },
+          { id: 'conformidades' as const, label: 'Conformidades', count: totalConforms,   icon: CheckCircle2,  active: 'var(--success)', hl: 'var(--success-hl)' },
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
