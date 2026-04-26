@@ -5,7 +5,7 @@ import CustomSelect from './CustomSelect';
 import DashboardView from './DashboardView';
 import ReportModal from './ReportModal';
 import { supabase } from '../supabase';
-import { OccurrenceData } from '../types';
+import { OccurrenceData, ChecklistEntry, ChecklistSession } from '../types';
 import { CHECKLIST_DATA } from '../constants';
 
 interface AdminScreenProps {
@@ -15,6 +15,8 @@ interface AdminScreenProps {
   onToggleBiometrics?: () => void;
   occurrences?: OccurrenceData[];
   checklistState?: Record<string, boolean>;
+  checklistEntries?: ChecklistEntry[];
+  checklistSessions?: ChecklistSession[];
 }
 
 interface ManagedUser {
@@ -56,7 +58,7 @@ function formatDate(iso: string | null | undefined): string {
   return new Date(iso).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics, onToggleBiometrics, occurrences = [], checklistState = {} }: AdminScreenProps) {
+export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics, onToggleBiometrics, occurrences = [], checklistState = {}, checklistEntries = [], checklistSessions = [] }: AdminScreenProps) {
   const [activeTab, setActiveTab] = useState<'users' | 'dashboard' | 'checklist'>('users');
   const [showReportModal, setShowReportModal] = useState(false);
   const [email, setEmail] = useState('');
@@ -388,9 +390,14 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         </button>
       </div>
 
-      {/* Dashboard tab — usa DashboardView com hierarquia data → colaborador */}
+      {/* Dashboard tab — passa todas las props incluyendo checklistSessions */}
       {activeTab === 'dashboard' && (
-        <DashboardView occurrences={occurrences} checklistState={checklistState} />
+        <DashboardView
+          occurrences={occurrences}
+          checklistState={checklistState}
+          checklistEntries={checklistEntries}
+          checklistSessions={checklistSessions}
+        />
       )}
 
       {activeTab === 'users' && (
