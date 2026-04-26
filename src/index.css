@@ -121,6 +121,10 @@ html {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
+  /* Evita zoom automático de iOS/Android ao focar inputs */
+  -moz-text-size-adjust: none;
+  -webkit-text-size-adjust: none;
+  text-size-adjust: none;
 }
 
 body {
@@ -130,6 +134,8 @@ body {
   color: var(--text);
   background-color: var(--bg);
   line-height: 1.6;
+  /* Previne overscroll bounce no iOS */
+  overscroll-behavior: none;
 }
 
 img, picture, video, canvas, svg { display: block; max-width: 100%; height: auto; }
@@ -153,7 +159,7 @@ a, button, [role="button"], input, textarea, select {
 }
 
 /* ── SCROLLBAR ────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
   background: var(--border);
@@ -215,7 +221,8 @@ a, button, [role="button"], input, textarea, select {
   background: var(--surface-2);
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
-  font-size: var(--text-sm);
+  /* Mínimo 16px em mobile para evitar zoom automático no iOS */
+  font-size: max(16px, var(--text-sm));
   font-weight: 500;
   color: var(--text);
   min-height: 44px;
@@ -244,7 +251,7 @@ select {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   color: var(--text);
-  font-size: var(--text-sm);
+  font-size: max(16px, var(--text-sm));
   font-weight: 500;
   font-family: var(--font-body);
   min-height: 44px;
@@ -266,7 +273,7 @@ select:hover {
   background-color: var(--surface);
 }
 
-/* Option theming — best effort (browser/OS controlled) */
+/* Option theming */
 select option {
   background-color: var(--surface);
   color: var(--text);
@@ -282,7 +289,6 @@ select option:hover {
   color: var(--primary);
 }
 
-/* Dark mode: swap the chevron to a lighter tint */
 [data-theme="dark"] select.input,
 [data-theme="dark"] select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -321,6 +327,7 @@ select option:hover {
   50% { opacity: 0.4; }
 }
 
+/* ── ADMIN GRID ───────────────────────────────────────────── */
 .admin-content-grid {
   display: grid;
   grid-template-columns: minmax(320px, 420px) minmax(0, 1fr);
@@ -348,6 +355,181 @@ select option:hover {
   .admin-stats-grid {
     padding: var(--s4);
     grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+}
+
+/* ── RESPONSIVE — GALAXY A55 & MOBILE GENERAL ─────────────── */
+/* Galaxy A55: 412 × 915px, device pixel ratio 2.625            */
+/* Breakpoints aplicados: ≤480px (mobile), ≤412px (small phone) */
+
+/* ── Layout principal mobile ── */
+@media (max-width: 480px) {
+
+  /* Padding global reduzido */
+  .card { border-radius: var(--r-lg); }
+
+  /* Grids de estatísticas: 2 colunas em vez de 4 */
+  [style*="repeat(auto-fit, minmax(200px"] {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  /* Sections: padding lateral menor */
+  [style*="padding: var(--s6)"],
+  [style*="padding: var(--s5) var(--s6)"] {
+    padding-inline: var(--s4) !important;
+  }
+}
+
+/* ── Checklist mobile ── */
+@media (max-width: 480px) {
+  /* Itens do checklist: layout de coluna em vez de row */
+  .checklist-item-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: var(--s2) !important;
+    padding: var(--s3) var(--s4) !important;
+  }
+
+  /* Foto thumbnail menor em mobile */
+  .occurrence-photo-thumb {
+    width: 64px !important;
+    height: 64px !important;
+  }
+
+  /* Cards de ocorrência: grid simples */
+  .occurrence-card-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* KPIs do dashboard: 2 colunas */
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--s3) !important;
+    padding: var(--s4) !important;
+  }
+}
+
+/* ── Header mobile compacto ── */
+@media (max-width: 480px) {
+  .header-page-title {
+    font-size: clamp(1.1rem, 4vw, 1.4rem) !important;
+  }
+
+  .header-topbar {
+    height: 52px !important;
+    padding: 0 var(--s3) !important;
+  }
+}
+
+/* ── Tabs/Nav mobile ── */
+@media (max-width: 480px) {
+  /* Tabs: scroll horizontal se necessário */
+  .mobile-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .mobile-tabs::-webkit-scrollbar { display: none; }
+
+  /* Botões de tab: compactos */
+  .mobile-tab-btn {
+    padding: var(--s3) var(--s4) !important;
+    font-size: 12px !important;
+    white-space: nowrap;
+  }
+}
+
+/* ── Modal/overlay mobile: bottom sheet ── */
+@media (max-width: 480px) {
+  /* Occurrence modal: ocupa tela toda de baixo para cima */
+  .occurrence-modal {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .occurrence-modal-inner {
+    border-bottom-left-radius: 0 !important;
+    border-bottom-right-radius: 0 !important;
+    max-height: 95dvh !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* ── Grids de fotos mobile ── */
+@media (max-width: 480px) {
+  /* Grid de evidências fotográficas: 2 colunas */
+  .photos-evidence-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--s2) !important;
+  }
+}
+
+/* ── Form controls mobile ── */
+@media (max-width: 480px) {
+  /* Inputs: tamanho mínimo 16px para evitar zoom iOS/Android */
+  .input,
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="date"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  /* Botões: altura mínima de toque confortável */
+  .btn-primary,
+  .btn-ghost,
+  button[type="submit"] {
+    min-height: 48px;
+  }
+}
+
+/* ── Supervisor/Admin: table cards mobile ── */
+@media (max-width: 480px) {
+  /* Cards de ocorrências agrupados por data */
+  .occurrence-date-group {
+    padding-inline: var(--s3) !important;
+  }
+  .occurrence-reporter-group {
+    margin-left: 0 !important;
+    padding-inline: var(--s2) !important;
+  }
+  .occurrence-item-card {
+    margin-left: 0 !important;
+  }
+  /* Badge dentro de cards: tamanho reduzido */
+  .badge {
+    font-size: 10px !important;
+    padding: 2px var(--s1) !important;
+  }
+}
+
+/* ── ColaboradorScreen: seção de checklist mobile ── */
+@media (max-width: 480px) {
+  /* Padding da área principal do colaborador */
+  .colaborador-main {
+    padding: var(--s3) !important;
+  }
+  /* Section headers do checklist: compacto */
+  .checklist-section-header {
+    padding: var(--s3) var(--s4) !important;
+    font-size: var(--text-xs) !important;
+  }
+  /* Container do progresso */
+  .progress-container {
+    padding: var(--s3) var(--s4) !important;
+  }
+}
+
+/* ── Safe area para celulares com notch/barra de navegação ── */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  /* Bottom navigation bar nativa do Android */
+  .app-bottom-safe {
+    padding-bottom: max(var(--s4), env(safe-area-inset-bottom));
   }
 }
 
