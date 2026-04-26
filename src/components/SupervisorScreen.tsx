@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { FileText } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import Header from './Header';
-import DashboardView from './DashboardView';
+import SupervisorDashboard from './SupervisorDashboard';
 import ReportModal from './ReportModal';
 
 interface SupervisorScreenProps {
@@ -37,7 +37,8 @@ export default function SupervisorScreen({
         onToggleBiometrics={onToggleBiometrics}
       />
 
-      <DashboardView occurrences={occurrences} checklistState={checklistState} />
+      {/* Command Center Dashboard */}
+      <SupervisorDashboard occurrences={occurrences} checklistState={checklistState} />
 
       {/* Botão flutuante de relatório */}
       <div style={{ position: 'fixed', bottom: 24, right: 20, zIndex: 100 }}>
