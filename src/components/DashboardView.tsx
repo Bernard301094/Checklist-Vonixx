@@ -1,13 +1,13 @@
 /**
  * DashboardView — Supervisor & Admin
  *
- * Ocorrências  → agrupadas por data → funcionário → cards colapsáveis
- * Conformidades → agrupadas por data (via occurrences.created_at do mesmo turno)
- *                 e por seção → itens marcados, com detail modal ao clicar
- *
- * O checklistState usa chave: `${section.id}__${item}` (App.tsx)
+ * Design B+C:
+ *   • Strip horizontal de dias (últimos 7 dias) com indicador de atividade
+ *   • Cards por funcionário (sempre visíveis) para o dia selecionado
+ *   • Cada card de registro → clic abre modal de detalhe
+ *   • Tab Conformidades mantém design original melhorado
  */
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   BarChart3, CheckCircle2, AlertTriangle, Images, ClipboardList,
   X, ChevronLeft, ChevronRight, ChevronDown, ChevronUp,
@@ -22,20 +22,30 @@ interface DashboardViewProps {
 }
 
 /* ─── helpers ─────────────────────────────────────────────── */
-function formatDateLabel(isoOrBR: string): string {
-  // Tenta parsear como ISO ou como pt-BR dd/mm/yyyy
-  try {
-    const parts = isoOrBR.includes('/') ? isoOrBR.split('/').reverse().join('-') : isoOrBR.slice(0, 10);
-    const d = new Date(parts + 'T12:00:00');
-    return d.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-  } catch {
-    return isoOrBR;
-  }
+function toLocalDateKey(isoOrDate: string | undefined): string {
+  if (!isoOrDate) return new Date().toISOString().slice(0, 10);
+  const d = new Date(isoOrDate);
+  // Usa horário local para evitar desfasagem de fuso
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
 }
 
-function dateKey(occ: OccurrenceData): string {
-  const d = occ.created_at ? new Date(occ.created_at) : new Date();
-  return d.toISOString().slice(0, 10); // YYYY-MM-DD para ordenação
+function formatDayStrip(dateKey: string): { dayNum: string; dayName: string; monthShort: string } {
+  const d = new Date(dateKey + 'T12:00:00');
+  const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+  const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  return {
+    dayNum: String(d.getDate()).padStart(2, '0'),
+    dayName: days[d.getDay()],
+    monthShort: months[d.getMonth()],
+  };
+}
+
+function formatFullDate(dateKey: string): string {
+  const d = new Date(dateKey + 'T12:00:00');
+  return d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function reporterLabel(raw: string): string {
@@ -51,27 +61,13 @@ function initials(name: string): string {
     .join('');
 }
 
-/* ─── types ───────────────────────────────────────────────── */
-type GroupedMap = Record<string, Record<string, OccurrenceData[]>>;
-
+/* ─── Occurrence Detail Modal ──────────────────────────────── */
 interface DetailModalProps {
   occurrence: OccurrenceData;
   onClose: () => void;
   onOpenPhoto: (photos: string[], idx: number) => void;
 }
 
-interface ConformDetail {
-  sectionTitle: string;
-  items: string[];
-  total: number;
-}
-
-interface ConformModalProps {
-  detail: ConformDetail;
-  onClose: () => void;
-}
-
-/* ─── Occurrence Detail Modal ──────────────────────────────── */
 function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModalProps) {
   const reporter = reporterLabel(occurrence.reporter);
   const dateStr = occurrence.created_at
@@ -104,7 +100,6 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
       `}</style>
       <div className="occ-detail-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="occ-detail-box">
-          {/* Header */}
           <div style={{ padding:'var(--s4) var(--s5)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, background:'var(--sidebar-bg)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:'var(--s3)' }}>
               <div style={{ width:40, height:40, borderRadius:'var(--r-xl)', background:'rgba(217,119,6,0.2)', color:'var(--warning)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -121,7 +116,6 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
           </div>
 
           <div className="occ-detail-scroll">
-            {/* Meta info */}
             <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'var(--s3)', padding:'var(--s4) var(--s5)', borderBottom:'1px solid var(--border)' }}>
               {[
                 { icon: User, label:'Funcionário', value: reporter },
@@ -139,7 +133,6 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
             </div>
 
             <div style={{ padding:'var(--s4) var(--s5)', display:'flex', flexDirection:'column', gap:'var(--s4)' }}>
-              {/* Fator crítico */}
               <div>
                 <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:'var(--s2)' }}>
                   <Hash size={13} style={{ color:'var(--warning)' }} />
@@ -150,7 +143,6 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
                 </div>
               </div>
 
-              {/* Comentário */}
               <div>
                 <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:'var(--s2)' }}>
                   <MessageSquare size={13} style={{ color:'var(--text-muted)' }} />
@@ -163,14 +155,13 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
                 </div>
               </div>
 
-              {/* Fotos */}
               {occurrence.photos.length > 0 && (
                 <div>
                   <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:'var(--s2)' }}>
                     <Camera size={13} style={{ color:'var(--primary)' }} />
                     <span style={{ fontSize:'var(--text-xs)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', color:'var(--primary)' }}>Evidências — {occurrence.photos.length} foto(s)</span>
                   </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:'var(--s3)' }}>
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))', gap:'var(--s3)' }}>
                     {occurrence.photos.map((p, i) => (
                       <button key={i} type="button" onClick={() => onOpenPhoto(occurrence.photos, i)}
                         style={{ position:'relative', borderRadius:'var(--r-lg)', overflow:'hidden', border:'1px solid var(--border)', aspectRatio:'1', padding:0, cursor:'zoom-in', background:'var(--surface-2)' }}>
@@ -190,33 +181,24 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
 }
 
 /* ─── Conformidade Detail Modal ────────────────────────────── */
-function ConformDetailModal({ detail, onClose }: ConformModalProps) {
+interface ConformDetail {
+  sectionTitle: string;
+  items: string[];
+  total: number;
+}
+
+function ConformDetailModal({ detail, onClose }: { detail: ConformDetail; onClose: () => void }) {
   return (
     <>
       <style>{`
-        .conf-detail-overlay{
-          position:fixed;inset:0;background:rgba(2,6,23,0.88);
-          backdrop-filter:blur(8px);display:flex;align-items:center;
-          justify-content:center;z-index:3000;padding:var(--s4);
-          animation:fadeInCF 0.15s ease;
-        }
-        .conf-detail-box{
-          width:100%;max-width:520px;background:var(--surface);
-          border:1px solid var(--border);border-radius:var(--r-2xl);
-          box-shadow:var(--sh-xl);max-height:92dvh;
-          display:flex;flex-direction:column;overflow:hidden;
-          animation:slideUpCF 0.2s ease;
-        }
-        @media(max-width:480px){
-          .conf-detail-overlay{align-items:flex-end;padding:0;}
-          .conf-detail-box{max-width:100%;border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:96dvh;}
-        }
+        .conf-detail-overlay{position:fixed;inset:0;background:rgba(2,6,23,0.88);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:3000;padding:var(--s4);animation:fadeInCF 0.15s ease;}
+        .conf-detail-box{width:100%;max-width:520px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-xl);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;animation:slideUpCF 0.2s ease;}
+        @media(max-width:480px){.conf-detail-overlay{align-items:flex-end;padding:0;}.conf-detail-box{max-width:100%;border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:96dvh;}}
         @keyframes fadeInCF{from{opacity:0}to{opacity:1}}
         @keyframes slideUpCF{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
       `}</style>
       <div className="conf-detail-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="conf-detail-box">
-          {/* Header */}
           <div style={{ padding:'var(--s4) var(--s5)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, background:'var(--success-hl)' }}>
             <div style={{ display:'flex', alignItems:'center', gap:'var(--s3)' }}>
               <div style={{ width:40, height:40, borderRadius:'var(--r-xl)', background:'rgba(22,163,74,0.2)', color:'var(--success)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
@@ -231,18 +213,10 @@ function ConformDetailModal({ detail, onClose }: ConformModalProps) {
               <X size={16} />
             </button>
           </div>
-
-          {/* Progress */}
           <div style={{ padding:'var(--s3) var(--s5)', borderBottom:'1px solid var(--border)', background:'var(--surface-2)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-            <span style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', fontWeight:600 }}>
-              {detail.items.length} de {detail.total} itens verificados
-            </span>
-            <span style={{ fontSize:'var(--text-xs)', fontWeight:800, color:'var(--success)' }}>
-              {Math.round((detail.items.length / detail.total) * 100)}% desta seção
-            </span>
+            <span style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', fontWeight:600 }}>{detail.items.length} de {detail.total} itens verificados</span>
+            <span style={{ fontSize:'var(--text-xs)', fontWeight:800, color:'var(--success)' }}>{Math.round((detail.items.length / detail.total) * 100)}% desta seção</span>
           </div>
-
-          {/* Items */}
           <div style={{ overflowY:'auto', flex:1, padding:'var(--s4) var(--s5)', display:'flex', flexDirection:'column', gap:'var(--s2)' }}>
             {detail.items.map((item, i) => (
               <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:'var(--s3)', padding:'var(--s3) var(--s4)', borderRadius:'var(--r-lg)', background:'var(--success-hl)', border:'1px solid rgba(22,163,74,0.18)' }}>
@@ -254,103 +228,6 @@ function ConformDetailModal({ detail, onClose }: ConformModalProps) {
         </div>
       </div>
     </>
-  );
-}
-
-/* ─── EmployeeGroup — colapsável ──────────────────────────── */
-interface EmployeeGroupProps {
-  reporter: string;
-  occs: OccurrenceData[];
-  defaultOpen: boolean;
-  onSelectOcc: (occ: OccurrenceData) => void;
-}
-
-function EmployeeGroup({ reporter, occs, defaultOpen, onSelectOcc }: EmployeeGroupProps) {
-  const [open, setOpen] = useState(defaultOpen);
-  const ini = initials(reporter);
-
-  return (
-    <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-xl)', overflow:'hidden' }}>
-      {/* Employee header — clicável para colapsar */}
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
-          padding:'var(--s3) var(--s4)', background:'var(--surface-2)',
-          borderBottom: open ? '1px solid var(--border)' : 'none',
-          cursor:'pointer', gap:'var(--s3)',
-          transition:'background var(--t)',
-        }}
-      >
-        <div style={{ display:'flex', alignItems:'center', gap:'var(--s3)', minWidth:0 }}>
-          <div style={{ width:34, height:34, borderRadius:'50%', background:'linear-gradient(135deg,var(--primary),#06b6d4)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:12, fontWeight:700, flexShrink:0 }}>
-            {ini || <User size={14} />}
-          </div>
-          <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:'var(--text-sm)', fontWeight:700, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{reporter}</div>
-            <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', fontWeight:600 }}>{occs.length} ocorrência(s)</div>
-          </div>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:'var(--s2)', flexShrink:0 }}>
-          <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', minWidth:22, height:22, borderRadius:999, fontSize:11, fontWeight:700, background:'var(--warning-hl)', color:'var(--warning)', padding:'0 6px' }}>
-            {occs.length}
-          </span>
-          {open ? <ChevronUp size={16} style={{ color:'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color:'var(--text-muted)' }} />}
-        </div>
-      </button>
-
-      {/* Occurrence list */}
-      {open && (
-        <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
-          {occs.map((occ, i) => (
-            <button
-              key={occ.id}
-              type="button"
-              onClick={() => onSelectOcc(occ)}
-              style={{
-                width:'100%', display:'flex', alignItems:'center', gap:'var(--s4)',
-                padding:'var(--s4) var(--s5)',
-                borderBottom: i < occs.length - 1 ? '1px solid var(--border)' : 'none',
-                background:'transparent', cursor:'pointer', textAlign:'left',
-                transition:'background var(--t)',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
-              {/* Left accent */}
-              <div style={{ width:4, alignSelf:'stretch', background:'var(--warning)', borderRadius:'var(--r-full)', flexShrink:0 }} />
-
-              <div style={{ flex:1, minWidth:0 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:'var(--s2)', marginBottom:'var(--s1)', flexWrap:'wrap' }}>
-                  <span style={{ fontSize:'var(--text-xs)', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>{occ.section}</span>
-                  {occ.photos.length > 0 && (
-                    <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:10, fontWeight:700, color:'var(--primary)', background:'var(--primary-hl)', padding:'1px 6px', borderRadius:999 }}>
-                      <Camera size={10} /> {occ.photos.length}
-                    </span>
-                  )}
-                </div>
-                <div style={{ fontSize:'var(--text-sm)', fontWeight:700, lineHeight:1.4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text)' }}>
-                  {occ.item}
-                </div>
-                {occ.comment && (
-                  <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:500 }}>
-                    {occ.comment}
-                  </div>
-                )}
-              </div>
-
-              <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'var(--s1)' }}>
-                <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, fontWeight:700, color:'var(--text-muted)' }}>
-                  <Clock size={10} /> {occ.time}
-                </span>
-                <ChevronRight size={14} style={{ color:'var(--text-faint)' }} />
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -370,16 +247,8 @@ function ConformSection({ title, sectionId, items, total, defaultOpen, onDetail 
 
   return (
     <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-xl)', overflow:'hidden' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        style={{
-          width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between',
-          padding:'var(--s3) var(--s4)', background:'var(--success-hl)',
-          borderBottom: open ? '1px solid rgba(22,163,74,0.18)' : 'none',
-          cursor:'pointer', gap:'var(--s3)',
-        }}
-      >
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'var(--s3) var(--s4)', background:'var(--success-hl)', borderBottom: open ? '1px solid rgba(22,163,74,0.18)' : 'none', cursor:'pointer', gap:'var(--s3)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'var(--s3)', minWidth:0 }}>
           <div style={{ width:34, height:34, borderRadius:'var(--r-lg)', background:'rgba(22,163,74,0.18)', color:'var(--success)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             <CheckCircle2 size={16} />
@@ -389,31 +258,180 @@ function ConformSection({ title, sectionId, items, total, defaultOpen, onDetail 
             <div style={{ fontSize:'var(--text-xs)', fontWeight:600, color:'var(--success)' }}>{items.length}/{total} itens conformes · {pct}%</div>
           </div>
         </div>
-        <div style={{ display:'flex', alignItems:'center', gap:'var(--s2)', flexShrink:0 }}>
-          {open ? <ChevronUp size={16} style={{ color:'var(--success)' }} /> : <ChevronDown size={16} style={{ color:'var(--success)' }} />}
-        </div>
+        {open ? <ChevronUp size={16} style={{ color:'var(--success)', flexShrink:0 }} /> : <ChevronDown size={16} style={{ color:'var(--success)', flexShrink:0 }} />}
       </button>
 
       {open && (
         <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
           {items.map((item, i) => (
-            <button
-              key={`${sectionId}-${i}`}
-              type="button"
-              onClick={() => onDetail({ sectionTitle: title, items, total })}
-              style={{
-                width:'100%', display:'flex', alignItems:'center', gap:'var(--s3)',
-                padding:'var(--s3) var(--s5)',
-                borderBottom: i < items.length - 1 ? '1px solid rgba(22,163,74,0.1)' : 'none',
-                background:'transparent', cursor:'pointer', textAlign:'left',
-                transition:'background var(--t)',
-              }}
+            <button key={`${sectionId}-${i}`} type="button" onClick={() => onDetail({ sectionTitle: title, items, total })}
+              style={{ width:'100%', display:'flex', alignItems:'center', gap:'var(--s3)', padding:'var(--s3) var(--s5)', borderBottom: i < items.length - 1 ? '1px solid rgba(22,163,74,0.1)' : 'none', background:'transparent', cursor:'pointer', textAlign:'left', transition:'background var(--t)' }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(22,163,74,0.06)')}
-              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
-            >
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <CheckCircle2 size={14} style={{ color:'var(--success)', flexShrink:0 }} />
               <span style={{ fontSize:'var(--text-sm)', fontWeight:600, lineHeight:1.5, flex:1 }}>{item}</span>
               <ChevronRight size={13} style={{ color:'var(--text-faint)', flexShrink:0 }} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Day Strip ────────────────────────────────────────────── */
+interface DayStripProps {
+  days: string[];         // YYYY-MM-DD sorted desc
+  selected: string;
+  occCountByDay: Record<string, number>;
+  onSelect: (d: string) => void;
+}
+
+function DayStrip({ days, selected, occCountByDay, onSelect }: DayStripProps) {
+  const todayKey = toLocalDateKey(new Date().toISOString());
+
+  return (
+    <div style={{ overflowX:'auto', display:'flex', gap:'var(--s2)', padding:'var(--s2) 0', scrollbarWidth:'none' }}>
+      {days.map(dk => {
+        const { dayNum, dayName, monthShort } = formatDayStrip(dk);
+        const isSelected = dk === selected;
+        const isToday = dk === todayKey;
+        const count = occCountByDay[dk] || 0;
+
+        return (
+          <button
+            key={dk}
+            type="button"
+            onClick={() => onSelect(dk)}
+            style={{
+              flexShrink: 0,
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              gap: 'var(--s1)',
+              padding: 'var(--s3) var(--s4)',
+              borderRadius: 'var(--r-xl)',
+              border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+              background: isSelected ? 'var(--primary-hl)' : 'var(--surface)',
+              cursor: 'pointer',
+              minWidth: 64,
+              transition: 'all 150ms ease',
+              position: 'relative',
+            }}
+          >
+            {/* Today badge */}
+            {isToday && (
+              <span style={{ position:'absolute', top:-1, right:-1, background:'var(--primary)', color:'#fff', fontSize:9, fontWeight:800, padding:'1px 5px', borderRadius:999, letterSpacing:'0.05em' }}>HOJE</span>
+            )}
+            <span style={{ fontSize:'var(--text-xs)', fontWeight:700, color: isSelected ? 'var(--primary)' : 'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>{dayName}</span>
+            <span style={{ fontSize:'var(--text-lg)', fontWeight:800, lineHeight:1, color: isSelected ? 'var(--primary)' : 'var(--text)' }}>{dayNum}</span>
+            <span style={{ fontSize:'var(--text-xs)', color: isSelected ? 'var(--primary)' : 'var(--text-muted)', fontWeight:600 }}>{monthShort}</span>
+            {/* Occurrence indicator dot */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'center', marginTop:2 }}>
+              {count > 0 ? (
+                <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', minWidth:18, height:18, borderRadius:999, fontSize:10, fontWeight:800, background: isSelected ? 'var(--warning)' : 'var(--warning-hl)', color: isSelected ? '#fff' : 'var(--warning)', padding:'0 5px' }}>{count}</span>
+              ) : (
+                <span style={{ width:6, height:6, borderRadius:'50%', background:'var(--success)', display:'block' }} />
+              )}
+            </div>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ─── Employee Card ─────────────────────────────────────────── */
+interface EmployeeCardProps {
+  reporter: string;
+  occs: OccurrenceData[];
+  onSelectOcc: (occ: OccurrenceData) => void;
+}
+
+function EmployeeCard({ reporter, occs, onSelectOcc }: EmployeeCardProps) {
+  const [expanded, setExpanded] = useState(true);
+  const ini = initials(reporter);
+
+  // Avatar color based on name hash
+  const colors = [
+    ['#0891b2','#cffafe'], ['#7c3aed','#ede9fe'], ['#be185d','#fce7f3'],
+    ['#b45309','#fef3c7'], ['#15803d','#dcfce7'], ['#0369a1','#e0f2fe'],
+  ];
+  const colorIdx = reporter.split('').reduce((a, c) => a + c.charCodeAt(0), 0) % colors.length;
+  const [avatarBg, avatarFg] = colors[colorIdx];
+
+  return (
+    <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-2xl)', overflow:'hidden', boxShadow:'var(--sh-sm)' }}>
+      {/* Employee header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'var(--s4) var(--s5)', background:'var(--surface-2)', borderBottom: expanded ? '1px solid var(--border)' : 'none' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'var(--s3)', minWidth:0 }}>
+          <div style={{ width:42, height:42, borderRadius:'50%', background:avatarBg, color:avatarFg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:800, flexShrink:0, border:`2px solid ${avatarBg}` }}>
+            {ini || <User size={16} />}
+          </div>
+          <div style={{ minWidth:0 }}>
+            <div style={{ fontSize:'var(--text-sm)', fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{reporter}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:'var(--s2)', marginTop:2 }}>
+              <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', height:18, padding:'0 7px', borderRadius:999, fontSize:10, fontWeight:700, background:'var(--warning-hl)', color:'var(--warning)' }}>
+                {occs.length} {occs.length === 1 ? 'ocorrência' : 'ocorrências'}
+              </span>
+              {occs.some(o => o.photos.length > 0) && (
+                <span style={{ display:'inline-flex', alignItems:'center', gap:3, height:18, padding:'0 7px', borderRadius:999, fontSize:10, fontWeight:700, background:'var(--primary-hl)', color:'var(--primary)' }}>
+                  <Camera size={10} /> {occs.reduce((a, o) => a + o.photos.length, 0)} fotos
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+        <button type="button" onClick={() => setExpanded(e => !e)}
+          style={{ width:32, height:32, borderRadius:'var(--r-lg)', background:'var(--surface)', border:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+          {expanded ? <ChevronUp size={15} style={{ color:'var(--text-muted)' }} /> : <ChevronDown size={15} style={{ color:'var(--text-muted)' }} />}
+        </button>
+      </div>
+
+      {/* Occurrence rows */}
+      {expanded && (
+        <div style={{ display:'flex', flexDirection:'column' }}>
+          {occs.map((occ, i) => (
+            <button
+              key={occ.id}
+              type="button"
+              onClick={() => onSelectOcc(occ)}
+              style={{
+                width:'100%', display:'flex', alignItems:'center', gap:'var(--s3)',
+                padding:'var(--s4) var(--s5)',
+                borderBottom: i < occs.length - 1 ? '1px solid var(--border)' : 'none',
+                background:'transparent', cursor:'pointer', textAlign:'left',
+                transition:'background 150ms ease',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+              onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+            >
+              {/* Accent bar */}
+              <div style={{ width:3, alignSelf:'stretch', background:'var(--warning)', borderRadius:'var(--r-full)', flexShrink:0 }} />
+
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'var(--s2)', marginBottom:'var(--s1)', flexWrap:'wrap' }}>
+                  <span style={{ fontSize:'var(--text-xs)', fontWeight:700, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.06em' }}>{occ.section}</span>
+                  {occ.photos.length > 0 && (
+                    <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:10, fontWeight:700, color:'var(--primary)', background:'var(--primary-hl)', padding:'1px 6px', borderRadius:999 }}>
+                      <Camera size={10} /> {occ.photos.length}
+                    </span>
+                  )}
+                </div>
+                <div style={{ fontSize:'var(--text-sm)', fontWeight:700, lineHeight:1.4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text)' }}>
+                  {occ.item}
+                </div>
+                {occ.comment && (
+                  <div style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:3, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:500 }}>
+                    {occ.comment}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:'var(--s1)' }}>
+                <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:10, fontWeight:700, color:'var(--text-muted)' }}>
+                  <Clock size={10} /> {occ.time}
+                </span>
+                <ChevronRight size={13} style={{ color:'var(--text-faint)' }} />
+              </div>
             </button>
           ))}
         </div>
@@ -443,24 +461,43 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
     { label: 'Seções', value: String(totalSections), detail: 'Áreas com ocorrência', icon: ClipboardList, tone: 'var(--text)', bg: 'var(--surface-2)' },
   ];
 
-  /* ── Grouping ocurrencias: date → reporter ── */
-  const grouped: GroupedMap = occurrences.reduce((acc, occ) => {
-    const dk = dateKey(occ);
-    const rep = reporterLabel(occ.reporter);
-    if (!acc[dk]) acc[dk] = {};
-    if (!acc[dk][rep]) acc[dk][rep] = [];
-    acc[dk][rep].push(occ);
-    return acc;
-  }, {} as GroupedMap);
+  /* ── Day strip: últimos 7 dias que tenham ocorrências + hoje ── */
+  const allDayKeys = useMemo(() => {
+    const todayKey = toLocalDateKey(new Date().toISOString());
+    const fromOcc = [...new Set(occurrences.map(o => toLocalDateKey(o.created_at)))];
+    const allKeys = [...new Set([todayKey, ...fromOcc])];
+    return allKeys.sort((a, b) => b.localeCompare(a)).slice(0, 7);
+  }, [occurrences]);
 
-  const sortedDates = Object.keys(grouped).sort((a, b) => b.localeCompare(a));
+  const occCountByDay = useMemo(() => {
+    const map: Record<string, number> = {};
+    occurrences.forEach(o => {
+      const dk = toLocalDateKey(o.created_at);
+      map[dk] = (map[dk] || 0) + 1;
+    });
+    return map;
+  }, [occurrences]);
+
+  const [selectedDay, setSelectedDay] = useState<string>(() => allDayKeys[0] || toLocalDateKey(new Date().toISOString()));
+
+  /* ── Occurrences for selected day, grouped by reporter ── */
+  const dayOccurrences = useMemo(() => {
+    return occurrences.filter(o => toLocalDateKey(o.created_at) === selectedDay);
+  }, [occurrences, selectedDay]);
+
+  const employeeGroups = useMemo(() => {
+    const map: Record<string, OccurrenceData[]> = {};
+    dayOccurrences.forEach(occ => {
+      const rep = reporterLabel(occ.reporter);
+      if (!map[rep]) map[rep] = [];
+      map[rep].push(occ);
+    });
+    return map;
+  }, [dayOccurrences]);
 
   /* ── Conformidades por seção ── */
-  // checklistState key: `${section.id}__${item}` (App.tsx)
   const conformSections = CHECKLIST_DATA.map(section => {
-    const conformItems = section.items.filter(
-      item => checklistState[`${section.id}__${item}`] === true
-    );
+    const conformItems = section.items.filter(item => checklistState[`${section.id}__${item}`] === true);
     return { section, conformItems };
   }).filter(({ conformItems }) => conformItems.length > 0);
 
@@ -501,19 +538,8 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
-            <button
-              key={tab.id}
-              type="button"
-              className="mobile-tab-btn"
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                padding:'var(--s4) var(--s5)', fontSize:'var(--text-sm)', fontWeight:700,
-                color: isActive ? tab.active : 'var(--text-muted)',
-                borderBottom: isActive ? `2px solid ${tab.active}` : '2px solid transparent',
-                background:'transparent', display:'flex', alignItems:'center', gap:'var(--s2)',
-                cursor:'pointer', transition:'color 150ms ease', whiteSpace:'nowrap',
-              }}
-            >
+            <button key={tab.id} type="button" className="mobile-tab-btn" onClick={() => setActiveTab(tab.id)}
+              style={{ padding:'var(--s4) var(--s5)', fontSize:'var(--text-sm)', fontWeight:700, color: isActive ? tab.active : 'var(--text-muted)', borderBottom: isActive ? `2px solid ${tab.active}` : '2px solid transparent', background:'transparent', display:'flex', alignItems:'center', gap:'var(--s2)', cursor:'pointer', transition:'color 150ms ease', whiteSpace:'nowrap' }}>
               <Icon size={15} />
               {tab.label}
               <span style={{ display:'inline-flex', alignItems:'center', justifyContent:'center', minWidth:20, height:20, borderRadius:999, fontSize:11, fontWeight:700, background: isActive ? tab.hl : 'var(--surface-2)', color: isActive ? tab.active : 'var(--text-muted)', padding:'0 6px' }}>
@@ -525,7 +551,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
       </div>
 
       {/* ── Tab Content ── */}
-      <div style={{ flex:1, overflowY:'auto', padding:'var(--s5)', display:'flex', flexDirection:'column', gap:'var(--s5)' }}>
+      <div style={{ flex:1, overflowY:'auto', padding:'var(--s5)', display:'flex', flexDirection:'column', gap:'var(--s4)' }}>
 
         {/* ══ OCORRÊNCIAS ══ */}
         {activeTab === 'ocorrencias' && (
@@ -538,36 +564,44 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
               <p style={{ fontSize:'var(--text-sm)', color:'var(--text-muted)', marginTop:'var(--s2)', maxWidth:440 }}>O checklist segue sem desvios registrados.</p>
             </div>
           ) : (
-            sortedDates.map((dk, di) => (
-              <div key={dk}>
-                {/* Date header */}
-                <div style={{ display:'flex', alignItems:'center', gap:'var(--s3)', marginBottom:'var(--s3)' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:'var(--s2)', padding:'var(--s2) var(--s4)', background:'var(--surface)', border:'1px solid var(--border)', borderRadius:'var(--r-full)', flexShrink:0 }}>
-                    <Calendar size={13} style={{ color:'var(--primary)' }} />
-                    <span style={{ fontSize:'var(--text-xs)', fontWeight:800, color:'var(--text)', letterSpacing:'0.03em' }}>
-                      {formatDateLabel(dk)}
-                    </span>
-                  </div>
-                  <div style={{ flex:1, height:1, background:'var(--divider)' }} />
-                  <span style={{ fontSize:'var(--text-xs)', fontWeight:700, color:'var(--text-muted)', flexShrink:0 }}>
-                    {Object.values(grouped[dk]).flat().length} ocorrência(s)
-                  </span>
+            <>
+              {/* Day Strip */}
+              <div className="card" style={{ padding:'var(--s4) var(--s5)', overflow:'hidden' }}>
+                <div style={{ fontSize:'var(--text-xs)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.08em', color:'var(--text-muted)', marginBottom:'var(--s3)', display:'flex', alignItems:'center', gap:'var(--s2)' }}>
+                  <Calendar size={12} /> Selecionar dia
                 </div>
+                <DayStrip
+                  days={allDayKeys}
+                  selected={selectedDay}
+                  occCountByDay={occCountByDay}
+                  onSelect={setSelectedDay}
+                />
+              </div>
 
-                {/* Employee groups */}
-                <div style={{ display:'flex', flexDirection:'column', gap:'var(--s3)' }}>
-                  {Object.keys(grouped[dk]).map((rep, ri) => (
-                    <EmployeeGroup
-                      key={rep}
-                      reporter={rep}
-                      occs={grouped[dk][rep]}
-                      defaultOpen={di === 0 && ri === 0}
-                      onSelectOcc={setSelectedOcc}
-                    />
-                  ))}
+              {/* Day title */}
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'var(--s2)' }}>
+                <div>
+                  <h3 style={{ fontSize:'var(--text-base)', fontWeight:800, color:'var(--text)' }}>{formatFullDate(selectedDay)}</h3>
+                  <p style={{ fontSize:'var(--text-xs)', color:'var(--text-muted)', marginTop:2, fontWeight:600 }}>
+                    {dayOccurrences.length === 0 ? 'Nenhuma ocorrência neste dia' : `${dayOccurrences.length} ocorrência(s) · ${Object.keys(employeeGroups).length} funcionário(s)`}
+                  </p>
                 </div>
               </div>
-            ))
+
+              {/* Employee cards */}
+              {dayOccurrences.length === 0 ? (
+                <div className="card" style={{ padding:'var(--s8)', textAlign:'center', background:'var(--surface-2)', border:'1px dashed var(--border)' }}>
+                  <CheckCircle2 size={32} style={{ color:'var(--success)', margin:'0 auto 12px' }} />
+                  <p style={{ fontSize:'var(--text-sm)', fontWeight:700, color:'var(--text-muted)' }}>Sem ocorrências neste dia</p>
+                </div>
+              ) : (
+                <div style={{ display:'flex', flexDirection:'column', gap:'var(--s4)' }}>
+                  {Object.entries(employeeGroups).map(([rep, occs]) => (
+                    <EmployeeCard key={rep} reporter={rep} occs={occs} onSelectOcc={setSelectedOcc} />
+                  ))}
+                </div>
+              )}
+            </>
           )
         )}
 
@@ -583,8 +617,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
             </div>
           ) : (
             <>
-              {/* Summary bar */}
-              <div style={{ display:'flex', alignItems:'center', gap:'var(--s3)', padding:'var(--s3) var(--s4)', background:'var(--success-hl)', border:'1px solid rgba(22,163,74,0.18)', borderRadius:'var(--r-xl)', marginBottom:'var(--s2)' }}>
+              <div style={{ display:'flex', alignItems:'center', gap:'var(--s3)', padding:'var(--s3) var(--s4)', background:'var(--success-hl)', border:'1px solid rgba(22,163,74,0.18)', borderRadius:'var(--r-xl)' }}>
                 <CheckCircle2 size={18} style={{ color:'var(--success)', flexShrink:0 }} />
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:'var(--text-xs)', fontWeight:800, color:'var(--success)' }}>
@@ -622,35 +655,21 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
           onOpenPhoto={(photos, idx) => { setSelectedOcc(null); setLightbox({ photos, index: idx }); }}
         />
       )}
-
-      {selectedConform && (
-        <ConformDetailModal
-          detail={selectedConform}
-          onClose={() => setSelectedConform(null)}
-        />
-      )}
+      {selectedConform && <ConformDetailModal detail={selectedConform} onClose={() => setSelectedConform(null)} />}
 
       {/* ── Lightbox ── */}
       {lightbox && (
         <div style={{ position:'fixed', inset:0, background:'rgba(2,6,23,0.93)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:4000, padding:'var(--s4)' }}>
-          <button type="button" onClick={closeLightbox} style={{ position:'absolute', top:20, right:20, width:44, height:44, borderRadius:'50%', background:'rgba(255,255,255,0.1)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', border:'1px solid rgba(255,255,255,0.15)', cursor:'pointer' }}>
-            <X size={20} />
-          </button>
+          <button type="button" onClick={closeLightbox} style={{ position:'absolute', top:20, right:20, width:44, height:44, borderRadius:'50%', background:'rgba(255,255,255,0.1)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', border:'1px solid rgba(255,255,255,0.15)', cursor:'pointer' }}><X size={20} /></button>
           {lightbox.photos.length > 1 && (
-            <button type="button" onClick={prevPhoto} style={{ position:'absolute', left:16, width:48, height:48, borderRadius:'50%', background:'rgba(255,255,255,0.1)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', border:'1px solid rgba(255,255,255,0.15)', cursor:'pointer' }}>
-              <ChevronLeft size={22} />
-            </button>
+            <button type="button" onClick={prevPhoto} style={{ position:'absolute', left:16, width:48, height:48, borderRadius:'50%', background:'rgba(255,255,255,0.1)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', border:'1px solid rgba(255,255,255,0.15)', cursor:'pointer' }}><ChevronLeft size={22} /></button>
           )}
           <div style={{ maxWidth:'min(1100px,92vw)', maxHeight:'88vh', display:'flex', flexDirection:'column', gap:'var(--s3)', alignItems:'center' }}>
             <img src={lightbox.photos[lightbox.index]} alt={`Foto ampliada ${lightbox.index + 1}`} style={{ maxWidth:'100%', maxHeight:'80vh', objectFit:'contain', borderRadius:'var(--r-xl)', boxShadow:'var(--sh-xl)' }} />
-            <div style={{ color:'rgba(255,255,255,0.8)', fontSize:'var(--text-sm)', fontWeight:600, textAlign:'center' }}>
-              Foto {lightbox.index + 1} de {lightbox.photos.length}
-            </div>
+            <div style={{ color:'rgba(255,255,255,0.8)', fontSize:'var(--text-sm)', fontWeight:600, textAlign:'center' }}>Foto {lightbox.index + 1} de {lightbox.photos.length}</div>
           </div>
           {lightbox.photos.length > 1 && (
-            <button type="button" onClick={nextPhoto} style={{ position:'absolute', right:16, width:48, height:48, borderRadius:'50%', background:'rgba(255,255,255,0.1)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', border:'1px solid rgba(255,255,255,0.15)', cursor:'pointer' }}>
-              <ChevronRight size={22} />
-            </button>
+            <button type="button" onClick={nextPhoto} style={{ position:'absolute', right:16, width:48, height:48, borderRadius:'50%', background:'rgba(255,255,255,0.1)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', border:'1px solid rgba(255,255,255,0.15)', cursor:'pointer' }}><ChevronRight size={22} /></button>
           )}
         </div>
       )}
