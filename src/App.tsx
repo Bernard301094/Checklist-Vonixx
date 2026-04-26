@@ -11,7 +11,7 @@ import ColaboradorScreen from './components/ColaboradorScreen';
 import LockScreen from './components/LockScreen';
 import ChangePasswordScreen from './components/ChangePasswordScreen';
 import AdminScreen from './components/AdminScreen';
-import { OccurrenceData } from './types';
+import { OccurrenceData, ChecklistEntry } from './types';
 import { supabase } from './supabase';
 import { INITIAL_OCCURRENCES } from './constants';
 
@@ -62,15 +62,14 @@ export default function App() {
   const [reporterName, setReporterName] = useState('');
   const [shift, setShift] = useState('TURNO A');
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
+  const [checklistEntries, setChecklistEntries] = useState<ChecklistEntry[]>([]);
   const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
 
   const resolvedUserIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-      // Bloqueio biométrico apenas para dispositivos móveis/tablets (< 1024px)
       const isMobile = window.innerWidth < 1024;
-      
       if (!isActive && role !== 'login' && useBiometrics && isMobile) {
         const skip = localStorage.getItem('skipBiometric');
         if (skip === 'true') {
@@ -95,15 +94,25 @@ export default function App() {
     async function loadData() {
       const { data: checklistsData, error: clErr } = await supabase
         .from(CHECKLISTS_TABLE)
-        .select('*');
+        .select('item_key, is_checked, reporter, checked_at, updated_at');
+
       if (clErr) {
         console.error('Erro ao carregar checklists:', clErr.message);
       } else if (checklistsData) {
         const state: Record<string, boolean> = {};
+        const entries: ChecklistEntry[] = [];
         checklistsData.forEach((item: any) => {
           state[item.item_key] = item.is_checked;
+          entries.push({
+            item_key: item.item_key,
+            is_checked: item.is_checked,
+            reporter: item.reporter ?? undefined,
+            checked_at: item.checked_at ?? undefined,
+            updated_at: item.updated_at ?? undefined,
+          });
         });
         setChecklistState(state);
+        setChecklistEntries(entries);
       }
 
       const { data: occData, error: occErr } = await supabase
@@ -233,7 +242,6 @@ export default function App() {
     }
   };
 
-  // ── Editar ocorrência existente ──────────────────────────────
   const handleUpdateOccurrence = async (id: string, patch: { comment?: string; photos?: string[] }) => {
     const { data, error } = await supabase
       .from(OCCURRENCES_TABLE)
@@ -253,12 +261,29 @@ export default function App() {
   };
 
   const handleCheck = async (key: string, checked: boolean) => {
+    const now = new Date().toISOString();
     setChecklistState(prev => ({ ...prev, [key]: checked }));
+    setChecklistEntries(prev => {
+      const existing = prev.find(e => e.item_key === key);
+      if (existing) {
+        return prev.map(e => e.item_key === key
+          ? { ...e, is_checked: checked, reporter: reporterName || undefined, checked_at: now, updated_at: now }
+          : e
+        );
+      }
+      return [...prev, { item_key: key, is_checked: checked, reporter: reporterName || undefined, checked_at: now, updated_at: now }];
+    });
 
     const { error } = await supabase
       .from(CHECKLISTS_TABLE)
       .upsert(
-        { item_key: key, is_checked: checked, updated_at: new Date().toISOString() },
+        {
+          item_key: key,
+          is_checked: checked,
+          reporter: reporterName || null,
+          checked_at: now,
+          updated_at: now,
+        },
         { onConflict: 'item_key' }
       );
 
@@ -323,6 +348,7 @@ export default function App() {
         onToggleBiometrics={toggleBiometrics}
         occurrences={occurrences}
         checklistState={checklistState}
+        checklistEntries={checklistEntries}
       />
     );
   }
@@ -333,6 +359,7 @@ export default function App() {
         onLogout={handleLogout}
         occurrences={occurrences}
         checklistState={checklistState}
+        checklistEntries={checklistEntries}
         useBiometrics={useBiometrics}
         onToggleBiometrics={toggleBiometrics}
       />
