@@ -11,9 +11,9 @@ import ColaboradorScreen from './components/ColaboradorScreen';
 import LockScreen from './components/LockScreen';
 import ChangePasswordScreen from './components/ChangePasswordScreen';
 import AdminScreen from './components/AdminScreen';
-import { OccurrenceData, ChecklistEntry } from './types';
+import { OccurrenceData, ChecklistEntry, ChecklistSession } from './types';
 import { supabase } from './supabase';
-import { INITIAL_OCCURRENCES } from './constants';
+import { INITIAL_OCCURRENCES, CHECKLIST_DATA } from './constants';
 
 interface AuthUser {
   id: string;
@@ -23,6 +23,7 @@ interface AuthUser {
 
 const OCCURRENCES_TABLE = 'occurrences';
 const CHECKLISTS_TABLE = 'checklists';
+const SESSIONS_TABLE = 'checklist_sessions';
 
 const fetchRoleFromDB = async (userId: string): Promise<'admin' | 'supervisor' | 'colaborador'> => {
   try {
@@ -64,6 +65,7 @@ export default function App() {
   const [checklistState, setChecklistState] = useState<Record<string, boolean>>({});
   const [checklistEntries, setChecklistEntries] = useState<ChecklistEntry[]>([]);
   const [occurrences, setOccurrences] = useState<OccurrenceData[]>([]);
+  const [checklistSessions, setChecklistSessions] = useState<ChecklistSession[]>([]);
 
   const resolvedUserIdRef = useRef<string | null>(null);
 
@@ -125,6 +127,17 @@ export default function App() {
         setOccurrences(INITIAL_OCCURRENCES as OccurrenceData[]);
       } else if (occData) {
         setOccurrences(occData as OccurrenceData[]);
+      }
+
+      const { data: sessData, error: sessErr } = await supabase
+        .from(SESSIONS_TABLE)
+        .select('*')
+        .order('submitted_at', { ascending: false });
+
+      if (sessErr) {
+        console.error('Erro ao carregar sessões:', sessErr.message);
+      } else if (sessData) {
+        setChecklistSessions(sessData as ChecklistSession[]);
       }
     }
 
@@ -292,6 +305,42 @@ export default function App() {
     }
   };
 
+  /**
+   * Salva um snapshot completo do checklist como sessão histórica.
+   * Chamado pelo ColaboradorScreen ao clicar "Sincronizar checklist".
+   */
+  const handleSaveSession = async (machine: string, state: Record<string, boolean>) => {
+    const items = CHECKLIST_DATA.flatMap(section =>
+      section.items.map((_, idx) => ({
+        key: `${section.id}-${idx}`,
+        checked: state[`${section.id}-${idx}`] === true,
+      }))
+    );
+
+    const payload = {
+      reporter: reporterName || 'Desconhecido',
+      machine: machine || 'NÃO INFORMADA',
+      shift,
+      submitted_at: new Date().toISOString(),
+      items,
+    };
+
+    const { data, error } = await supabase
+      .from(SESSIONS_TABLE)
+      .insert([payload])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao salvar sessão:', error.message);
+      return;
+    }
+
+    if (data) {
+      setChecklistSessions(prev => [data as ChecklistSession, ...prev]);
+    }
+  };
+
   if (authLoading) {
     return (
       <div style={{
@@ -349,6 +398,7 @@ export default function App() {
         occurrences={occurrences}
         checklistState={checklistState}
         checklistEntries={checklistEntries}
+        checklistSessions={checklistSessions}
       />
     );
   }
@@ -360,6 +410,7 @@ export default function App() {
         occurrences={occurrences}
         checklistState={checklistState}
         checklistEntries={checklistEntries}
+        checklistSessions={checklistSessions}
         useBiometrics={useBiometrics}
         onToggleBiometrics={toggleBiometrics}
       />
@@ -373,6 +424,7 @@ export default function App() {
       onCheck={handleCheck}
       onSaveOccurrence={handleAddOccurrence}
       onUpdateOccurrence={handleUpdateOccurrence}
+      onSaveSession={handleSaveSession}
       occurrences={occurrences}
       userEmail={currentUser?.email || ''}
       reporterName={reporterName}
