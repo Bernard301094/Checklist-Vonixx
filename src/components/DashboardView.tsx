@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   AlertTriangle, CheckCircle2, X, ChevronDown, ChevronUp,
-  Clock, Camera, Activity, Target, Search, XCircle, Calendar, User, Layers
+  Clock, Camera, Activity, Target, Search, XCircle, Calendar, User, Layers, Cpu
 } from 'lucide-react';
 import { OccurrenceData, ChecklistEntry, ChecklistSession } from '../types';
 import { CHECKLIST_DATA } from '../constants';
@@ -20,7 +20,7 @@ function reporterLabel(raw: string): string {
 
 function machineLabel(raw: string): string {
   const m = raw.split(' - Auth:')[0].match(/\|\s*[Mm]á?quina:\s*(.+)$/);
-  return m ? m[1].trim() : 'MÁQUINA NÃO IDENTIFICADA';
+  return m ? m[1].trim() : '';
 }
 
 function initials(name: string): string {
@@ -158,6 +158,7 @@ interface ConformItem {
   itemText: string;
   checked: boolean;
   reporter: string;
+  machine: string;
   time: string;
 }
 
@@ -168,6 +169,26 @@ interface ConformSectionData {
   items: ConformItem[];
   checkedCount: number;
   totalCount: number;
+}
+
+/** Badge de máquina — ROMI 01 / ROMI 02 */
+function MachineBadge({ machine }: { machine: string }) {
+  if (!machine) return null;
+  const isRomi1 = machine.includes('01') || machine.toLowerCase().includes('romi 1') || machine.toLowerCase() === 'romi1';
+  const bg = isRomi1 ? '#eff6ff' : '#f5f3ff';
+  const color = isRomi1 ? '#2563eb' : '#7c3aed';
+  const border = isRomi1 ? '#bfdbfe' : '#ddd6fe';
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 3,
+      fontSize: 10, fontWeight: 800, padding: '2px 7px',
+      borderRadius: 999, background: bg, color, border: `1px solid ${border}`,
+      textTransform: 'uppercase', letterSpacing: '0.04em',
+    }}>
+      <Cpu size={9} />
+      {machine}
+    </span>
+  );
 }
 
 /** Tarjeta individual por sección */
@@ -216,11 +237,11 @@ function ConformSectionCard({ section }: { section: ConformSectionData }) {
         <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
           {section.items.map((item) => (
             <div key={item.key} style={{
-              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+              display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
               borderRadius: 10, background: item.checked ? '#f0fdf4' : '#fff7f7',
               border: `1px solid ${item.checked ? '#bbf7d0' : '#fecaca'}`,
             }}>
-              <div style={{ flexShrink: 0 }}>
+              <div style={{ flexShrink: 0, marginTop: 1 }}>
                 {item.checked
                   ? <CheckCircle2 size={18} style={{ color: '#10b981' }} />
                   : <XCircle size={18} style={{ color: '#ef4444' }} />
@@ -228,12 +249,15 @@ function ConformSectionCard({ section }: { section: ConformSectionData }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', lineHeight: 1.4 }}>{item.itemText}</div>
-                {(item.reporter || item.time) && (
-                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <User size={10} /> {item.reporter || 'Colaborador não identificado'}
-                    {item.time && <><Clock size={10} style={{ marginLeft: 4 }} /> {item.time}</>}
-                  </div>
-                )}
+                <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                  {item.machine && <MachineBadge machine={item.machine} />}
+                  {(item.reporter || item.time) && (
+                    <span style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <User size={10} /> {item.reporter || 'Colaborador não identificado'}
+                      {item.time && <><Clock size={10} style={{ marginLeft: 4 }} /> {item.time}</>}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           ))}
@@ -349,7 +373,6 @@ export default function DashboardView({
 
   /* ---- Conformidades agrupadas por día → categoría ---- */
   const conformByDay = useMemo(() => {
-    // Determinar qué días existen
     const daySet = new Set<string>();
     checklistEntries.forEach(e => {
       const iso = e.updated_at || e.checked_at;
@@ -377,11 +400,13 @@ export default function DashboardView({
                 : '';
               const belongsToDay = entryDateKey === day || (!entryDateKey && day === todayISO());
               const checked = belongsToDay ? (checklistState[key] === true) : false;
-              const reporter = belongsToDay && entry?.reporter ? reporterLabel(entry.reporter) : '';
+              const rawReporter = belongsToDay && entry?.reporter ? entry.reporter : '';
+              const reporter = rawReporter ? reporterLabel(rawReporter) : '';
+              const machine = rawReporter ? machineLabel(rawReporter) : '';
               const timeStr = belongsToDay && (entry?.updated_at || entry?.checked_at)
                 ? formatTime(entry.updated_at || entry.checked_at || '')
                 : '';
-              return { key, itemText, checked, reporter, time: timeStr };
+              return { key, itemText, checked, reporter, machine, time: timeStr };
             });
 
             const checkedCount = items.filter(i => i.checked).length;
