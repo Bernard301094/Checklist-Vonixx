@@ -275,16 +275,17 @@ export default function App() {
 
   const handleCheck = async (key: string, checked: boolean) => {
     const now = new Date().toISOString();
+    const resolvedReporter = reporterName?.trim() || currentUser?.user_metadata?.name || currentUser?.user_metadata?.full_name || currentUser?.email || 'Desconhecido';
     setChecklistState(prev => ({ ...prev, [key]: checked }));
     setChecklistEntries(prev => {
       const existing = prev.find(e => e.item_key === key);
       if (existing) {
         return prev.map(e => e.item_key === key
-          ? { ...e, is_checked: checked, reporter: reporterName || undefined, checked_at: now, updated_at: now }
+          ? { ...e, is_checked: checked, reporter: resolvedReporter, checked_at: now, updated_at: now }
           : e
         );
       }
-      return [...prev, { item_key: key, is_checked: checked, reporter: reporterName || undefined, checked_at: now, updated_at: now }];
+      return [...prev, { item_key: key, is_checked: checked, reporter: resolvedReporter, checked_at: now, updated_at: now }];
     });
 
     const { error } = await supabase
@@ -293,7 +294,7 @@ export default function App() {
         {
           item_key: key,
           is_checked: checked,
-          reporter: reporterName || null,
+          reporter: resolvedReporter,
           checked_at: now,
           updated_at: now,
         },
