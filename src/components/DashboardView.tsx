@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   AlertTriangle, CheckCircle2, X, ChevronDown, ChevronUp,
-  Clock, Camera, Cpu, Activity, Target, Search, XCircle, Calendar
+  Clock, Camera, Cpu, Activity, Target, Search, XCircle, Calendar, Layers
 } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
@@ -10,6 +10,30 @@ interface DashboardViewProps {
   occurrences: OccurrenceData[];
   checklistState: Record<string, boolean>;
 }
+
+/* --- Agrupación de secciones por categoría --- */
+const CONFORMITY_GROUPS = [
+  {
+    id: 'equipamentos',
+    label: 'Equipamentos e Transporte',
+    sectionIds: ['perifericos', 'esteiras'],
+  },
+  {
+    id: 'moinho_mecanicos',
+    label: 'Moinho e Componentes Mecânicos',
+    sectionIds: ['moinho', 'componentes'],
+  },
+  {
+    id: 'operacao_molde',
+    label: 'Operação, Molde e Lubrificação',
+    sectionIds: ['operacao', 'molde', 'lubrificacao'],
+  },
+  {
+    id: 'parametros_docs',
+    label: 'Parâmetros e Documentação',
+    sectionIds: ['parametros', 'documentacao'],
+  },
+];
 
 /* --- Helpers --- */
 function reporterLabel(raw: string): string {
@@ -146,57 +170,130 @@ function CollaboratorCard({ reporter, occs, onOpenPhoto }: { reporter: string; o
   );
 }
 
-/* --- Sección de Conformidad --- */
-function ConformSectionFull({ section, checklistState }: { section: typeof CHECKLIST_DATA[number]; checklistState: Record<string, boolean>; }) {
+/* --- Nivel Conformidad: Ítem individual --- */
+function ConformItemRow({ item, ok }: { item: string; ok: boolean }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '10px 16px', borderBottom: '1px solid #f1f5f9', background: ok ? '#f8fafc' : '#ffffff' }}>
+      {ok
+        ? <CheckCircle2 size={15} style={{ color: '#10b981', flexShrink: 0, marginTop: 2 }} />
+        : <XCircle size={15} style={{ color: '#ef4444', flexShrink: 0, marginTop: 2 }} />
+      }
+      <span style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: ok ? '#334155' : '#94a3b8' }}>{item}</span>
+    </div>
+  );
+}
+
+/* --- Nivel Conformidad: Sección individual (colapsable) --- */
+function ConformSectionCard({ section, checklistState }: { section: typeof CHECKLIST_DATA[number]; checklistState: Record<string, boolean> }) {
   const [open, setOpen] = useState(false);
 
-  // LECTURA CORRECTA DE LLAVES: section.id + "-" + indice
   const itemStates = section.items.map((item, idx) => ({
     item,
     ok: checklistState[`${section.id}-${idx}`] === true,
   }));
 
-  const checkedItems = itemStates.filter(x => x.ok).map(x => x.item);
-  const uncheckedItems = itemStates.filter(x => !x.ok).map(x => x.item);
-
-  const pct = section.items.length > 0 ? Math.round((checkedItems.length / section.items.length) * 100) : 0;
+  const checkedCount = itemStates.filter(x => x.ok).length;
+  const pct = section.items.length > 0 ? Math.round((checkedCount / section.items.length) * 100) : 0;
   const isComplete = pct === 100;
 
   return (
-    <div className="card" style={{ marginBottom: '12px', overflow: 'hidden', border: isComplete ? '1px solid #a7f3d0' : '1px solid var(--border)' }}>
-      <button type="button" onClick={() => setOpen(!open)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: isComplete ? '#f0fdf4' : 'transparent', border: 'none', cursor: 'pointer' }}>
-        <div style={{ width: 36, height: 36, borderRadius: '8px', background: isComplete ? '#d1fae5' : '#f1f5f9', border: `1px solid ${isComplete ? '#10b981' : '#e2e8f0'}`, color: isComplete ? '#10b981' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          <CheckCircle2 size={18} />
+    <div style={{ marginBottom: '8px', borderRadius: '10px', overflow: 'hidden', border: isComplete ? '1px solid #a7f3d0' : '1px solid #e2e8f0' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '12px', padding: '12px 14px', background: isComplete ? '#f0fdf4' : '#ffffff', border: 'none', cursor: 'pointer' }}
+      >
+        <div style={{ width: 30, height: 30, borderRadius: '7px', background: isComplete ? '#d1fae5' : '#f1f5f9', border: `1px solid ${isComplete ? '#10b981' : '#e2e8f0'}`, color: isComplete ? '#10b981' : '#94a3b8', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <CheckCircle2 size={15} />
         </div>
         <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: isComplete ? '#065f46' : 'var(--text)' }}>{section.title}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: 4 }}>
-            <div style={{ flex: 1, height: 6, background: isComplete ? '#a7f3d0' : '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}>
+          <div style={{ fontSize: '13px', fontWeight: 700, color: isComplete ? '#065f46' : '#334155' }}>{section.title}</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: 4 }}>
+            <div style={{ flex: 1, height: 5, background: isComplete ? '#a7f3d0' : '#e2e8f0', borderRadius: 99, overflow: 'hidden' }}>
               <div style={{ height: '100%', width: `${pct}%`, background: isComplete ? '#10b981' : 'var(--primary)', transition: 'width 0.3s' }} />
             </div>
-            <span style={{ fontSize: 11, fontWeight: 800, color: isComplete ? '#10b981' : '#64748b' }}>
-              {checkedItems.length}/{section.items.length}
+            <span style={{ fontSize: 11, fontWeight: 800, color: isComplete ? '#10b981' : '#64748b', whiteSpace: 'nowrap' }}>
+              {checkedCount}/{section.items.length}
             </span>
           </div>
         </div>
         <div style={{ color: isComplete ? '#10b981' : '#94a3b8' }}>
-          {open ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </div>
       </button>
 
       {open && (
         <div style={{ borderTop: isComplete ? '1px solid #a7f3d0' : '1px solid #e2e8f0' }}>
-          {checkedItems.map((item, i) => (
-            <div key={`ok-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 16px', borderBottom: '1px solid #e2e8f0', background: '#f8fafc' }}>
-              <CheckCircle2 size={16} style={{ color: '#10b981', flexShrink: 0, marginTop: 2 }} />
-              <span style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#334155' }}>{item}</span>
-            </div>
+          {itemStates.map((s, i) => (
+            <ConformItemRow key={i} item={s.item} ok={s.ok} />
           ))}
-          {uncheckedItems.map((item, i) => (
-            <div key={`nok-${i}`} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', padding: '12px 16px', borderBottom: i < uncheckedItems.length - 1 ? '1px solid #e2e8f0' : 'none' }}>
-              <XCircle size={16} style={{ color: '#ef4444', flexShrink: 0, marginTop: 2 }} />
-              <span style={{ flex: 1, fontSize: '13px', fontWeight: 600, color: '#94a3b8' }}>{item}</span>
-            </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* --- Nivel Conformidad: Grupo de categoría (colapsable) --- */
+function ConformGroupCard({ group, checklistState }: { group: typeof CONFORMITY_GROUPS[number]; checklistState: Record<string, boolean> }) {
+  const [open, setOpen] = useState(false);
+
+  const sections = CHECKLIST_DATA.filter(s => group.sectionIds.includes(s.id));
+
+  const { checkedCount, totalCount } = useMemo(() => {
+    let checked = 0;
+    let total = 0;
+    sections.forEach(section => {
+      section.items.forEach((_, idx) => {
+        total++;
+        if (checklistState[`${section.id}-${idx}`] === true) checked++;
+      });
+    });
+    return { checkedCount: checked, totalCount: total };
+  }, [sections, checklistState]);
+
+  const pct = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
+  const isComplete = pct === 100;
+
+  return (
+    <div style={{ marginBottom: '16px' }}>
+      {/* Divisor de grupo — mismo estilo que el divisor de fecha en Alertas */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+        <button
+          type="button"
+          onClick={() => setOpen(!open)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '10px',
+            padding: '8px 16px',
+            background: isComplete ? '#d1fae5' : '#e2e8f0',
+            color: isComplete ? '#065f46' : '#475569',
+            borderRadius: '99px',
+            fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em',
+            border: 'none', cursor: 'pointer',
+            transition: 'background 0.2s'
+          }}
+        >
+          <Layers size={14} />
+          {group.label}
+          <span style={{
+            marginLeft: 4,
+            padding: '1px 7px',
+            borderRadius: '99px',
+            background: isComplete ? '#10b981' : '#94a3b8',
+            color: '#fff',
+            fontSize: '11px', fontWeight: 900
+          }}>
+            {pct}%
+          </span>
+          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+        </button>
+        <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
+      </div>
+
+      {/* Secciones dentro del grupo */}
+      {open && (
+        <div style={{ paddingLeft: '16px', borderLeft: '2px solid #cbd5e1', marginLeft: 4 }}>
+          {sections.map(section => (
+            <ConformSectionCard key={section.id} section={section} checklistState={checklistState} />
           ))}
         </div>
       )}
@@ -210,7 +307,6 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
   const [activeTab, setActiveTab] = useState<'timeline' | 'conformidades'>('timeline');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Cálculo corregido de conformidades generales
   const verifiedCount = useMemo(() => {
     let count = 0;
     CHECKLIST_DATA.forEach(section => {
@@ -225,7 +321,6 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
   const validationProgress = maxChecks > 0 ? Math.round((verifiedCount / maxChecks) * 100) : 0;
   const totalPhotos = occurrences.reduce((acc, o) => acc + o.photos.length, 0);
 
-  // Filtrado de la barra de búsqueda
   const filteredOccs = useMemo(() => {
     let list = occurrences;
     if (searchQuery.trim()) {
@@ -240,48 +335,37 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
     return list;
   }, [occurrences, searchQuery]);
 
-  // Nivel 1: Agrupación por Fecha > Nivel 2: Colaborador
   const dateGroups = useMemo(() => {
     const map: Record<string, OccurrenceData[]> = {};
-    
-    // Primero agrupamos por fecha (YYYY-MM-DD)
     filteredOccs.forEach(o => {
       const dateStr = o.created_at ? new Date(o.created_at).toISOString().split('T')[0] : '1970-01-01';
       if (!map[dateStr]) map[dateStr] = [];
       map[dateStr].push(o);
     });
 
-    // Ordenamos las fechas de la más reciente a la más antigua
     return Object.entries(map)
       .sort(([dateA], [dateB]) => dateB.localeCompare(dateA))
       .map(([dateStr, dayOccs]) => {
-        
-        // Formatear la etiqueta de la fecha a un formato amigable (ej: "24 de abril de 2026")
         let dateLabel = 'Data não registrada';
         if (dateStr !== '1970-01-01') {
           const [y, m, d] = dateStr.split('-');
           const dObj = new Date(parseInt(y), parseInt(m)-1, parseInt(d));
           dateLabel = dObj.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
         }
-
-        // Dentro de cada fecha, agrupamos por colaborador
         const collabMap: Record<string, OccurrenceData[]> = {};
         dayOccs.forEach(o => {
           const r = reporterLabel(o.reporter);
           if (!collabMap[r]) collabMap[r] = [];
           collabMap[r].push(o);
         });
-        
-        // Ordenamos los colaboradores por cantidad de ocurrencias
         const collabs = Object.entries(collabMap).sort(([, a], [, b]) => b.length - a.length);
-
         return { dateStr, dateLabel, collabs };
       });
   }, [filteredOccs]);
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-      
+
       {/* Pestañas */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>
         <button
@@ -299,8 +383,8 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
       </div>
 
       <div style={{ padding: '20px', flex: 1, overflowY: 'auto', background: '#f8fafc' }}>
-        
-        {/* Pestaña: Ocurrencias (Drill-down por Fechas) */}
+
+        {/* Pestaña: Alertas */}
         {activeTab === 'timeline' && (
           <>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '16px', marginBottom: '20px' }}>
@@ -343,16 +427,12 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
               <div>
                 {dateGroups.map((group) => (
                   <div key={group.dateStr} style={{ marginBottom: '32px' }}>
-                    
-                    {/* Divisor Elegante de Fecha */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
                       <div style={{ padding: '8px 16px', background: '#e2e8f0', color: '#475569', borderRadius: '99px', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Calendar size={14} /> {group.dateLabel}
                       </div>
                       <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
                     </div>
-
-                    {/* Renderización de Colaboradores de ese día */}
                     {group.collabs.map(([reporter, repOccs]) => (
                       <CollaboratorCard key={reporter} reporter={reporter} occs={repOccs} onOpenPhoto={(p, idx) => setLightbox({ photos: p, index: idx })} />
                     ))}
@@ -363,7 +443,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
           </>
         )}
 
-        {/* Pestaña: Conformidades */}
+        {/* Pestaña: Conformidades — agrupadas por categoría */}
         {activeTab === 'conformidades' && (
           <>
             <div className="card" style={{ padding: '24px', marginBottom: '24px', background: 'linear-gradient(135deg, #059669, #10b981)', border: 'none', color: '#fff', boxShadow: '0 10px 25px -5px rgba(16, 185, 129, 0.4)' }}>
@@ -383,9 +463,10 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
               </p>
             </div>
 
+            {/* Grupos de categorías — mismo patrón visual que las fechas en Alertas */}
             <div>
-              {CHECKLIST_DATA.map(section => (
-                <ConformSectionFull key={section.id} section={section} checklistState={checklistState} />
+              {CONFORMITY_GROUPS.map(group => (
+                <ConformGroupCard key={group.id} group={group} checklistState={checklistState} />
               ))}
             </div>
           </>
