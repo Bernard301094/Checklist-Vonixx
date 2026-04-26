@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   AlertTriangle, CheckCircle2, X, ChevronDown, ChevronUp,
-  Clock, Camera, Activity, Target, Search, XCircle, Calendar, User
+  Clock, Camera, Activity, Target, Search, XCircle, Calendar, User, Layers
 } from 'lucide-react';
 import { OccurrenceData, ChecklistEntry, ChecklistSession } from '../types';
 import { CHECKLIST_DATA } from '../constants';
@@ -37,21 +37,13 @@ function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 }
 
-/** Dado un key "sectionId-itemIndex", devuelve { sectionTitle, itemText, sectionNumber } */
-function resolveItemKey(key: string): { sectionTitle: string; itemText: string; sectionNumber: number } | null {
-  const lastDash = key.lastIndexOf('-');
-  if (lastDash === -1) return null;
-  const sectionId = key.substring(0, lastDash);
-  const itemIndex = parseInt(key.substring(lastDash + 1));
-  const sectionIndex = CHECKLIST_DATA.findIndex(s => s.id === sectionId);
-  if (sectionIndex === -1) return null;
-  const section = CHECKLIST_DATA[sectionIndex];
-  if (itemIndex < 0 || itemIndex >= section.items.length) return null;
-  return {
-    sectionTitle: section.title,
-    itemText: section.items[itemIndex],
-    sectionNumber: sectionIndex + 1,
-  };
+function todayISO(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function isoDateKey(iso: string): string {
+  return new Date(iso).toISOString().split('T')[0];
 }
 
 /* ======================================================
@@ -158,112 +150,145 @@ function CollaboratorCard({ reporter, occs, onOpenPhoto }: { reporter: string; o
 }
 
 /* ======================================================
-   CONFORMIDADES — componentes
+   CONFORMIDADES — tipos e componentes
    ====================================================== */
 
-/**
- * Ítem no conforme individual en la lista de conformidades.
- * Muestra: número + título de sección, nombre del ítem, hora y comentario.
- */
-interface NonConformItem {
-  key: string;
-  sectionNumber: number;
+interface ConformSectionData {
+  sectionId: string;
   sectionTitle: string;
-  itemText: string;
-  time: string;     // hora formateada "HH:MM"
-  comment: string;
+  sectionIndex: number;
+  items: {
+    key: string;
+    itemText: string;
+    checked: boolean;
+    reporter: string;
+    time: string;
+  }[];
+  checkedCount: number;
+  totalCount: number;
 }
 
-function NonConformItemRow({ item }: { item: NonConformItem }) {
+/** Grupo de secciones colapsable con pill divisor */
+function ConformSectionGroup({
+  groupLabel,
+  sections,
+  defaultOpen,
+}: {
+  groupLabel: string;
+  sections: ConformSectionData[];
+  defaultOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+
+  const totalItems = sections.reduce((a, s) => a + s.totalCount, 0);
+  const checkedItems = sections.reduce((a, s) => a + s.checkedCount, 0);
+  const pct = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
+  const color = pct === 100 ? '#10b981' : pct >= 60 ? '#0d9488' : '#d97706';
+
   return (
-    <div style={{ padding: '14px 16px', borderRadius: '12px', background: '#fff', border: '1px solid #e2e8f0', marginBottom: '10px', boxShadow: '0 1px 2px rgba(0,0,0,0.02)' }}>
-      {/* Sección + hora */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 6 }}>
-        <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ width: 28, height: 28, borderRadius: '7px', background: '#fee2e2', color: '#dc2626', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: 1 }}>
-            <XCircle size={14} />
-          </div>
-          <div>
-            <div style={{ fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', color: '#dc2626', letterSpacing: '0.05em' }}>
-              {item.sectionNumber}. {item.sectionTitle}
-            </div>
-            <div style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b', marginTop: 2 }}>
-              {item.itemText}
-            </div>
-          </div>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: '12px', fontWeight: 600, color: '#64748b', flexShrink: 0 }}>
-          <Clock size={12} /> {item.time}
-        </div>
+    <div style={{ marginBottom: '16px' }}>
+      {/* Pill divisor — mismo estilo que Alertas */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: open ? '12px' : 0 }}>
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: '8px',
+            padding: '7px 14px', borderRadius: 999,
+            background: '#e2e8f0', color: '#475569',
+            border: '1px solid #cbd5e1',
+            fontSize: '12px', fontWeight: 800,
+            textTransform: 'uppercase', letterSpacing: '0.05em',
+            cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0,
+          }}
+        >
+          <Layers size={13} style={{ color }} />
+          <span>{groupLabel}</span>
+          <span style={{ width: 4, height: 4, borderRadius: '50%', background: '#94a3b8', display: 'inline-block' }} />
+          <span style={{ color }}>{pct}%</span>
+          {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+        <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
       </div>
-      {/* Comentario */}
-      {item.comment && (
-        <div style={{ padding: '9px 12px', background: '#fafafa', borderRadius: '8px', border: '1px dashed #cbd5e1', marginTop: 10, marginLeft: 38 }}>
-          <p style={{ fontSize: '13px', color: '#475569', fontStyle: 'italic', margin: 0 }}>"{item.comment}"</p>
+
+      {open && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {sections.map(sec => (
+            <ConformSectionCard key={sec.sectionId} section={sec} />
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-/**
- * Card de un colaborador en la vista Conformidades.
- * Muestra: avatar + nombre + turno + badges (ocorrências + máquinas)
- * Al expandir: lista de ítems no conformes (igual que en Alertas).
- */
-function ConformCollaboratorCard({
-  reporter,
-  shift,
-  nonConformItems,
-  machineCount,
-}: {
-  reporter: string;
-  shift: string;
-  nonConformItems: NonConformItem[];
-  machineCount: number;
-}) {
+/** Card de una sección con sus ítems */
+function ConformSectionCard({ section }: { section: ConformSectionData }) {
   const [open, setOpen] = useState(false);
+  const pct = section.totalCount > 0 ? Math.round((section.checkedCount / section.totalCount) * 100) : 0;
+  const color = pct === 100 ? '#10b981' : pct >= 60 ? '#0d9488' : '#d97706';
+  const bgColor = pct === 100 ? '#ecfdf5' : pct >= 60 ? '#f0fdfa' : '#fffbeb';
 
   return (
-    <div className="card animate-in" style={{ padding: '20px', marginBottom: '16px', border: open ? '1px solid #cbd5e1' : '1px solid transparent' }}>
+    <div className="card animate-in" style={{ padding: '16px 20px', marginBottom: 0, border: '1px solid #e2e8f0' }}>
       <div
-        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
-        onClick={() => setOpen(!open)}
+        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: 12 }}
+        onClick={() => setOpen(o => !o)}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: 48, height: 48, borderRadius: '12px', background: 'linear-gradient(135deg, #059669, #10b981)', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, boxShadow: '0 4px 10px rgba(5,150,105,0.3)' }}>
-            {initials(reporter)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+          <div style={{ width: 40, height: 40, borderRadius: '10px', background: bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            {pct === 100
+              ? <CheckCircle2 size={20} style={{ color: '#10b981' }} />
+              : <Target size={20} style={{ color }} />
+            }
           </div>
-          <div>
-            <div style={{ fontSize: '16px', fontWeight: 800, color: 'var(--text)' }}>{reporter}</div>
-            <div style={{ fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: 4 }}>{shift}</div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '11px', fontWeight: 700, background: '#fee2e2', color: '#dc2626', padding: '2px 8px', borderRadius: '6px' }}>
-                {nonConformItems.length} Ocorrências
-              </span>
-              <span style={{ fontSize: '11px', fontWeight: 700, background: '#f1f5f9', color: '#475569', padding: '2px 8px', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
-                {machineCount} Máquinas
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '14px', fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {section.sectionIndex}. {section.sectionTitle}
+            </div>
+            <div style={{ display: 'flex', gap: 8, marginTop: 4, alignItems: 'center' }}>
+              <div style={{ height: 6, flex: 1, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden', maxWidth: 120 }}>
+                <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 99, transition: 'width 0.5s ease' }} />
+              </div>
+              <span style={{ fontSize: 12, fontWeight: 700, color }}>
+                {section.checkedCount}/{section.totalCount}
               </span>
             </div>
           </div>
         </div>
-        <div style={{ color: '#94a3b8', background: '#f8fafc', padding: '6px', borderRadius: '8px' }}>
-          {open ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <span style={{ fontSize: 15, fontWeight: 900, color }}>{pct}%</span>
+          <div style={{ color: '#94a3b8', background: '#f8fafc', padding: '5px', borderRadius: '8px' }}>
+            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </div>
         </div>
       </div>
 
       {open && (
-        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
-          {nonConformItems.length === 0 ? (
-            <div style={{ padding: '24px', textAlign: 'center', color: '#10b981', fontWeight: 700, fontSize: 14 }}>
-              <CheckCircle2 size={24} style={{ margin: '0 auto 8px' }} />
-              Sem não conformidades registradas
+        <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {section.items.map((item) => (
+            <div key={item.key} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+              borderRadius: 10, background: item.checked ? '#f0fdf4' : '#fff7f7',
+              border: `1px solid ${item.checked ? '#bbf7d0' : '#fecaca'}`,
+            }}>
+              <div style={{ flexShrink: 0 }}>
+                {item.checked
+                  ? <CheckCircle2 size={18} style={{ color: '#10b981' }} />
+                  : <XCircle size={18} style={{ color: '#ef4444' }} />
+                }
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', lineHeight: 1.4 }}>{item.itemText}</div>
+                {item.reporter && (
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <User size={10} /> {item.reporter}
+                    {item.time && <><Clock size={10} style={{ marginLeft: 4 }} /> {item.time}</>}
+                  </div>
+                )}
+              </div>
             </div>
-          ) : (
-            nonConformItems.map((item, idx) => (
-              <NonConformItemRow key={`${item.key}-${idx}`} item={item} />
-            ))
-          )}
+          ))}
         </div>
       )}
     </div>
@@ -277,8 +302,6 @@ export default function DashboardView({ occurrences, checklistState, checklistEn
   const [lightbox, setLightbox] = useState<{ photos: string[]; index: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'timeline' | 'conformidades'>('timeline');
   const [searchQuery, setSearchQuery] = useState('');
-
-  const hasSessions = checklistSessions.length > 0;
 
   const verifiedCount = useMemo(() => {
     let count = 0;
@@ -328,84 +351,119 @@ export default function DashboardView({ occurrences, checklistState, checklistEn
   }, [filteredOccs]);
 
   /* -------------------------------------------------------
-     Grupos de CONFORMIDADES por fecha → colaborador
-     Para cada sesión buscamos los ítems no conformes y
-     cruzamos con occurrences para obtener hora y comentario.
+     Grupos de CONFORMIDADES — construidos desde checklistState
+     + checklistEntries, sin depender de checklistSessions.
+     
+     Usamos la fecha de "updated_at" (o "checked_at") de cada
+     entrada para agrupar por día. Si no hay fecha, cae en hoy.
      ------------------------------------------------------- */
-  const conformDateGroups = useMemo(() => {
-    if (!hasSessions) return [];
 
-    const map: Record<string, ChecklistSession[]> = {};
-    checklistSessions.forEach(s => {
-      const dateStr = s.submitted_at ? new Date(s.submitted_at).toISOString().split('T')[0] : '1970-01-01';
-      if (!map[dateStr]) map[dateStr] = [];
-      map[dateStr].push(s);
-    });
+  /** Grupos de categorías para el pill divisor */
+  const SECTION_GROUPS = [
+    { label: 'Equipamentos e Transporte', sectionIds: ['perifericos', 'esteiras'] },
+    { label: 'Moinho e Componentes Mecânicos', sectionIds: ['moinho', 'componentes'] },
+    { label: 'Operação, Molde e Lubrificação', sectionIds: ['operacao', 'molde', 'lubrificacao'] },
+    { label: 'Parâmetros e Documentação', sectionIds: ['parametros', 'documentacao'] },
+  ];
 
-    return Object.entries(map)
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([dateStr, daySessions]) => {
-        const dateLabel = dateStr !== '1970-01-01' ? formatDateLabel(dateStr) : 'Data não registrada';
+  /** Mapa rápido: item_key → ChecklistEntry */
+  const entryMap = useMemo(() => {
+    const m: Record<string, ChecklistEntry> = {};
+    checklistEntries.forEach(e => { m[e.item_key] = e; });
+    return m;
+  }, [checklistEntries]);
 
-        // Agrupar por reporter (nombre + turno)
-        const collabMap: Record<string, { sessions: ChecklistSession[]; shift: string }> = {};
-        daySessions.forEach(s => {
-          const r = s.reporter || 'Desconhecido';
-          if (!collabMap[r]) collabMap[r] = { sessions: [], shift: s.shift || '' };
-          collabMap[r].sessions.push(s);
-        });
+  /** Fecha más reciente de actualización del checklist (para el encabezado) */
+  const lastUpdateDate = useMemo(() => {
+    const dates = checklistEntries
+      .map(e => e.updated_at || e.checked_at)
+      .filter(Boolean) as string[];
+    if (!dates.length) return null;
+    return dates.sort().reverse()[0];
+  }, [checklistEntries]);
 
-        const collabs = Object.entries(collabMap).map(([reporter, { sessions, shift }]) => {
-          // Recopilar todas las máquinas únicas
-          const machines = new Set(sessions.map(s => s.machine).filter(Boolean));
+  /**
+   * Construye los datos de conformidades agrupados por SECTION_GROUPS.
+   * Cada sección muestra sus ítems con estado checked/unchecked.
+   */
+  const conformGroups = useMemo(() => {
+    return SECTION_GROUPS.map(group => {
+      const sections: ConformSectionData[] = CHECKLIST_DATA
+        .map((sec, sIdx) => {
+          // Incluir si el id encaja con el grupo o si no hay grupos definidos
+          const inGroup = group.sectionIds.some(sid =>
+            sec.id.toLowerCase().includes(sid) ||
+            sec.title.toLowerCase().includes(sid)
+          );
+          if (!inGroup) return null;
 
-          // Construir lista de ítems no conformes
-          const nonConformItems: NonConformItem[] = [];
-
-          sessions.forEach(session => {
-            const sessionTime = formatTime(session.submitted_at);
-
-            session.items
-              .filter(i => !i.checked)
-              .forEach(unchecked => {
-                const resolved = resolveItemKey(unchecked.key);
-                if (!resolved) return;
-
-                // Buscar la ocurrencia correspondiente (mismo reporter, misma sección, mismo ítem)
-                const matchingOcc = occurrences.find(o => {
-                  const occReporter = reporterLabel(o.reporter);
-                  const sessReporter = reporterLabel(reporter);
-                  return (
-                    occReporter === sessReporter &&
-                    o.item === resolved.itemText &&
-                    (o.section === resolved.sectionTitle ||
-                      o.section.includes(resolved.sectionNumber.toString()))
-                  );
-                });
-
-                nonConformItems.push({
-                  key: unchecked.key,
-                  sectionNumber: resolved.sectionNumber,
-                  sectionTitle: resolved.sectionTitle,
-                  itemText: resolved.itemText,
-                  time: matchingOcc ? matchingOcc.time : sessionTime,
-                  comment: matchingOcc ? matchingOcc.comment : '',
-                });
-              });
+          const items = sec.items.map((itemText, iIdx) => {
+            const key = `${sec.id}-${iIdx}`;
+            const entry = entryMap[key];
+            const checked = checklistState[key] === true;
+            const reporter = entry?.reporter ? reporterLabel(entry.reporter) : '';
+            const timeStr = entry?.updated_at || entry?.checked_at
+              ? formatTime(entry.updated_at || entry.checked_at || '')
+              : '';
+            return { key, itemText, checked, reporter, time: timeStr };
           });
 
-          // Ordenar por hora descendente
-          nonConformItems.sort((a, b) => b.time.localeCompare(a.time));
+          const checkedCount = items.filter(i => i.checked).length;
+          return {
+            sectionId: sec.id,
+            sectionTitle: sec.title.replace(/^\d+\.\s*/, ''),
+            sectionIndex: sIdx + 1,
+            items,
+            checkedCount,
+            totalCount: items.length,
+          } as ConformSectionData;
+        })
+        .filter((s): s is ConformSectionData => s !== null);
 
-          return { reporter, shift, nonConformItems, machineCount: machines.size };
+      return { groupLabel: group.label, sections };
+    }).filter(g => g.sections.length > 0);
+  }, [checklistState, entryMap]);
+
+  /**
+   * Si ningún sectionId del grupo encaja con los ids reales del CHECKLIST_DATA,
+   * hacemos un fallback: dividimos el array equitativamente en 4 grupos.
+   */
+  const usesFallbackGroups = conformGroups.every(g => g.sections.length === 0);
+
+  const fallbackGroups = useMemo(() => {
+    if (!usesFallbackGroups) return [];
+    const chunkSize = Math.ceil(CHECKLIST_DATA.length / 4);
+    const groupLabels = [
+      'Grupo 1', 'Grupo 2', 'Grupo 3', 'Grupo 4',
+    ];
+    return Array.from({ length: 4 }, (_, gi) => {
+      const slice = CHECKLIST_DATA.slice(gi * chunkSize, (gi + 1) * chunkSize);
+      const sections: ConformSectionData[] = slice.map((sec, sIdx) => {
+        const realIdx = gi * chunkSize + sIdx;
+        const items = sec.items.map((itemText, iIdx) => {
+          const key = `${sec.id}-${iIdx}`;
+          const entry = entryMap[key];
+          const checked = checklistState[key] === true;
+          const reporter = entry?.reporter ? reporterLabel(entry.reporter) : '';
+          const timeStr = entry?.updated_at || entry?.checked_at
+            ? formatTime(entry.updated_at || entry.checked_at || '')
+            : '';
+          return { key, itemText, checked, reporter, time: timeStr };
         });
-
-        // Ordenar por número de no conformidades descendente
-        collabs.sort((a, b) => b.nonConformItems.length - a.nonConformItems.length);
-
-        return { dateStr, dateLabel, collabs };
+        return {
+          sectionId: sec.id,
+          sectionTitle: sec.title.replace(/^\d+\.\s*/, ''),
+          sectionIndex: realIdx + 1,
+          items,
+          checkedCount: items.filter(i => i.checked).length,
+          totalCount: items.length,
+        } as ConformSectionData;
       });
-  }, [checklistSessions, occurrences, hasSessions]);
+      return { groupLabel: groupLabels[gi], sections };
+    }).filter(g => g.sections.length > 0);
+  }, [usesFallbackGroups, checklistState, entryMap]);
+
+  const finalGroups = usesFallbackGroups ? fallbackGroups : conformGroups;
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
@@ -481,46 +539,30 @@ export default function DashboardView({ occurrences, checklistState, checklistEn
               </div>
               <p style={{ fontSize: '13px', color: '#d1fae5', marginTop: '12px', fontWeight: 600 }}>
                 {verifiedCount} de {maxChecks} pontos de inspeção validados
+                {lastUpdateDate && (
+                  <span style={{ marginLeft: 8, opacity: 0.8 }}>
+                    · atualizado {formatTime(lastUpdateDate)}
+                  </span>
+                )}
               </p>
             </div>
 
-            {/* Histórico de sesiones agrupado por fecha → colaborador → ítems no conformes */}
-            {hasSessions ? (
-              <>
-                {conformDateGroups.length === 0 ? (
-                  <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b', background: '#ffffff', borderRadius: '16px', border: '1px dashed #cbd5e1' }}>
-                    Nenhuma sessão registrada.
-                  </div>
-                ) : (
-                  conformDateGroups.map(group => (
-                    <div key={group.dateStr} style={{ marginBottom: '32px' }}>
-                      {/* Divisor de data — mismo estilo que Alertas */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '16px' }}>
-                        <div style={{ padding: '8px 16px', background: '#e2e8f0', color: '#475569', borderRadius: '99px', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                          <Calendar size={14} /> {group.dateLabel}
-                        </div>
-                        <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
-                      </div>
-                      {group.collabs.map(({ reporter, shift, nonConformItems, machineCount }) => (
-                        <ConformCollaboratorCard
-                          key={reporter}
-                          reporter={reporter}
-                          shift={shift}
-                          nonConformItems={nonConformItems}
-                          machineCount={machineCount}
-                        />
-                      ))}
-                    </div>
-                  ))
-                )}
-              </>
-            ) : (
-              /* Fallback sin sesiones */
+            {/* Grupos de seções com pill divisor */}
+            {finalGroups.length === 0 ? (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b', background: '#ffffff', borderRadius: '16px', border: '1px dashed #cbd5e1', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
                 <User size={32} style={{ color: '#94a3b8' }} />
-                <div style={{ fontWeight: 700 }}>Sem sessões registradas</div>
-                <div style={{ fontSize: 13 }}>As não conformidades serão exibidas aqui assim que houver submissões de checklist.</div>
+                <div style={{ fontWeight: 700 }}>Sem dados de checklist</div>
+                <div style={{ fontSize: 13 }}>Aguardando registros do checklist.</div>
               </div>
+            ) : (
+              finalGroups.map((group, gi) => (
+                <ConformSectionGroup
+                  key={group.groupLabel}
+                  groupLabel={group.groupLabel}
+                  sections={group.sections}
+                  defaultOpen={gi === 0}
+                />
+              ))
             )}
           </>
         )}
