@@ -1,8 +1,8 @@
 /**
- * DashboardView v9 — Admin & Supervisor Dashboard
- * Hierarchy: Date → Collaborator → Occurrences
+ * DashboardView v10 — Date → Machine → Collaborator → Occurrences
  * Fully responsive, mobile-first, touch-friendly.
- * v9: show machine name inside CollaboratorCard and OccurrenceDetailModal.
+ * v10: group by machine inside each date; inline occurrence rows show full detail;
+ *      conformidade tab shows all items (checked + unchecked) with status.
  */
 import { useState, useMemo } from 'react';
 import {
@@ -11,7 +11,7 @@ import {
   Clock, Camera, Calendar, Activity,
   Users, Shield, Zap, Star,
   ArrowRight, Flame, Target, Search,
-  BarChart2, UserCheck, Eye, Cpu
+  BarChart2, UserCheck, Eye, Cpu, XCircle
 } from 'lucide-react';
 import { OccurrenceData } from '../types';
 import { CHECKLIST_DATA } from '../constants';
@@ -44,20 +44,11 @@ function formatDateFull(dateKey: string): string {
   return d.toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 }
 
-/**
- * Returns just the person's name + shift, stripping machine and auth.
- * "João Silva (Turno A) | Máquina: ROMI 01 - Auth: ..." → "João Silva (Turno A)"
- */
 function reporterLabel(raw: string): string {
   const withoutAuth = raw.split(' - Auth:')[0].trim();
   return withoutAuth.split(' | Máquina:')[0].split(' | maquina:')[0].trim();
 }
 
-/**
- * Extracts the machine name from the reporter string.
- * "João Silva (Turno A) | Máquina: ROMI 01 - Auth: ..." → "ROMI 01"
- * Returns null if not present.
- */
 function machineLabel(raw: string): string | null {
   const withoutAuth = raw.split(' - Auth:')[0].trim();
   const machineMatch = withoutAuth.match(/\|\s*[Mm]á?quina:\s*(.+)$/);
@@ -81,201 +72,271 @@ function getAvatarColor(name: string) {
   return AVATAR_COLORS[name.split('').reduce((a,c)=>a+c.charCodeAt(0),0) % AVATAR_COLORS.length];
 }
 
-/* ─── Occurrence Detail Modal ──────────────────────────────── */
-function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: {
-  occurrence: OccurrenceData; onClose: ()=>void; onOpenPhoto: (p:string[], i:number)=>void;
+/* ─── Inline Occurrence Detail Card ──────────────────────────
+   Shown directly inside the CollaboratorCard when expanded,
+   no modal needed — full details visible on tap/click.
+*/
+function OccurrenceDetailCard({ occ, onOpenPhoto }: {
+  occ: OccurrenceData;
+  onOpenPhoto: (photos: string[], index: number) => void;
 }) {
-  const reporter = reporterLabel(occurrence.reporter);
-  const machine  = machineLabel(occurrence.reporter);
-  const dateStr = occurrence.created_at
-    ? new Date(occurrence.created_at).toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}) : '—';
-  const av = getAvatarColor(reporter);
   return (
-    <>
-      <style>{`
-        .occ-ov{position:fixed;inset:0;background:rgba(2,6,23,0.92);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;z-index:3000;padding:clamp(12px,4vw,20px);animation:odFi .25s ease;}
-        .occ-box{width:100%;max-width:600px;background:linear-gradient(145deg,#0f172a,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:clamp(16px,4vw,28px);box-shadow:0 40px 80px rgba(0,0,0,0.6);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;animation:odSu .35s cubic-bezier(0.16,1,0.3,1);}
-        @media(max-width:480px){.occ-ov{align-items:flex-end;padding:0;}.occ-box{max-width:100%;border-radius:clamp(16px,4vw,24px) clamp(16px,4vw,24px) 0 0;max-height:96dvh;}}
-        @keyframes odFi{from{opacity:0}to{opacity:1}}
-        @keyframes odSu{from{opacity:0;transform:translateY(40px) scale(.97)}to{opacity:1;transform:none}}
-        .occ-scroll{overflow-y:auto;flex:1;padding:clamp(16px,4vw,24px);scrollbar-width:thin;}
-        .occ-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(90px,22vw,130px),1fr));gap:clamp(8px,2vw,10px);}
-      `}</style>
-      <div className="occ-ov" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-        <div className="occ-box">
-          <div style={{padding:'clamp(14px,4vw,22px) clamp(16px,4vw,24px)',background:'linear-gradient(90deg,rgba(217,119,6,0.12),rgba(217,119,6,0.03))',borderBottom:'1px solid rgba(217,119,6,0.15)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,gap:12}}>
-            <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
-              <div style={{position:'relative',flexShrink:0}}>
-                <div style={{width:46,height:46,borderRadius:14,background:'rgba(217,119,6,0.2)',border:'1px solid rgba(217,119,6,0.3)',color:'#f59e0b',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 20px rgba(217,119,6,0.25)'}}>
-                  <AlertTriangle size={20}/>
-                </div>
-                <div style={{position:'absolute',top:-4,right:-4,width:14,height:14,borderRadius:'50%',background:'#ef4444',border:'2px solid #0f172a',animation:'pulseDot 2s infinite'}}/>
-              </div>
-              <div style={{minWidth:0}}>
-                <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.14em',color:'rgba(251,191,36,0.7)',marginBottom:3}}>⚠ PONTO CRÍTICO</div>
-                <div style={{fontSize:'clamp(13px,3.5vw,15px)',fontWeight:800,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{occurrence.section}</div>
-              </div>
-            </div>
-            <button onClick={onClose} style={{width:44,height:44,borderRadius:10,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.6)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
-              <X size={16}/>
-            </button>
+    <div style={{
+      margin: '0 clamp(10px,3vw,16px) clamp(8px,2vw,12px)',
+      borderRadius: 16,
+      border: '1px solid rgba(217,119,6,0.2)',
+      background: 'rgba(217,119,6,0.05)',
+      overflow: 'hidden',
+    }}>
+      {/* Header row */}
+      <div style={{ display:'flex', alignItems:'center', gap:10, padding:'clamp(10px,3vw,14px) clamp(12px,3vw,16px)', borderBottom:'1px solid rgba(217,119,6,0.12)' }}>
+        <AlertTriangle size={14} style={{ color:'#f59e0b', flexShrink:0 }}/>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:10, fontWeight:900, textTransform:'uppercase' as const, letterSpacing:'0.1em', color:'rgba(251,191,36,0.7)', marginBottom:2 }}>{occ.section}</div>
+          <div style={{ fontSize:'clamp(12px,3.5vw,13px)', fontWeight:800, color:'var(--text)', lineHeight:1.4 }}>{occ.item}</div>
+        </div>
+        <div style={{ flexShrink:0, textAlign:'right' }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:4, justifyContent:'flex-end', fontVariantNumeric:'tabular-nums' }}>
+            <Clock size={10}/> {occ.time}
           </div>
-          <div className="occ-scroll">
-            {/* Reporter row */}
-            <div style={{display:'flex',alignItems:'center',gap:'clamp(10px,3vw,14px)',padding:'clamp(14px,3vw,18px) clamp(14px,3vw,20px)',background:'rgba(255,255,255,0.03)',borderRadius:18,border:'1px solid rgba(255,255,255,0.06)',marginBottom:20}}>
-              <div style={{width:48,height:48,borderRadius:'50%',background:av.bg,border:`2px solid ${av.fg}44`,color:av.fg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:15,fontWeight:900,flexShrink:0,boxShadow:`0 4px 16px ${av.glow}`}}>{initials(reporter)}</div>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:15,fontWeight:800,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reporter}</div>
-                {machine && (
-                  <div style={{display:'inline-flex',alignItems:'center',gap:5,marginTop:5,padding:'2px 10px',borderRadius:99,background:'rgba(99,102,241,0.15)',border:'1px solid rgba(99,102,241,0.25)',color:'#818cf8'}}>
-                    <Cpu size={10}/>
-                    <span style={{fontSize:11,fontWeight:800,whiteSpace:'nowrap'}}>{machine}</span>
-                  </div>
-                )}
-                {!machine && (
-                  <div style={{fontSize:12,color:'rgba(255,255,255,0.4)',marginTop:3,fontWeight:600}}>Operador responsável</div>
-                )}
-              </div>
-              <div style={{textAlign:'right',flexShrink:0}}>
-                <div style={{fontSize:14,fontWeight:800,color:'rgba(255,255,255,0.85)'}}>{occurrence.time}</div>
-                <div style={{fontSize:11,color:'rgba(255,255,255,0.35)',marginTop:2}}>{dateStr}</div>
-              </div>
+          {occ.photos.length > 0 && (
+            <div style={{ fontSize:10, fontWeight:700, color:'var(--primary)', display:'flex', alignItems:'center', gap:3, justifyContent:'flex-end', marginTop:3 }}>
+              <Camera size={9}/> {occ.photos.length}
             </div>
-            <div style={{display:'flex',flexDirection:'column',gap:18}}>
-              <div>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-                  <div style={{width:3,height:14,background:'#f59e0b',borderRadius:99}}/>
-                  <span style={{fontSize:11,fontWeight:800,textTransform:'uppercase' as const,letterSpacing:'0.1em',color:'#f59e0b'}}>Não Conformidade</span>
-                </div>
-                <div style={{padding:'clamp(14px,4vw,18px) clamp(14px,4vw,20px)',background:'rgba(217,119,6,0.08)',border:'1px solid rgba(217,119,6,0.2)',borderRadius:18,borderLeft:'3px solid #f59e0b'}}>
-                  <p style={{fontSize:'clamp(13px,3.5vw,14px)',fontWeight:700,lineHeight:1.6,color:'#fff',margin:0}}>{occurrence.item}</p>
-                </div>
-              </div>
-              <div>
-                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-                  <div style={{width:3,height:14,background:'rgba(255,255,255,0.25)',borderRadius:99}}/>
-                  <span style={{fontSize:11,fontWeight:800,textTransform:'uppercase' as const,letterSpacing:'0.1em',color:'rgba(255,255,255,0.4)'}}>Observações</span>
-                </div>
-                <div style={{padding:'clamp(14px,4vw,18px) clamp(14px,4vw,20px)',background:'rgba(255,255,255,0.03)',border:'1px solid rgba(255,255,255,0.07)',borderRadius:18}}>
-                  <p style={{fontSize:14,lineHeight:1.8,fontWeight:500,color:occurrence.comment?'rgba(255,255,255,0.8)':'rgba(255,255,255,0.3)',margin:0,fontStyle:occurrence.comment?'normal':'italic'}}>
-                    {occurrence.comment||'Nenhuma observação adicional registrada.'}
-                  </p>
-                </div>
-              </div>
-              {occurrence.photos.length>0&&(
-                <div>
-                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
-                    <div style={{width:3,height:14,background:'#0d9488',borderRadius:99}}/>
-                    <span style={{fontSize:11,fontWeight:800,textTransform:'uppercase' as const,letterSpacing:'0.1em',color:'#0d9488'}}>Evidências · {occurrence.photos.length}</span>
-                  </div>
-                  <div className="occ-photo-grid">
-                    {occurrence.photos.map((p,i)=>(
-                      <button key={i} type="button" onClick={()=>onOpenPhoto(occurrence.photos,i)}
-                        style={{position:'relative',borderRadius:14,overflow:'hidden',border:'1px solid rgba(255,255,255,0.08)',aspectRatio:'1',padding:0,cursor:'zoom-in',background:'rgba(255,255,255,0.04)',transition:'all 0.25s',minHeight:44}}
-                        onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04)';e.currentTarget.style.borderColor='rgba(13,148,136,0.4)';}}
-                        onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.borderColor='rgba(255,255,255,0.08)';}}>
-                        <img src={p} alt={`Foto ${i+1}`} style={{width:'100%',height:'100%',objectFit:'cover'}} loading="lazy"/>
-                        <div style={{position:'absolute',bottom:6,right:6,background:'rgba(0,0,0,0.7)',color:'#fff',fontSize:9,fontWeight:900,padding:'2px 7px',borderRadius:99,backdropFilter:'blur(8px)'}}>{i+1}/{occurrence.photos.length}</div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          )}
+        </div>
+      </div>
+
+      {/* Comment */}
+      {occ.comment && (
+        <div style={{ padding:'clamp(8px,2vw,12px) clamp(12px,3vw,16px)', borderBottom: occ.photos.length > 0 ? '1px solid rgba(217,119,6,0.12)' : 'none' }}>
+          <div style={{ fontSize:10, fontWeight:900, textTransform:'uppercase' as const, letterSpacing:'0.1em', color:'rgba(255,255,255,0.35)', marginBottom:5 }}>Observação</div>
+          <p style={{ fontSize:'clamp(11px,3vw,13px)', lineHeight:1.7, fontWeight:500, color:'rgba(255,255,255,0.7)', fontStyle:'italic', margin:0 }}>"{occ.comment}"</p>
+        </div>
+      )}
+
+      {/* Photos grid */}
+      {occ.photos.length > 0 && (
+        <div style={{ padding:'clamp(8px,2vw,10px) clamp(12px,3vw,16px)' }}>
+          <div style={{ fontSize:10, fontWeight:900, textTransform:'uppercase' as const, letterSpacing:'0.1em', color:'rgba(13,148,136,0.7)', marginBottom:6 }}>Evidências · {occ.photos.length}</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(clamp(72px,18vw,110px),1fr))', gap:'clamp(5px,1.5vw,8px)' }}>
+            {occ.photos.map((p, i) => (
+              <button key={i} type="button" onClick={() => onOpenPhoto(occ.photos, i)}
+                style={{ position:'relative', borderRadius:10, overflow:'hidden', border:'1px solid rgba(255,255,255,0.08)', aspectRatio:'1', padding:0, cursor:'zoom-in', background:'rgba(255,255,255,0.04)', minHeight:44 }}
+                onMouseEnter={e=>{e.currentTarget.style.transform='scale(1.04)';e.currentTarget.style.borderColor='rgba(13,148,136,0.4)';}}
+                onMouseLeave={e=>{e.currentTarget.style.transform='scale(1)';e.currentTarget.style.borderColor='rgba(255,255,255,0.08)';}}>
+                <img src={p} alt={`Foto ${i+1}`} style={{ width:'100%', height:'100%', objectFit:'cover' }} loading="lazy"/>
+                <div style={{ position:'absolute', bottom:4, right:4, background:'rgba(0,0,0,0.7)', color:'#fff', fontSize:9, fontWeight:900, padding:'1px 5px', borderRadius:99, backdropFilter:'blur(8px)' }}>{i+1}/{occ.photos.length}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Collaborator Card (inside a machine group) ──────────── */
+function CollaboratorCard({ reporter, occs, onOpenPhoto }: {
+  reporter: string;
+  occs: OccurrenceData[];
+  onOpenPhoto: (photos: string[], index: number) => void;
+}) {
+  const [expanded, setExpanded] = useState(true);
+  const av = getAvatarColor(reporter);
+  const photoCount = occs.reduce((a, o) => a + o.photos.length, 0);
+
+  return (
+    <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:18, overflow:'hidden', boxShadow:'0 2px 10px rgba(0,0,0,0.05)' }}>
+      {/* Collaborator header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'clamp(10px,3vw,14px) clamp(12px,3vw,18px)', background:'linear-gradient(90deg,var(--surface-2) 0%,var(--surface) 100%)', borderBottom: expanded ? '1px solid var(--border)' : 'none', gap:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'clamp(9px,2.5vw,12px)', minWidth:0, flex:1 }}>
+          <div style={{ position:'relative', flexShrink:0 }}>
+            <div style={{ width:40, height:40, borderRadius:'50%', background:av.bg, border:`2px solid ${av.fg}44`, color:av.fg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:13, fontWeight:900, boxShadow:`0 4px 12px ${av.glow}` }}>
+              {initials(reporter)}
+            </div>
+            <div style={{ position:'absolute', bottom:0, right:0, width:13, height:13, borderRadius:'50%', background:'#f59e0b', border:'2px solid var(--surface)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+              <AlertTriangle size={6} color="#fff"/>
+            </div>
+          </div>
+          <div style={{ minWidth:0, flex:1 }}>
+            <div style={{ fontSize:'clamp(12px,3.5vw,14px)', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{reporter}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:5, marginTop:4, flexWrap:'wrap' as const }}>
+              <span style={{ display:'inline-flex', alignItems:'center', gap:3, height:20, padding:'0 8px', borderRadius:99, fontSize:10, fontWeight:900, background:'rgba(217,119,6,0.1)', color:'#d97706', border:'1px solid rgba(217,119,6,0.15)', whiteSpace:'nowrap' as const }}>
+                <AlertTriangle size={8}/> {occs.length} {occs.length===1?'alerta':'alertas'}
+              </span>
+              {photoCount > 0 && (
+                <span style={{ display:'inline-flex', alignItems:'center', gap:3, height:20, padding:'0 8px', borderRadius:99, fontSize:10, fontWeight:900, background:'rgba(13,148,136,0.1)', color:'var(--primary)', border:'1px solid rgba(13,148,136,0.15)', whiteSpace:'nowrap' as const }}>
+                  <Camera size={8}/> {photoCount} fotos
+                </span>
               )}
             </div>
           </div>
         </div>
+        <button type="button" onClick={() => setExpanded(e => !e)}
+          style={{ width:40, height:40, borderRadius:10, background:'var(--surface-2)', border:'1px solid var(--border)', color:'var(--text-muted)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+          {expanded ? <ChevronUp size={15}/> : <ChevronDown size={15}/>}
+        </button>
       </div>
-    </>
-  );
-}
 
-/* ─── Conformidade Detail Modal ────────────────────────────── */
-function ConformDetailModal({ detail, onClose }: { detail: { sectionTitle:string; items:string[]; total:number }; onClose:()=>void }) {
-  const pct = Math.round((detail.items.length/detail.total)*100);
-  return (
-    <>
-      <style>{`
-        .cf-ov{position:fixed;inset:0;background:rgba(2,6,23,0.92);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;z-index:3000;padding:clamp(12px,4vw,20px);animation:cfFi .25s ease;}
-        .cf-box{width:100%;max-width:540px;background:linear-gradient(145deg,#0f172a,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:clamp(16px,4vw,28px);box-shadow:0 40px 80px rgba(0,0,0,0.6);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;animation:cfSu .35s cubic-bezier(0.16,1,0.3,1);}
-        @media(max-width:480px){.cf-ov{align-items:flex-end;padding:0;}.cf-box{max-width:100%;border-radius:clamp(16px,4vw,24px) clamp(16px,4vw,24px) 0 0;max-height:96dvh;}}
-        @keyframes cfFi{from{opacity:0}to{opacity:1}}
-        @keyframes cfSu{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
-      `}</style>
-      <div className="cf-ov" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
-        <div className="cf-box">
-          <div style={{padding:'clamp(14px,4vw,22px) clamp(16px,4vw,24px)',background:'linear-gradient(90deg,rgba(22,163,74,0.12),rgba(22,163,74,0.03))',borderBottom:'1px solid rgba(22,163,74,0.15)',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0,gap:12}}>
-            <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0}}>
-              <div style={{width:46,height:46,borderRadius:14,background:'rgba(22,163,74,0.2)',border:'1px solid rgba(22,163,74,0.3)',color:'#22c55e',display:'flex',alignItems:'center',justifyContent:'center',boxShadow:'0 8px 20px rgba(22,163,74,0.25)',flexShrink:0}}>
-                <CheckCircle2 size={22}/>
-              </div>
-              <div style={{minWidth:0}}>
-                <div style={{fontSize:10,fontWeight:800,letterSpacing:'0.14em',color:'rgba(34,197,94,0.7)',marginBottom:3}}>✓ ITENS VALIDADOS</div>
-                <div style={{fontSize:'clamp(13px,3.5vw,15px)',fontWeight:800,color:'#fff',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{detail.sectionTitle}</div>
-              </div>
-            </div>
-            <button onClick={onClose} style={{width:44,height:44,borderRadius:10,background:'rgba(255,255,255,0.06)',border:'1px solid rgba(255,255,255,0.08)',color:'rgba(255,255,255,0.5)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
-              <X size={16}/>
-            </button>
-          </div>
-          <div style={{padding:'12px clamp(16px,4vw,24px)',borderBottom:'1px solid rgba(255,255,255,0.06)',background:'rgba(255,255,255,0.02)',display:'flex',alignItems:'center',gap:16,flexShrink:0}}>
-            <div style={{flex:1,height:6,background:'rgba(255,255,255,0.06)',borderRadius:99,overflow:'hidden'}}>
-              <div style={{height:'100%',width:`${pct}%`,background:'linear-gradient(90deg,#16a34a,#22c55e)',borderRadius:99,transition:'all 1s ease'}}/>
-            </div>
-            <span style={{fontSize:13,fontWeight:900,color:'#22c55e',fontVariantNumeric:'tabular-nums',flexShrink:0}}>{detail.items.length}/{detail.total} · {pct}%</span>
-          </div>
-          <div style={{overflowY:'auto',flex:1,padding:'16px clamp(16px,4vw,24px)',display:'flex',flexDirection:'column',gap:8}}>
-            {detail.items.map((item,i)=>(
-              <div key={i} style={{display:'flex',alignItems:'flex-start',gap:12,padding:'clamp(10px,3vw,12px) clamp(12px,3vw,16px)',borderRadius:14,background:'rgba(22,163,74,0.07)',border:'1px solid rgba(22,163,74,0.12)'}}>
-                <CheckCircle2 size={16} style={{color:'#22c55e',flexShrink:0,marginTop:2}}/>
-                <span style={{fontSize:13,fontWeight:600,lineHeight:1.5,color:'rgba(255,255,255,0.85)'}}>{item}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </>
-  );
-}
-
-/* ─── ConformSection ────────────────────────────────────────── */
-function ConformSection({ title, sectionId, items, total, defaultOpen, onDetail }:{
-  title:string; sectionId:string; items:string[]; total:number; defaultOpen:boolean; onDetail:(d:any)=>void;
-}) {
-  const [open,setOpen] = useState(defaultOpen);
-  const pct = total>0?Math.round((items.length/total)*100):0;
-  const isComplete = pct===100;
-  return (
-    <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:20,overflow:'hidden',transition:'all 0.2s',boxShadow:'0 2px 12px rgba(0,0,0,0.08)'}}>
-      <button type="button" onClick={()=>setOpen(o=>!o)}
-        style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)',background:open?'rgba(22,163,74,0.05)':'transparent',borderBottom:open?'1px solid rgba(22,163,74,0.1)':'none',cursor:'pointer',gap:12,minHeight:44}}>
-        <div style={{display:'flex',alignItems:'center',gap:12,minWidth:0,flex:1}}>
-          <div style={{width:40,height:40,borderRadius:12,background:isComplete?'rgba(22,163,74,0.2)':'rgba(22,163,74,0.1)',border:`1px solid ${isComplete?'rgba(22,163,74,0.4)':'rgba(22,163,74,0.2)'}`,color:'var(--success)',display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-            {isComplete?<Star size={18} fill="currentColor"/>:<CheckCircle2 size={18}/>}
-          </div>
-          <div style={{minWidth:0,flex:1}}>
-            <div style={{fontSize:'clamp(12px,3.5vw,14px)',fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',color:'var(--text)'}}>{title}</div>
-            <div style={{display:'flex',alignItems:'center',gap:8,marginTop:6}}>
-              <div style={{flex:1,height:4,background:'rgba(22,163,74,0.12)',borderRadius:99,overflow:'hidden',maxWidth:120}}>
-                <div style={{height:'100%',width:`${pct}%`,background:isComplete?'linear-gradient(90deg,#16a34a,#22c55e)':'#16a34a',borderRadius:99}}/>
-              </div>
-              <span style={{fontSize:11,fontWeight:800,color:'var(--success)',whiteSpace:'nowrap'}}>{items.length}/{total} · {pct}%</span>
-            </div>
-          </div>
-        </div>
-        {open?<ChevronUp size={18} style={{color:'var(--success)',flexShrink:0}}/>:<ChevronDown size={18} style={{color:'var(--success)',flexShrink:0}}/>}
-      </button>
-      {open&&(
-        <div style={{display:'flex',flexDirection:'column'}}>
-          {items.map((item,i)=>(
-            <button key={`${sectionId}-${i}`} type="button" onClick={()=>onDetail({sectionTitle:title,items,total})}
-              style={{width:'100%',display:'flex',alignItems:'center',gap:12,padding:'clamp(11px,3vw,13px) clamp(14px,4vw,24px)',borderBottom:i<items.length-1?'1px solid var(--border)':'none',background:'transparent',cursor:'pointer',textAlign:'left',transition:'background 0.15s',minHeight:44}}
-              onMouseEnter={e=>(e.currentTarget.style.background='rgba(22,163,74,0.04)')}
-              onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-              <CheckCircle2 size={14} style={{color:'var(--success)',flexShrink:0}}/>
-              <span style={{fontSize:'clamp(12px,3vw,13px)',fontWeight:600,lineHeight:1.5,flex:1,color:'var(--text)'}}>{item}</span>
-              <ArrowRight size={13} style={{color:'var(--text-faint)',flexShrink:0}}/>
-            </button>
+      {/* Inline occurrence detail cards */}
+      {expanded && (
+        <div style={{ display:'flex', flexDirection:'column', gap: 'clamp(6px,2vw,10px)', paddingTop:'clamp(8px,2vw,10px)', paddingBottom:'clamp(6px,2vw,8px)' }}>
+          {occs.map(occ => (
+            <OccurrenceDetailCard key={occ.id} occ={occ} onOpenPhoto={onOpenPhoto}/>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Machine Group Block ─────────────────────────────────── */
+function MachineGroup({ machine, occs, onOpenPhoto }: {
+  machine: string;
+  occs: OccurrenceData[];
+  onOpenPhoto: (photos: string[], index: number) => void;
+}) {
+  const [open, setOpen] = useState(true);
+
+  const collabGroups = useMemo(() => {
+    const map: Record<string, OccurrenceData[]> = {};
+    occs.forEach(o => { const r = reporterLabel(o.reporter); if (!map[r]) map[r] = []; map[r].push(o); });
+    return map;
+  }, [occs]);
+
+  const photoCount = occs.reduce((a, o) => a + o.photos.length, 0);
+
+  return (
+    <div style={{ border:'1px solid rgba(99,102,241,0.2)', borderRadius:20, overflow:'hidden', background:'rgba(99,102,241,0.03)' }}>
+      {/* Machine header */}
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ width:'100%', display:'flex', alignItems:'center', gap:'clamp(10px,3vw,14px)', padding:'clamp(11px,3vw,15px) clamp(14px,4vw,20px)', background: open ? 'rgba(99,102,241,0.08)' : 'rgba(99,102,241,0.04)', borderBottom: open ? '1px solid rgba(99,102,241,0.15)' : 'none', cursor:'pointer', minHeight:52 }}>
+        <div style={{ width:40, height:40, borderRadius:12, background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.25)', color:'#818cf8', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, boxShadow:'0 4px 12px rgba(99,102,241,0.2)' }}>
+          <Cpu size={18}/>
+        </div>
+        <div style={{ flex:1, minWidth:0, textAlign:'left' }}>
+          <div style={{ fontSize:'clamp(13px,3.5vw,15px)', fontWeight:900, color:'#a5b4fc', letterSpacing:'-0.01em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{machine}</div>
+          <div style={{ display:'flex', gap:'clamp(6px,2vw,10px)', marginTop:4, flexWrap:'wrap' as const }}>
+            <span style={{ fontSize:10, fontWeight:800, color:'#d97706', display:'flex', alignItems:'center', gap:3 }}>
+              <AlertTriangle size={9}/> {occs.length} {occs.length===1?'ocorrência':'ocorrências'}
+            </span>
+            <span style={{ fontSize:10, fontWeight:800, color:'#818cf8', display:'flex', alignItems:'center', gap:3 }}>
+              <Users size={9}/> {Object.keys(collabGroups).length} {Object.keys(collabGroups).length===1?'operador':'operadores'}
+            </span>
+            {photoCount > 0 && (
+              <span style={{ fontSize:10, fontWeight:800, color:'var(--primary)', display:'flex', alignItems:'center', gap:3 }}>
+                <Camera size={9}/> {photoCount} fotos
+              </span>
+            )}
+          </div>
+        </div>
+        <div style={{ flexShrink:0, color:'#818cf8' }}>
+          {open ? <ChevronUp size={16}/> : <ChevronDown size={16}/>}
+        </div>
+      </button>
+
+      {/* Collaborator cards inside machine */}
+      {open && (
+        <div style={{ display:'flex', flexDirection:'column', gap:'clamp(8px,2vw,12px)', padding:'clamp(10px,3vw,14px) clamp(12px,3vw,16px)' }}>
+          {Object.entries(collabGroups).map(([rep, repOccs]) => (
+            <CollaboratorCard key={rep} reporter={rep} occs={repOccs} onOpenPhoto={onOpenPhoto}/>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Date Block Header ─────────────────────────────────────── */
+function DateBlockHeader({ dateKey, occCount, collabCount, machineCount, isOpen, onToggle }:{
+  dateKey:string; occCount:number; collabCount:number; machineCount:number; isOpen:boolean; onToggle:()=>void;
+}) {
+  const today = toLocalDateKey(new Date().toISOString());
+  const isToday = dateKey===today;
+  const {dayNum,dayName,monthShort,year} = formatDayStrip(dateKey);
+
+  return (
+    <button type="button" onClick={onToggle}
+      style={{width:'100%',display:'flex',alignItems:'center',gap:'clamp(10px,3vw,16px)',padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)',background:isToday?'linear-gradient(135deg,rgba(13,148,136,0.1),rgba(8,145,178,0.05))':'var(--surface)',border:'1px solid '+(isToday?'rgba(13,148,136,0.25)':'var(--border)'),borderRadius:20,cursor:'pointer',textAlign:'left',boxShadow:isToday?'0 4px 16px rgba(13,148,136,0.15)':'0 2px 8px rgba(0,0,0,0.04)',transition:'all 0.2s',flexWrap:'wrap' as const,minHeight:60}}
+      onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.boxShadow=isToday?'0 8px 24px rgba(13,148,136,0.2)':'0 6px 18px rgba(0,0,0,0.08)';}}
+      onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.boxShadow=isToday?'0 4px 16px rgba(13,148,136,0.15)':'0 2px 8px rgba(0,0,0,0.04)';}}>
+
+      <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'clamp(6px,2vw,10px) clamp(10px,3vw,14px)',borderRadius:14,background:isToday?'rgba(13,148,136,0.15)':'var(--surface-2)',border:isToday?'1px solid rgba(13,148,136,0.25)':'1px solid var(--border)',minWidth:'clamp(44px,12vw,56px)',flexShrink:0}}>
+        <span style={{fontSize:9,fontWeight:900,textTransform:'uppercase' as const,letterSpacing:'0.1em',color:isToday?'var(--primary)':'var(--text-muted)'}}>{dayName}</span>
+        <span style={{fontSize:'clamp(17px,5vw,22px)',fontWeight:900,lineHeight:1.1,color:isToday?'var(--primary)':'var(--text)'}}>{dayNum}</span>
+        <span style={{fontSize:9,fontWeight:800,color:isToday?'var(--primary)':'var(--text-muted)',textTransform:'uppercase' as const}}>{monthShort} {year}</span>
+      </div>
+
+      <div style={{flex:1,minWidth:0}}>
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap' as const}}>
+          {isToday&&<span style={{fontSize:9,fontWeight:900,padding:'2px 8px',borderRadius:99,background:'linear-gradient(90deg,#0d9488,#0891b2)',color:'#fff',letterSpacing:'0.1em'}}>HOJE</span>}
+          <span style={{fontSize:'clamp(12px,3.5vw,14px)',fontWeight:800,color:'var(--text)',textTransform:'capitalize' as const,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{formatDateFull(dateKey)}</span>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:'clamp(6px,1.5vw,10px)',flexWrap:'wrap' as const}}>
+          <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'clamp(10px,2.5vw,11px)',fontWeight:800,padding:'3px clamp(8px,2vw,10px)',borderRadius:99,background:occCount>0?'rgba(217,119,6,0.1)':'rgba(22,163,74,0.08)',color:occCount>0?'#d97706':'#16a34a',border:`1px solid ${occCount>0?'rgba(217,119,6,0.2)':'rgba(22,163,74,0.15)'}`}}>
+            {occCount>0?<Flame size={10}/>:<Shield size={10}/>}
+            {occCount>0?`${occCount} ${occCount===1?'alerta':'alertas'}`:'Sem alertas'}
+          </span>
+          {machineCount > 0 && (
+            <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'clamp(10px,2.5vw,11px)',fontWeight:800,padding:'3px clamp(8px,2vw,10px)',borderRadius:99,background:'rgba(99,102,241,0.08)',color:'#818cf8',border:'1px solid rgba(99,102,241,0.15)'}}>
+              <Cpu size={10}/> {machineCount} {machineCount===1?'máquina':'máquinas'}
+            </span>
+          )}
+          <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'clamp(10px,2.5vw,11px)',fontWeight:800,padding:'3px clamp(8px,2vw,10px)',borderRadius:99,background:'rgba(37,99,235,0.08)',color:'#2563eb',border:'1px solid rgba(37,99,235,0.15)'}}>
+            <Users size={10}/> {collabCount} {collabCount===1?'operador':'operadores'}
+          </span>
+        </div>
+      </div>
+
+      <div style={{flexShrink:0,color:'var(--text-muted)'}}>
+        {isOpen?<ChevronUp size={18}/>:<ChevronDown size={18}/>}
+      </div>
+    </button>
+  );
+}
+
+/* ─── Date Section (Date → Machine → Collaborator) ─────────── */
+function DateSection({ dateKey, occs, onOpenPhoto }: {
+  dateKey: string;
+  occs: OccurrenceData[];
+  onOpenPhoto: (photos: string[], index: number) => void;
+}) {
+  const today = toLocalDateKey(new Date().toISOString());
+  const [open, setOpen] = useState(dateKey === today);
+
+  // Group by machine name (or 'SEM MÁQUINA' if none)
+  const machineGroups = useMemo(() => {
+    const map: Record<string, OccurrenceData[]> = {};
+    occs.forEach(o => {
+      const m = machineLabel(o.reporter) || 'SEM MÁQUINA';
+      if (!map[m]) map[m] = [];
+      map[m].push(o);
+    });
+    return map;
+  }, [occs]);
+
+  const uniqueCollabs = useMemo(() => new Set(occs.map(o => reporterLabel(o.reporter))).size, [occs]);
+  const machineCount = useMemo(() => Object.keys(machineGroups).filter(m => m !== 'SEM MÁQUINA').length, [machineGroups]);
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+      <DateBlockHeader
+        dateKey={dateKey}
+        occCount={occs.length}
+        collabCount={uniqueCollabs}
+        machineCount={machineCount}
+        isOpen={open}
+        onToggle={() => setOpen(o => !o)}
+      />
+      {open && (
+        <div style={{ display:'flex', flexDirection:'column', gap:'clamp(8px,2vw,12px)', paddingTop:'clamp(10px,2vw,14px)' }}>
+          {Object.entries(machineGroups)
+            .sort(([a], [b]) => a === 'SEM MÁQUINA' ? 1 : b === 'SEM MÁQUINA' ? -1 : a.localeCompare(b))
+            .map(([machine, machineOccs]) => (
+              <MachineGroup key={machine} machine={machine} occs={machineOccs} onOpenPhoto={onOpenPhoto}/>
+            ))
+          }
         </div>
       )}
     </div>
@@ -303,173 +364,6 @@ function StatCard({ label, value, sub, icon:Icon, color, bg, gradient }:{
         <div style={{fontSize:'clamp(20px,5.5vw,28px)',fontWeight:900,color:'var(--text)',lineHeight:1,letterSpacing:'-0.02em'}}>{value}</div>
         {sub&&<div style={{fontSize:'clamp(9px,2.5vw,10px)',color:'var(--text-muted)',fontWeight:700,marginTop:4}}>{sub}</div>}
       </div>
-    </div>
-  );
-}
-
-/* ─── Collaborator Card (inside a date section) ─────────────── */
-function CollaboratorCard({ reporter, occs, onSelectOcc }:{
-  reporter:string; occs:OccurrenceData[]; onSelectOcc:(occ:OccurrenceData)=>void;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const av = getAvatarColor(reporter);
-  const photoCount = occs.reduce((a,o)=>a+o.photos.length,0);
-
-  // Collect unique machines for this collaborator across all their occurrences
-  const machines = useMemo(()=>{
-    const set = new Set<string>();
-    occs.forEach(o=>{ const m=machineLabel(o.reporter); if(m) set.add(m); });
-    return [...set];
-  },[occs]);
-
-  return (
-    <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:20,overflow:'hidden',boxShadow:'0 4px 16px rgba(0,0,0,0.06)',transition:'box-shadow 0.2s'}}>
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)',background:'linear-gradient(90deg,var(--surface-2) 0%,var(--surface) 100%)',borderBottom:expanded?'1px solid var(--border)':'none',gap:10}}>
-        <div style={{display:'flex',alignItems:'center',gap:'clamp(10px,3vw,14px)',minWidth:0,flex:1}}>
-          <div style={{position:'relative',flexShrink:0}}>
-            <div style={{width:46,height:46,borderRadius:'50%',background:av.bg,border:`2px solid ${av.fg}44`,color:av.fg,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:900,boxShadow:`0 4px 14px ${av.glow}`}}>
-              {initials(reporter)}
-            </div>
-            <div style={{position:'absolute',bottom:0,right:0,width:14,height:14,borderRadius:'50%',background:'#f59e0b',border:'2px solid var(--surface)',display:'flex',alignItems:'center',justifyContent:'center'}}>
-              <AlertTriangle size={7} color="#fff"/>
-            </div>
-          </div>
-          <div style={{minWidth:0,flex:1}}>
-            <div style={{fontSize:'clamp(13px,3.5vw,15px)',fontWeight:800,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{reporter}</div>
-            {/* Machine badges */}
-            {machines.length>0&&(
-              <div style={{display:'flex',flexWrap:'wrap' as const,gap:4,marginTop:4}}>
-                {machines.map(m=>(
-                  <span key={m} style={{display:'inline-flex',alignItems:'center',gap:4,height:20,padding:'0 8px',borderRadius:99,fontSize:10,fontWeight:800,background:'rgba(99,102,241,0.12)',color:'#818cf8',border:'1px solid rgba(99,102,241,0.2)',whiteSpace:'nowrap' as const}}>
-                    <Cpu size={8}/> {m}
-                  </span>
-                ))}
-              </div>
-            )}
-            <div style={{display:'flex',alignItems:'center',gap:6,marginTop:machines.length>0?4:5,flexWrap:'wrap' as const}}>
-              <span style={{display:'inline-flex',alignItems:'center',gap:4,height:22,padding:'0 10px',borderRadius:99,fontSize:10,fontWeight:900,background:'rgba(217,119,6,0.1)',color:'#d97706',border:'1px solid rgba(217,119,6,0.15)',whiteSpace:'nowrap' as const}}>
-                <AlertTriangle size={9}/> {occs.length} {occs.length===1?'alerta':'alertas'}
-              </span>
-              {photoCount>0&&(
-                <span style={{display:'inline-flex',alignItems:'center',gap:4,height:22,padding:'0 10px',borderRadius:99,fontSize:10,fontWeight:900,background:'rgba(13,148,136,0.1)',color:'var(--primary)',border:'1px solid rgba(13,148,136,0.15)',whiteSpace:'nowrap' as const}}>
-                  <Camera size={9}/> {photoCount}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-        <button type="button" onClick={()=>setExpanded(e=>!e)}
-          style={{width:44,height:44,borderRadius:10,background:'var(--surface-2)',border:'1px solid var(--border)',color:'var(--text-muted)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',flexShrink:0}}>
-          {expanded?<ChevronUp size={16}/>:<ChevronDown size={16}/>}
-        </button>
-      </div>
-
-      {expanded&&(
-        <div style={{display:'flex',flexDirection:'column'}}>
-          {occs.map((occ,i)=>(
-            <button key={occ.id} type="button" onClick={()=>onSelectOcc(occ)}
-              style={{width:'100%',display:'flex',alignItems:'flex-start',gap:'clamp(10px,3vw,14px)',padding:'clamp(12px,3vw,14px) clamp(14px,4vw,20px)',borderBottom:i<occs.length-1?'1px solid var(--border)':'none',background:'transparent',cursor:'pointer',textAlign:'left',transition:'background 0.15s',minHeight:44}}
-              onMouseEnter={e=>(e.currentTarget.style.background='var(--surface-2)')}
-              onMouseLeave={e=>(e.currentTarget.style.background='transparent')}>
-              <div style={{width:3,height:36,background:'linear-gradient(180deg,#f59e0b,rgba(217,119,6,0.3))',borderRadius:99,flexShrink:0,marginTop:2}}/>
-              <div style={{flex:1,minWidth:0}}>
-                <div style={{fontSize:10,fontWeight:900,color:'var(--text-muted)',textTransform:'uppercase' as const,letterSpacing:'0.1em',marginBottom:3}}>{occ.section}</div>
-                <div style={{fontSize:'clamp(12px,3.5vw,13px)',fontWeight:800,color:'var(--text)',lineHeight:1.4,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{occ.item}</div>
-                {occ.comment&&(
-                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:3,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontWeight:500,fontStyle:'italic'}}>"{occ.comment}"</div>
-                )}
-              </div>
-              <div style={{flexShrink:0,display:'flex',flexDirection:'column',alignItems:'flex-end',gap:5}}>
-                <span style={{display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:800,color:'var(--text-muted)',fontVariantNumeric:'tabular-nums',whiteSpace:'nowrap' as const}}>
-                  <Clock size={10}/> {occ.time}
-                </span>
-                {occ.photos.length>0&&(
-                  <span style={{display:'flex',alignItems:'center',gap:3,fontSize:10,fontWeight:700,color:'var(--primary)',whiteSpace:'nowrap' as const}}>
-                    <Camera size={9}/> {occ.photos.length}
-                  </span>
-                )}
-                <ChevronRight size={13} style={{color:'var(--text-faint)'}}/>
-              </div>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ─── Date Block Header ─────────────────────────────────────── */
-function DateBlockHeader({ dateKey, occCount, collabCount, isOpen, onToggle }:{
-  dateKey:string; occCount:number; collabCount:number; isOpen:boolean; onToggle:()=>void;
-}) {
-  const today = toLocalDateKey(new Date().toISOString());
-  const isToday = dateKey===today;
-  const {dayNum,dayName,monthShort,year} = formatDayStrip(dateKey);
-
-  return (
-    <button type="button" onClick={onToggle}
-      style={{width:'100%',display:'flex',alignItems:'center',gap:'clamp(10px,3vw,16px)',padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)',background:isToday?'linear-gradient(135deg,rgba(13,148,136,0.1),rgba(8,145,178,0.05))':'var(--surface)',border:'1px solid '+(isToday?'rgba(13,148,136,0.25)':'var(--border)'),borderRadius:20,cursor:'pointer',textAlign:'left',boxShadow:isToday?'0 4px 16px rgba(13,148,136,0.15)':'0 2px 8px rgba(0,0,0,0.04)',transition:'all 0.2s',flexWrap:'wrap' as const,minHeight:60}}
-      onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.boxShadow=isToday?'0 8px 24px rgba(13,148,136,0.2)':'0 6px 18px rgba(0,0,0,0.08)';}}
-      onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.boxShadow=isToday?'0 4px 16px rgba(13,148,136,0.15)':'0 2px 8px rgba(0,0,0,0.04)';}}>
-
-      <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'clamp(6px,2vw,10px) clamp(10px,3vw,14px)',borderRadius:14,background:isToday?'rgba(13,148,136,0.15)':'var(--surface-2)',border:isToday?'1px solid rgba(13,148,136,0.25)':'1px solid var(--border)',minWidth:'clamp(44px,12vw,56px)',flexShrink:0}}>
-        <span style={{fontSize:9,fontWeight:900,textTransform:'uppercase' as const,letterSpacing:'0.1em',color:isToday?'var(--primary)':'var(--text-muted)'}}>{dayName}</span>
-        <span style={{fontSize:'clamp(17px,5vw,22px)',fontWeight:900,lineHeight:1.1,color:isToday?'var(--primary)':'var(--text)'}}>{dayNum}</span>
-        <span style={{fontSize:9,fontWeight:800,color:isToday?'var(--primary)':'var(--text-muted)',textTransform:'uppercase' as const}}>{monthShort} {year}</span>
-      </div>
-
-      <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:6,flexWrap:'wrap' as const}}>
-          {isToday&&<span style={{fontSize:9,fontWeight:900,padding:'2px 8px',borderRadius:99,background:'linear-gradient(90deg,#0d9488,#0891b2)',color:'#fff',letterSpacing:'0.1em'}}>HOJE</span>}
-          <span style={{fontSize:'clamp(12px,3.5vw,14px)',fontWeight:800,color:'var(--text)',textTransform:'capitalize' as const,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{formatDateFull(dateKey)}</span>
-        </div>
-        <div style={{display:'flex',alignItems:'center',gap:'clamp(8px,2vw,12px)',flexWrap:'wrap' as const}}>
-          <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'clamp(10px,2.5vw,11px)',fontWeight:800,padding:'3px clamp(8px,2vw,10px)',borderRadius:99,background:occCount>0?'rgba(217,119,6,0.1)':'rgba(22,163,74,0.08)',color:occCount>0?'#d97706':'#16a34a',border:`1px solid ${occCount>0?'rgba(217,119,6,0.2)':'rgba(22,163,74,0.15)'}`}}>
-            {occCount>0?<Flame size={10}/>:<Shield size={10}/>}
-            {occCount>0?`${occCount} ${occCount===1?'alerta':'alertas'}`:'Sem alertas'}
-          </span>
-          <span style={{display:'inline-flex',alignItems:'center',gap:5,fontSize:'clamp(10px,2.5vw,11px)',fontWeight:800,padding:'3px clamp(8px,2vw,10px)',borderRadius:99,background:'rgba(37,99,235,0.08)',color:'#2563eb',border:'1px solid rgba(37,99,235,0.15)'}}>
-            <Users size={10}/> {collabCount} {collabCount===1?'colaborador':'colaboradores'}
-          </span>
-        </div>
-      </div>
-
-      <div style={{flexShrink:0,color:'var(--text-muted)'}}>
-        {isOpen?<ChevronUp size={18}/>:<ChevronDown size={18}/>}
-      </div>
-    </button>
-  );
-}
-
-/* ─── Date Section (collapsible) ────────────────────────────── */
-function DateSection({ dateKey, occs, onSelectOcc }:{
-  dateKey:string; occs:OccurrenceData[]; onSelectOcc:(occ:OccurrenceData)=>void;
-}) {
-  const today = toLocalDateKey(new Date().toISOString());
-  const [open, setOpen] = useState(dateKey===today);
-
-  const empGroups = useMemo(()=>{
-    const map: Record<string,OccurrenceData[]> = {};
-    occs.forEach(o=>{ const r=reporterLabel(o.reporter); if(!map[r])map[r]=[]; map[r].push(o); });
-    return map;
-  },[occs]);
-
-  return (
-    <div style={{display:'flex',flexDirection:'column',gap:0}}>
-      <DateBlockHeader
-        dateKey={dateKey}
-        occCount={occs.length}
-        collabCount={Object.keys(empGroups).length}
-        isOpen={open}
-        onToggle={()=>setOpen(o=>!o)}
-      />
-      {open&&(
-        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(min(100%,380px),1fr))',gap:'clamp(8px,2vw,12px)',paddingTop:'clamp(8px,2vw,12px)'}}>
-          {Object.entries(empGroups).map(([rep,repOccs])=>(
-            <CollaboratorCard key={rep} reporter={rep} occs={repOccs} onSelectOcc={onSelectOcc}/>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -509,13 +403,65 @@ function CollaboratorSummaryRow({ reporter, totalOccs, totalPhotos, activeDays, 
   );
 }
 
+/* ─── Conformidade Section (with all items, checked + unchecked) ─ */
+function ConformSectionFull({ section, checklistState }: {
+  section: typeof CHECKLIST_DATA[number];
+  checklistState: Record<string, boolean>;
+}) {
+  const [open, setOpen] = useState(false);
+  const checkedItems   = section.items.filter(i => checklistState[`${section.id}__${i}`] === true);
+  const uncheckedItems = section.items.filter(i => !checklistState[`${section.id}__${i}`]);
+  const pct = section.items.length > 0 ? Math.round((checkedItems.length / section.items.length) * 100) : 0;
+  const isComplete = pct === 100;
+
+  return (
+    <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:20, overflow:'hidden', boxShadow:'0 2px 10px rgba(0,0,0,0.05)' }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)', background: open ? 'rgba(22,163,74,0.05)' : 'transparent', borderBottom: open ? '1px solid rgba(22,163,74,0.1)' : 'none', cursor:'pointer', minHeight:52 }}>
+        <div style={{ width:40, height:40, borderRadius:12, background: isComplete ? 'rgba(22,163,74,0.2)' : 'rgba(22,163,74,0.1)', border:`1px solid ${isComplete?'rgba(22,163,74,0.4)':'rgba(22,163,74,0.2)'}`, color:'var(--success)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+          {isComplete ? <Star size={18} fill="currentColor"/> : <CheckCircle2 size={18}/>}
+        </div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontSize:'clamp(12px,3.5vw,14px)', fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text)' }}>{section.title}</div>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:5 }}>
+            <div style={{ flex:1, height:4, background:'rgba(22,163,74,0.12)', borderRadius:99, overflow:'hidden', maxWidth:120 }}>
+              <div style={{ height:'100%', width:`${pct}%`, background: isComplete ? 'linear-gradient(90deg,#16a34a,#22c55e)' : '#16a34a', borderRadius:99 }}/>
+            </div>
+            <span style={{ fontSize:11, fontWeight:800, color:'var(--success)', whiteSpace:'nowrap' }}>{checkedItems.length}/{section.items.length} · {pct}%</span>
+          </div>
+        </div>
+        {open ? <ChevronUp size={16} style={{ color:'var(--success)', flexShrink:0 }}/> : <ChevronDown size={16} style={{ color:'var(--success)', flexShrink:0 }}/>}
+      </button>
+
+      {open && (
+        <div style={{ display:'flex', flexDirection:'column' }}>
+          {/* Checked items */}
+          {checkedItems.map((item, i) => (
+            <div key={`ok-${i}`} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'clamp(10px,3vw,12px) clamp(14px,4vw,20px)', borderBottom:'1px solid var(--border)', background:'rgba(22,163,74,0.03)' }}>
+              <CheckCircle2 size={14} style={{ color:'#22c55e', flexShrink:0, marginTop:2 }}/>
+              <span style={{ fontSize:'clamp(11px,3vw,13px)', fontWeight:600, lineHeight:1.5, flex:1, color:'var(--text)' }}>{item}</span>
+              <span style={{ fontSize:9, fontWeight:900, padding:'2px 7px', borderRadius:99, background:'rgba(22,163,74,0.12)', color:'#22c55e', flexShrink:0, whiteSpace:'nowrap' }}>OK</span>
+            </div>
+          ))}
+          {/* Unchecked items */}
+          {uncheckedItems.map((item, i) => (
+            <div key={`nok-${i}`} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'clamp(10px,3vw,12px) clamp(14px,4vw,20px)', borderBottom: i < uncheckedItems.length - 1 ? '1px solid var(--border)' : 'none', background:'rgba(239,68,68,0.02)' }}>
+              <XCircle size={14} style={{ color:'rgba(239,68,68,0.5)', flexShrink:0, marginTop:2 }}/>
+              <span style={{ fontSize:'clamp(11px,3vw,13px)', fontWeight:600, lineHeight:1.5, flex:1, color:'var(--text-muted)' }}>{item}</span>
+              <span style={{ fontSize:9, fontWeight:900, padding:'2px 7px', borderRadius:99, background:'rgba(239,68,68,0.1)', color:'#f87171', flexShrink:0, whiteSpace:'nowrap' }}>PENDENTE</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main Component ──────────────────────────────────────── */
 export default function DashboardView({ occurrences, checklistState }: DashboardViewProps) {
-  const [lightbox, setLightbox]         = useState<{photos:string[];index:number}|null>(null);
-  const [activeTab, setActiveTab]       = useState<'timeline'|'colaboradores'|'conformidades'>('timeline');
-  const [selectedOcc, setSelectedOcc]   = useState<OccurrenceData|null>(null);
-  const [selectedConform, setSelectedConform] = useState<any>(null);
-  const [searchQuery, setSearchQuery]   = useState('');
+  const [lightbox, setLightbox]       = useState<{photos:string[];index:number}|null>(null);
+  const [activeTab, setActiveTab]     = useState<'timeline'|'colaboradores'|'conformidades'>('timeline');
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterCollab, setFilterCollab] = useState<string|null>(null);
 
   const verifiedCount      = Object.values(checklistState).filter(v=>v).length;
@@ -547,7 +493,6 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
     return Object.entries(map).sort(([a],[b])=>b.localeCompare(a));
   },[filteredOccs]);
 
-  // Aggregate stats per normalized collaborator name (includes machines list)
   const collabStats = useMemo(()=>{
     const map: Record<string,{occs:number;photos:number;days:Set<string>;machines:Set<string>}> = {};
     occurrences.forEach(o=>{
@@ -560,8 +505,6 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
     });
     return Object.entries(map).sort(([,a],[,b])=>b.occs-a.occs).map(([r,s])=>({reporter:r,...s,activeDays:s.days.size,machines:[...s.machines]}));
   },[occurrences]);
-
-  const conformSections = CHECKLIST_DATA.map(s=>({section:s,conformItems:s.items.filter(i=>checklistState[`${s.id}__${i}`]===true)})).filter(({conformItems})=>conformItems.length>0);
 
   const stats = [
     {label:'CONFORMIDADE',value:`${validationProgress}%`,sub:`${verifiedCount}/${maxChecks} itens`,icon:Target,color:validationProgress>=90?'#16a34a':'#0d9488',bg:validationProgress>=90?'rgba(22,163,74,0.15)':'rgba(13,148,136,0.15)',gradient:validationProgress>=90?'linear-gradient(145deg,rgba(22,163,74,0.06),var(--surface))':'linear-gradient(145deg,rgba(13,148,136,0.06),var(--surface))'},
@@ -599,15 +542,11 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
         .filter-chip{display:inline-flex;align-items:center;gap:6px;padding:clamp(6px,2vw,8px) clamp(10px,3vw,14px);border-radius:99px;font-size:clamp(10px,2.5vw,11px);font-weight:800;border:1px solid;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:36px;background:rgba(37,99,235,0.1);border-color:rgba(37,99,235,0.25);color:#2563eb;}
 
         .timeline-stack{display:flex;flex-direction:column;gap:clamp(14px,4vw,24px);}
-
         .collab-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr));gap:clamp(8px,2vw,12px);}
-
-        .conform-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:clamp(8px,2vw,12px);}
+        .conform-grid{display:flex;flex-direction:column;gap:clamp(8px,2vw,12px);}
 
         .empty-state{padding:clamp(32px,8vw,56px) clamp(16px,4vw,24px);text-align:center;background:var(--surface);border:2px dashed var(--border);border-radius:20px;}
-
         .lb-btn{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;}
-
         .conf-prog{padding:clamp(14px,4vw,22px);border-radius:20px;background:linear-gradient(135deg,rgba(22,163,74,0.08),rgba(13,148,136,0.04));border:1px solid rgba(22,163,74,0.2);position:relative;overflow:hidden;}
       `}</style>
 
@@ -652,7 +591,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
                 <div style={{width:56,height:56,borderRadius:'50%',background:'rgba(22,163,74,0.1)',color:'#16a34a',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 16px',boxShadow:'0 0 24px rgba(22,163,74,0.2)'}}>
                   <Shield size={26}/>
                 </div>
-                <p style={{fontSize:'clamp(13px,4vw,15px)',fontWeight:800,color:'var(--text)'}}>
+                <p style={{fontSize:'clamp(13px,4vw,15px)',fontWeight:800,color:'var(--text)'}}>  
                   {searchQuery||filterCollab?'Nenhum resultado encontrado':'Nenhuma ocorrência registrada'}
                 </p>
                 <p style={{fontSize:'clamp(11px,3vw,13px)',color:'var(--text-muted)',marginTop:6,fontWeight:500}}>
@@ -662,7 +601,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
             ):(
               <div className="timeline-stack">
                 {groupedByDate.map(([dk,dayOccs])=>(
-                  <DateSection key={dk} dateKey={dk} occs={dayOccs} onSelectOcc={setSelectedOcc}/>
+                  <DateSection key={dk} dateKey={dk} occs={dayOccs} onOpenPhoto={(p,i)=>setLightbox({photos:p,index:i})}/>
                 ))}
               </div>
             )}
@@ -704,6 +643,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
         {/* ── CONFORMIDADES tab ── */}
         {activeTab==='conformidades'&&(
           <div style={{display:'flex',flexDirection:'column',gap:'clamp(12px,3vw,18px)'}}>
+            {/* Progress header */}
             <div className="conf-prog">
               <div style={{position:'absolute',top:-30,right:-30,width:130,height:130,borderRadius:'50%',background:'rgba(22,163,74,0.06)'}}/>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:'clamp(12px,3vw,18px)',position:'relative',gap:12,flexWrap:'wrap' as const}}>
@@ -726,24 +666,15 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
               </div>
             </div>
 
-            {conformSections.length===0?(
-              <div className="empty-state">
-                <p style={{fontSize:'clamp(13px,4vw,15px)',fontWeight:800,color:'var(--text)'}}>Nenhum item verificado ainda</p>
-              </div>
-            ):(
-              <div className="conform-grid">
-                {conformSections.map(({section,conformItems},i)=>(
-                  <ConformSection key={section.id} title={section.title} sectionId={section.id} items={conformItems} total={section.items.length} defaultOpen={i===0} onDetail={setSelectedConform}/>
-                ))}
-              </div>
-            )}
+            {/* All sections with all items */}
+            <div className="conform-grid">
+              {CHECKLIST_DATA.map(section => (
+                <ConformSectionFull key={section.id} section={section} checklistState={checklistState}/>
+              ))}
+            </div>
           </div>
         )}
       </div>
-
-      {/* Modals */}
-      {selectedOcc&&<OccurrenceDetailModal occurrence={selectedOcc} onClose={()=>setSelectedOcc(null)} onOpenPhoto={(p,i)=>{setSelectedOcc(null);setLightbox({photos:p,index:i});}}/>}
-      {selectedConform&&<ConformDetailModal detail={selectedConform} onClose={()=>setSelectedConform(null)}/>}
 
       {/* Lightbox */}
       {lightbox&&(
