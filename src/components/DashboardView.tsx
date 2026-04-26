@@ -1,7 +1,8 @@
 /**
- * DashboardView v7 — Admin & Supervisor Dashboard
+ * DashboardView v8 — Admin & Supervisor Dashboard
  * Hierarchy: Date → Collaborator → Occurrences
  * Fully responsive, mobile-first, touch-friendly.
+ * Fix: same collaborator on multiple machines is now grouped as one person.
  */
 import { useState, useMemo } from 'react';
 import {
@@ -43,7 +44,23 @@ function formatDateFull(dateKey: string): string {
   return d.toLocaleDateString('pt-BR', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
 }
 
-function reporterLabel(raw: string): string { return raw.split(' - Auth:')[0].trim(); }
+/**
+ * Normalizes the reporter field to just the person's name + shift,
+ * stripping the machine info so the same person on different machines
+ * is treated as ONE collaborator.
+ *
+ * Input examples:
+ *   "João Silva (Turno A) | Máquina: ROMI 01 - Auth: user@email.com"
+ *   "João Silva (Turno A) | Máquina: ROMI 02 - Auth: user@email.com"
+ * Output: "João Silva (Turno A)"
+ */
+function reporterLabel(raw: string): string {
+  // Strip auth part first
+  const withoutAuth = raw.split(' - Auth:')[0].trim();
+  // Strip machine part (anything after " | Máquina:")
+  const withoutMachine = withoutAuth.split(' | Máquina:')[0].split(' | maquina:')[0].trim();
+  return withoutMachine;
+}
 
 function initials(name: string): string {
   return name.split(/[\s@._-]+/).filter(Boolean).map(p=>p[0]?.toUpperCase()).slice(0,2).join('');
@@ -467,7 +484,9 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
   const maxChecks          = CHECKLIST_DATA.reduce((acc,s)=>acc+s.items.length,0);
   const validationProgress = maxChecks>0?Math.round((verifiedCount/maxChecks)*100):0;
   const totalPhotos        = occurrences.reduce((acc,o)=>acc+o.photos.length,0);
-  const uniqueCollabs      = useMemo(()=>[...new Set(occurrences.map(o=>reporterLabel(o.reporter)))],[occurrences]);
+
+  // Deduplicate collaborators by normalized name (ignores machine differences)
+  const uniqueCollabs = useMemo(()=>[...new Set(occurrences.map(o=>reporterLabel(o.reporter)))],[occurrences]);
 
   const filteredOccs = useMemo(()=>{
     let list = occurrences;
@@ -490,6 +509,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
     return Object.entries(map).sort(([a],[b])=>b.localeCompare(a));
   },[filteredOccs]);
 
+  // Aggregate stats per normalized collaborator name
   const collabStats = useMemo(()=>{
     const map: Record<string,{occs:number;photos:number;days:Set<string>}> = {};
     occurrences.forEach(o=>{
