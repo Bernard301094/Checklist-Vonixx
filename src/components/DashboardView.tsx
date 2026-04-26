@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   AlertTriangle, CheckCircle2, X, ChevronDown, ChevronUp,
-  Clock, Camera, Cpu, Activity, Target, Search, XCircle, Calendar, Layers, User
+  Clock, Camera, Cpu, Activity, Target, Search, XCircle, Calendar, Layers
 } from 'lucide-react';
 import { OccurrenceData, ChecklistEntry } from '../types';
 import { CHECKLIST_DATA } from '../constants';
@@ -209,157 +209,18 @@ function ConformSectionCard({ section, checklistState }: { section: typeof CHECK
   );
 }
 
-/** Colaborador dentro de un grupo de conformidad */
-function CollaboratorConformCard({
-  reporter,
-  sectionIds,
-  checklistState,
-  entries,
-}: {
-  reporter: string;
-  sectionIds: string[];
-  checklistState: Record<string, boolean>;
-  entries: ChecklistEntry[];
-}) {
-  const [open, setOpen] = useState(false);
-
-  // Construye un checklistState filtrado a solo los ítems marcados por este colaborador
-  const reporterState = useMemo(() => {
-    const state: Record<string, boolean> = {};
-    entries.forEach(e => {
-      if ((e.reporter || 'Sem identificação') === reporter) {
-        state[e.item_key] = e.is_checked;
-      }
-    });
-    return state;
-  }, [entries, reporter]);
-
-  const sections = CHECKLIST_DATA.filter(s => sectionIds.includes(s.id));
-
-  const { checkedCount, totalCount } = useMemo(() => {
-    let checked = 0;
-    let total = 0;
-    sections.forEach(section => {
-      section.items.forEach((_, idx) => {
-        total++;
-        const key = `${section.id}-${idx}`;
-        if (reporterState[key] === true) checked++;
-      });
-    });
-    return { checkedCount: checked, totalCount: total };
-  }, [sections, reporterState]);
-
-  const pct = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
-
-  return (
-    <div style={{ marginBottom: '10px', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-      <button
-        type="button"
-        onClick={() => setOpen(!open)}
-        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: '14px', padding: '14px 16px', background: open ? '#f1f5f9' : '#ffffff', border: 'none', cursor: 'pointer', transition: 'background 0.2s' }}
-      >
-        <div style={{ width: 38, height: 38, borderRadius: '10px', background: 'linear-gradient(135deg, #0d9488, #14b8a6)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, flexShrink: 0, boxShadow: '0 3px 8px rgba(13,148,136,0.25)' }}>
-          {initials(reporter)}
-        </div>
-        <div style={{ flex: 1, textAlign: 'left' }}>
-          <div style={{ fontSize: '14px', fontWeight: 700, color: '#1e293b' }}>{reporter}</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: 4 }}>
-            <div style={{ flex: 1, height: 4, background: '#e2e8f0', borderRadius: 99, overflow: 'hidden', maxWidth: 100 }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: pct === 100 ? '#10b981' : 'var(--primary)', transition: 'width 0.3s' }} />
-            </div>
-            <span style={{ fontSize: 11, fontWeight: 800, color: pct === 100 ? '#10b981' : '#64748b' }}>
-              {checkedCount}/{totalCount}
-            </span>
-          </div>
-        </div>
-        <div style={{ color: '#94a3b8' }}>{open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</div>
-      </button>
-      {open && (
-        <div style={{ padding: '12px 14px 14px', borderTop: '1px solid #e2e8f0', background: '#fafafa' }}>
-          {sections.map(section => (
-            <ConformSectionCard key={section.id} section={section} checklistState={reporterState} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Fecha dentro de un grupo de conformidad */
-function ConformDateGroup({
-  dateLabel,
-  reporters,
-  sectionIds,
-  checklistState,
-  entries,
-}: {
-  dateLabel: string;
-  reporters: string[];
-  sectionIds: string[];
-  checklistState: Record<string, boolean>;
-  entries: ChecklistEntry[];
-}) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div style={{ marginBottom: '12px' }}>
-      {/* Sub-divisor de fecha */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-        <button
-          type="button"
-          onClick={() => setOpen(!open)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: '8px',
-            padding: '6px 14px',
-            background: '#f1f5f9',
-            color: '#475569',
-            borderRadius: '99px',
-            fontSize: '11px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em',
-            border: '1px solid #e2e8f0', cursor: 'pointer',
-          }}
-        >
-          <Calendar size={12} />
-          {dateLabel}
-          <span style={{ background: '#e2e8f0', color: '#64748b', borderRadius: '99px', padding: '1px 6px', fontSize: 10, fontWeight: 900 }}>
-            {reporters.length}
-          </span>
-          {open ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
-        </button>
-        <div style={{ flex: 1, height: '1px', background: '#e2e8f0' }} />
-      </div>
-
-      {open && (
-        <div style={{ paddingLeft: '12px', borderLeft: '2px solid #e2e8f0', marginLeft: 4 }}>
-          {reporters.map(reporter => (
-            <CollaboratorConformCard
-              key={reporter}
-              reporter={reporter}
-              sectionIds={sectionIds}
-              checklistState={checklistState}
-              entries={entries}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** Grupo de categoría principal */
+/** Grupo de categoría — divisor pill igual que Alertas */
 function ConformGroupCard({
   group,
   checklistState,
-  checklistEntries,
 }: {
   group: typeof CONFORMITY_GROUPS[number];
   checklistState: Record<string, boolean>;
-  checklistEntries: ChecklistEntry[];
 }) {
   const [open, setOpen] = useState(false);
 
   const sections = CHECKLIST_DATA.filter(s => group.sectionIds.includes(s.id));
 
-  // Porcentaje global del grupo (todos los ítems)
   const { checkedCount, totalCount } = useMemo(() => {
     let checked = 0;
     let total = 0;
@@ -375,96 +236,43 @@ function ConformGroupCard({
   const pct = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
   const isComplete = pct === 100;
 
-  // Construir jerarquía Fecha → Colaboradores
-  const dateGroups = useMemo(() => {
-    // Filtrar solo entradas que pertenezcan a las secciones del grupo y estén marcadas
-    const relevantKeys = new Set<string>();
-    sections.forEach(section => {
-      section.items.forEach((_, idx) => relevantKeys.add(`${section.id}-${idx}`));
-    });
-
-    const dateMap: Record<string, Set<string>> = {};
-    const noDateReporters = new Set<string>();
-
-    checklistEntries.forEach(e => {
-      if (!relevantKeys.has(e.item_key)) return;
-      const rep = e.reporter || 'Sem identificação';
-      const dateStr = e.checked_at
-        ? new Date(e.checked_at).toISOString().split('T')[0]
-        : null;
-      if (dateStr) {
-        if (!dateMap[dateStr]) dateMap[dateStr] = new Set();
-        dateMap[dateStr].add(rep);
-      } else {
-        noDateReporters.add(rep);
-      }
-    });
-
-    const sorted = Object.entries(dateMap)
-      .sort(([a], [b]) => b.localeCompare(a))
-      .map(([dateStr, reporterSet]) => ({
-        dateStr,
-        dateLabel: formatDateLabel(dateStr),
-        reporters: Array.from(reporterSet),
-      }));
-
-    if (noDateReporters.size > 0) {
-      sorted.push({ dateStr: 'sem-data', dateLabel: 'Sem data registrada', reporters: Array.from(noDateReporters) });
-    }
-
-    return sorted;
-  }, [sections, checklistEntries]);
-
-  // Si no hay entradas con metadata, mostrar fallback sin jerarquía
-  const hasMeta = checklistEntries.some(e => e.reporter || e.checked_at);
-
   return (
-    <div style={{ marginBottom: '16px' }}>
-      {/* Divisor de grupo — mismo estilo que el divisor de fecha en Alertas */}
+    <div style={{ marginBottom: '24px' }}>
+      {/* Divisor pill — mismo estilo que el divisor de fecha en Alertas */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
         <button
           type="button"
           onClick={() => setOpen(!open)}
           style={{
-            display: 'flex', alignItems: 'center', gap: '10px',
+            display: 'flex', alignItems: 'center', gap: '8px',
             padding: '8px 16px',
             background: isComplete ? '#d1fae5' : '#e2e8f0',
             color: isComplete ? '#065f46' : '#475569',
             borderRadius: '99px',
             fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em',
             border: 'none', cursor: 'pointer', transition: 'background 0.2s',
+            whiteSpace: 'nowrap',
           }}
         >
-          <Layers size={14} />
+          <Layers size={13} />
           {group.label}
-          <span style={{ marginLeft: 4, padding: '1px 7px', borderRadius: '99px', background: isComplete ? '#10b981' : '#94a3b8', color: '#fff', fontSize: '11px', fontWeight: 900 }}>
+          <span style={{
+            padding: '1px 7px', borderRadius: '99px',
+            background: isComplete ? '#10b981' : '#94a3b8',
+            color: '#fff', fontSize: '11px', fontWeight: 900,
+          }}>
             {pct}%
           </span>
-          {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+          {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
         </button>
         <div style={{ flex: 1, height: '1px', background: '#cbd5e1' }} />
       </div>
 
       {open && (
         <div style={{ paddingLeft: '16px', borderLeft: '2px solid #cbd5e1', marginLeft: 4 }}>
-          {hasMeta && dateGroups.length > 0 ? (
-            /* Jerarquía: Fecha → Colaborador → Sección */
-            dateGroups.map(dg => (
-              <ConformDateGroup
-                key={dg.dateStr}
-                dateLabel={dg.dateLabel}
-                reporters={dg.reporters}
-                sectionIds={group.sectionIds}
-                checklistState={checklistState}
-                entries={checklistEntries}
-              />
-            ))
-          ) : (
-            /* Fallback: solo secciones (datos sin metadata de colaborador/fecha) */
-            sections.map(section => (
-              <ConformSectionCard key={section.id} section={section} checklistState={checklistState} />
-            ))
-          )}
+          {sections.map(section => (
+            <ConformSectionCard key={section.id} section={section} checklistState={checklistState} />
+          ))}
         </div>
       )}
     </div>
@@ -607,7 +415,6 @@ export default function DashboardView({ occurrences, checklistState, checklistEn
                   key={group.id}
                   group={group}
                   checklistState={checklistState}
-                  checklistEntries={checklistEntries}
                 />
               ))}
             </div>
