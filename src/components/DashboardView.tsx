@@ -1,7 +1,7 @@
 /**
- * DashboardView v5 — Ultra-Premium Command Center
- * Redesigned with date-grouped timeline, glassmorphism cards,
- * gradient stats and a high-fidelity enterprise visual language.
+ * DashboardView v6 — Ultra-Premium + Fully Responsive
+ * Mobile-first: fluid grids, clamp() spacing, touch targets ≥44px,
+ * date-grouped timeline, glassmorphism cards.
  */
 import { useState, useMemo } from 'react';
 import {
@@ -38,11 +38,6 @@ function formatDayStrip(dateKey: string): { dayNum: string; dayName: string; mon
     dayName: days[d.getDay()],
     monthShort: months[d.getMonth()],
   };
-}
-
-function formatFullDate(dateKey: string): string {
-  const d = new Date(dateKey + 'T12:00:00');
-  return d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function formatDateLabel(dateKey: string): string {
@@ -104,14 +99,14 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
           background:rgba(2,6,23,0.9);
           backdrop-filter:blur(20px);
           display:flex;align-items:center;justify-content:center;
-          z-index:3000;padding:20px;
+          z-index:3000;padding:clamp(12px,4vw,20px);
           animation:fadeInOD 0.25s ease;
         }
         .occ-detail-box {
           width:100%;max-width:600px;
           background:linear-gradient(145deg,#0f172a,#1e293b);
           border:1px solid rgba(255,255,255,0.08);
-          border-radius:28px;
+          border-radius:clamp(16px,4vw,28px);
           box-shadow:0 40px 80px rgba(0,0,0,0.6),0 0 0 1px rgba(255,255,255,0.04);
           max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;
           animation:slideUpOD 0.35s cubic-bezier(0.16, 1, 0.3, 1);
@@ -120,42 +115,45 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
           .occ-detail-overlay{align-items:flex-end;padding:0;}
           .occ-detail-box{max-width:100%;border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:96dvh;}
         }
-        .occ-detail-scroll{overflow-y:auto;flex:1;padding:24px;scrollbar-width:thin;}
+        .occ-detail-header{padding:clamp(14px,4vw,22px) clamp(16px,4vw,24px);}
+        .occ-detail-scroll{overflow-y:auto;flex:1;padding:clamp(16px,4vw,24px);scrollbar-width:thin;}
+        .occ-reporter-row{display:flex;align-items:center;gap:clamp(10px,3vw,14px);padding:clamp(14px,3vw,18px) clamp(14px,3vw,20px);}
+        .occ-photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(clamp(90px,22vw,130px),1fr));gap:clamp(8px,2vw,10px);}
         @keyframes fadeInOD{from{opacity:0}to{opacity:1}}
         @keyframes slideUpOD{from{opacity:0;transform:translateY(40px) scale(0.97)}to{opacity:1;transform:none}}
       `}</style>
       <div className="occ-detail-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="occ-detail-box">
           {/* Header */}
-          <div style={{ padding:'22px 24px', background:'linear-gradient(90deg,rgba(217,119,6,0.12),rgba(217,119,6,0.03))', borderBottom:'1px solid rgba(217,119,6,0.15)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-              <div style={{ position:'relative' }}>
+          <div className="occ-detail-header" style={{ background:'linear-gradient(90deg,rgba(217,119,6,0.12),rgba(217,119,6,0.03))', borderBottom:'1px solid rgba(217,119,6,0.15)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, gap:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:clamp(10,12,14), minWidth:0 }}>
+              <div style={{ position:'relative', flexShrink:0 }}>
                 <div style={{ width:46, height:46, borderRadius:14, background:'rgba(217,119,6,0.2)', border:'1px solid rgba(217,119,6,0.3)', color:'#f59e0b', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 20px rgba(217,119,6,0.25)' }}>
                   <AlertTriangle size={20} />
                 </div>
                 <div style={{ position:'absolute', top:-4, right:-4, width:14, height:14, borderRadius:'50%', background:'#ef4444', border:'2px solid #0f172a', animation:'pulseDot 2s infinite' }} />
               </div>
-              <div>
+              <div style={{ minWidth:0 }}>
                 <div style={{ fontSize:10, fontWeight:800, letterSpacing:'0.14em', color:'rgba(251,191,36,0.7)', marginBottom:3 }}>⚠ PONTO CRÍTICO DETECTADO</div>
-                <div style={{ fontSize:16, fontWeight:800, color:'#fff', letterSpacing:'-0.01em' }}>{occurrence.section}</div>
+                <div style={{ fontSize:clamp(13,15,16), fontWeight:800, color:'#fff', letterSpacing:'-0.01em', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{occurrence.section}</div>
               </div>
             </div>
-            <button onClick={onClose} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.6)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s' }}>
+            <button onClick={onClose} style={{ width:44, height:44, borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.6)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s', flexShrink:0 }}>
               <X size={16} />
             </button>
           </div>
 
           <div className="occ-detail-scroll">
             {/* Reporter info */}
-            <div style={{ display:'flex', alignItems:'center', gap:14, padding:'18px 20px', background:'rgba(255,255,255,0.03)', borderRadius:18, border:'1px solid rgba(255,255,255,0.06)', marginBottom:20 }}>
+            <div className="occ-reporter-row" style={{ background:'rgba(255,255,255,0.03)', borderRadius:18, border:'1px solid rgba(255,255,255,0.06)', marginBottom:20 }}>
               <div style={{ width:48, height:48, borderRadius:'50%', background:avatar.bg, border:`2px solid ${avatar.fg}44`, color:avatar.fg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:900, flexShrink:0, boxShadow:`0 4px 16px ${avatar.glow}` }}>
                 {initials(reporter)}
               </div>
-              <div style={{ flex:1 }}>
-                <div style={{ fontSize:15, fontWeight:800, color:'#fff' }}>{reporter}</div>
+              <div style={{ flex:1, minWidth:0 }}>
+                <div style={{ fontSize:15, fontWeight:800, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{reporter}</div>
                 <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:3, fontWeight:600 }}>Operador responsável</div>
               </div>
-              <div style={{ textAlign:'right' }}>
+              <div style={{ textAlign:'right', flexShrink:0 }}>
                 <div style={{ fontSize:14, fontWeight:800, color:'rgba(255,255,255,0.85)' }}>{occurrence.time}</div>
                 <div style={{ fontSize:11, color:'rgba(255,255,255,0.35)', marginTop:2 }}>{dateStr}</div>
               </div>
@@ -167,8 +165,8 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
                   <div style={{ width:3, height:14, background:'#f59e0b', borderRadius:99 }} />
                   <span style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', color:'#f59e0b' }}>Não Conformidade</span>
                 </div>
-                <div style={{ padding:'18px 20px', background:'rgba(217,119,6,0.08)', border:'1px solid rgba(217,119,6,0.2)', borderRadius:18, borderLeft:'3px solid #f59e0b' }}>
-                  <p style={{ fontSize:15, fontWeight:700, lineHeight:1.6, color:'#fff', margin:0 }}>{occurrence.item}</p>
+                <div style={{ padding:'clamp(14px,4vw,18px) clamp(14px,4vw,20px)', background:'rgba(217,119,6,0.08)', border:'1px solid rgba(217,119,6,0.2)', borderRadius:18, borderLeft:'3px solid #f59e0b' }}>
+                  <p style={{ fontSize:clamp(13,14,15), fontWeight:700, lineHeight:1.6, color:'#fff', margin:0 }}>{occurrence.item}</p>
                 </div>
               </div>
 
@@ -177,7 +175,7 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
                   <div style={{ width:3, height:14, background:'rgba(255,255,255,0.25)', borderRadius:99 }} />
                   <span style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', color:'rgba(255,255,255,0.4)' }}>Observações</span>
                 </div>
-                <div style={{ padding:'18px 20px', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:18 }}>
+                <div style={{ padding:'clamp(14px,4vw,18px) clamp(14px,4vw,20px)', background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:18 }}>
                   <p style={{ fontSize:14, lineHeight:1.8, fontWeight:500, color: occurrence.comment ? 'rgba(255,255,255,0.8)' : 'rgba(255,255,255,0.3)', margin:0, fontStyle: occurrence.comment ? 'normal' : 'italic' }}>
                     {occurrence.comment || 'Nenhuma observação adicional registrada.'}
                   </p>
@@ -190,10 +188,10 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
                     <div style={{ width:3, height:14, background:'#0d9488', borderRadius:99 }} />
                     <span style={{ fontSize:11, fontWeight:800, textTransform:'uppercase', letterSpacing:'0.1em', color:'#0d9488' }}>Evidências Fotográficas · {occurrence.photos.length}</span>
                   </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(130px,1fr))', gap:10 }}>
+                  <div className="occ-photo-grid">
                     {occurrence.photos.map((p, i) => (
                       <button key={i} type="button" onClick={() => onOpenPhoto(occurrence.photos, i)}
-                        style={{ position:'relative', borderRadius:14, overflow:'hidden', border:'1px solid rgba(255,255,255,0.08)', aspectRatio:'1', padding:0, cursor:'zoom-in', background:'rgba(255,255,255,0.04)', transition:'all 0.25s' }}
+                        style={{ position:'relative', borderRadius:14, overflow:'hidden', border:'1px solid rgba(255,255,255,0.08)', aspectRatio:'1', padding:0, cursor:'zoom-in', background:'rgba(255,255,255,0.04)', transition:'all 0.25s', minHeight:44 }}
                         onMouseEnter={e => { e.currentTarget.style.transform='scale(1.04)'; e.currentTarget.style.borderColor='rgba(13,148,136,0.4)'; }}
                         onMouseLeave={e => { e.currentTarget.style.transform='scale(1)'; e.currentTarget.style.borderColor='rgba(255,255,255,0.08)'; }}>
                         <img src={p} alt={`Foto ${i+1}`} style={{ width:'100%', height:'100%', objectFit:'cover' }} loading="lazy" />
@@ -211,44 +209,48 @@ function OccurrenceDetailModal({ occurrence, onClose, onOpenPhoto }: DetailModal
   );
 }
 
+function clamp(min: number, val: number, max: number): string {
+  return `clamp(${min}px,${val}px,${max}px)`;
+}
+
 /* ─── Conformidade Detail Modal ────────────────────────────── */
 function ConformDetailModal({ detail, onClose }: { detail: { sectionTitle: string; items: string[]; total: number }; onClose: () => void }) {
   const pct = Math.round((detail.items.length / detail.total) * 100);
   return (
     <>
       <style>{`
-        .conf-detail-overlay{position:fixed;inset:0;background:rgba(2,6,23,0.9);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;z-index:3000;padding:20px;animation:fadeInCF 0.25s ease;}
-        .conf-detail-box{width:100%;max-width:540px;background:linear-gradient(145deg,#0f172a,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:28px;box-shadow:0 40px 80px rgba(0,0,0,0.6);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;animation:slideUpCF 0.35s cubic-bezier(0.16, 1, 0.3, 1);}
+        .conf-detail-overlay{position:fixed;inset:0;background:rgba(2,6,23,0.9);backdrop-filter:blur(20px);display:flex;align-items:center;justify-content:center;z-index:3000;padding:clamp(12px,4vw,20px);animation:fadeInCF 0.25s ease;}
+        .conf-detail-box{width:100%;max-width:540px;background:linear-gradient(145deg,#0f172a,#1e293b);border:1px solid rgba(255,255,255,0.08);border-radius:clamp(16px,4vw,28px);box-shadow:0 40px 80px rgba(0,0,0,0.6);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;animation:slideUpCF 0.35s cubic-bezier(0.16, 1, 0.3, 1);}
         @media(max-width:480px){.conf-detail-overlay{align-items:flex-end;padding:0;}.conf-detail-box{max-width:100%;border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:96dvh;}}
         @keyframes fadeInCF{from{opacity:0}to{opacity:1}}
         @keyframes slideUpCF{from{opacity:0;transform:translateY(40px)}to{opacity:1;transform:none}}
       `}</style>
       <div className="conf-detail-overlay" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
         <div className="conf-detail-box">
-          <div style={{ padding:'22px 24px', background:'linear-gradient(90deg,rgba(22,163,74,0.12),rgba(22,163,74,0.03))', borderBottom:'1px solid rgba(22,163,74,0.15)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0 }}>
-            <div style={{ display:'flex', alignItems:'center', gap:14 }}>
-              <div style={{ width:46, height:46, borderRadius:14, background:'rgba(22,163,74,0.2)', border:'1px solid rgba(22,163,74,0.3)', color:'#22c55e', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 20px rgba(22,163,74,0.25)' }}>
+          <div style={{ padding:'clamp(14px,4vw,22px) clamp(16px,4vw,24px)', background:'linear-gradient(90deg,rgba(22,163,74,0.12),rgba(22,163,74,0.03))', borderBottom:'1px solid rgba(22,163,74,0.15)', display:'flex', alignItems:'center', justifyContent:'space-between', flexShrink:0, gap:12 }}>
+            <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0 }}>
+              <div style={{ width:46, height:46, borderRadius:14, background:'rgba(22,163,74,0.2)', border:'1px solid rgba(22,163,74,0.3)', color:'#22c55e', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 8px 20px rgba(22,163,74,0.25)', flexShrink:0 }}>
                 <CheckCircle2 size={22} />
               </div>
-              <div>
+              <div style={{ minWidth:0 }}>
                 <div style={{ fontSize:10, fontWeight:800, letterSpacing:'0.14em', color:'rgba(34,197,94,0.7)', marginBottom:3 }}>✓ ITENS VALIDADOS</div>
-                <div style={{ fontSize:16, fontWeight:800, color:'#fff' }}>{detail.sectionTitle}</div>
+                <div style={{ fontSize:'clamp(13px,3.5vw,16px)', fontWeight:800, color:'#fff', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{detail.sectionTitle}</div>
               </div>
             </div>
-            <button onClick={onClose} style={{ width:36, height:36, borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+            <button onClick={onClose} style={{ width:44, height:44, borderRadius:10, background:'rgba(255,255,255,0.06)', border:'1px solid rgba(255,255,255,0.08)', color:'rgba(255,255,255,0.5)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
               <X size={16} />
             </button>
           </div>
-          <div style={{ padding:'12px 24px', borderBottom:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', display:'flex', alignItems:'center', gap:16, flexShrink:0 }}>
+          <div style={{ padding:'12px clamp(16px,4vw,24px)', borderBottom:'1px solid rgba(255,255,255,0.06)', background:'rgba(255,255,255,0.02)', display:'flex', alignItems:'center', gap:16, flexShrink:0 }}>
             <div style={{ flex:1, height:6, background:'rgba(255,255,255,0.06)', borderRadius:99, overflow:'hidden' }}>
               <div style={{ height:'100%', width:`${pct}%`, background:'linear-gradient(90deg,#16a34a,#22c55e)', borderRadius:99, transition:'all 1s ease' }} />
             </div>
             <span style={{ fontSize:13, fontWeight:900, color:'#22c55e', fontVariantNumeric:'tabular-nums', flexShrink:0 }}>{detail.items.length}/{detail.total} · {pct}%</span>
           </div>
-          <div style={{ overflowY:'auto', flex:1, padding:'16px 24px', display:'flex', flexDirection:'column', gap:8 }}>
+          <div style={{ overflowY:'auto', flex:1, padding:'16px clamp(16px,4vw,24px)', display:'flex', flexDirection:'column', gap:8 }}>
             {detail.items.map((item, i) => (
-              <div key={i} style={{ display:'flex', alignItems:'center', gap:12, padding:'12px 16px', borderRadius:14, background:'rgba(22,163,74,0.07)', border:'1px solid rgba(22,163,74,0.12)' }}>
-                <CheckCircle2 size={16} style={{ color:'#22c55e', flexShrink:0 }} />
+              <div key={i} style={{ display:'flex', alignItems:'flex-start', gap:12, padding:'clamp(10px,3vw,12px) clamp(12px,3vw,16px)', borderRadius:14, background:'rgba(22,163,74,0.07)', border:'1px solid rgba(22,163,74,0.12)' }}>
+                <CheckCircle2 size={16} style={{ color:'#22c55e', flexShrink:0, marginTop:2 }} />
                 <span style={{ fontSize:13, fontWeight:600, lineHeight:1.5, color:'rgba(255,255,255,0.85)' }}>{item}</span>
               </div>
             ))}
@@ -268,13 +270,13 @@ function ConformSection({ title, sectionId, items, total, defaultOpen, onDetail 
   return (
     <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:20, overflow:'hidden', transition:'all 0.2s', boxShadow:'0 2px 12px rgba(0,0,0,0.08)' }}>
       <button type="button" onClick={() => setOpen(o => !o)}
-        style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', background: open ? 'rgba(22,163,74,0.05)' : 'transparent', borderBottom: open ? '1px solid rgba(22,163,74,0.1)' : 'none', cursor:'pointer', gap:12 }}>
+        style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)', background: open ? 'rgba(22,163,74,0.05)' : 'transparent', borderBottom: open ? '1px solid rgba(22,163,74,0.1)' : 'none', cursor:'pointer', gap:12, minHeight:44 }}>
         <div style={{ display:'flex', alignItems:'center', gap:12, minWidth:0, flex:1 }}>
           <div style={{ width:40, height:40, borderRadius:12, background: isComplete ? 'rgba(22,163,74,0.2)' : 'rgba(22,163,74,0.1)', border:`1px solid ${isComplete ? 'rgba(22,163,74,0.4)' : 'rgba(22,163,74,0.2)'}`, color:'var(--success)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
             {isComplete ? <Star size={18} fill="currentColor" /> : <CheckCircle2 size={18} />}
           </div>
           <div style={{ minWidth:0, flex:1 }}>
-            <div style={{ fontSize:14, fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text)' }}>{title}</div>
+            <div style={{ fontSize:'clamp(12px,3.5vw,14px)', fontWeight:800, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', color:'var(--text)' }}>{title}</div>
             <div style={{ display:'flex', alignItems:'center', gap:8, marginTop:6 }}>
               <div style={{ flex:1, height:4, background:'rgba(22,163,74,0.12)', borderRadius:99, overflow:'hidden', maxWidth:120 }}>
                 <div style={{ height:'100%', width:`${pct}%`, background: isComplete ? 'linear-gradient(90deg,#16a34a,#22c55e)' : '#16a34a', borderRadius:99 }} />
@@ -290,11 +292,11 @@ function ConformSection({ title, sectionId, items, total, defaultOpen, onDetail 
         <div style={{ display:'flex', flexDirection:'column' }}>
           {items.map((item, i) => (
             <button key={`${sectionId}-${i}`} type="button" onClick={() => onDetail({ sectionTitle: title, items, total })}
-              style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'13px 24px', borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none', background:'transparent', cursor:'pointer', textAlign:'left', transition:'background 0.15s' }}
+              style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'clamp(11px,3vw,13px) clamp(14px,4vw,24px)', borderBottom: i < items.length - 1 ? '1px solid var(--border)' : 'none', background:'transparent', cursor:'pointer', textAlign:'left', transition:'background 0.15s', minHeight:44 }}
               onMouseEnter={e => (e.currentTarget.style.background = 'rgba(22,163,74,0.04)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}>
               <CheckCircle2 size={14} style={{ color:'var(--success)', flexShrink:0 }} />
-              <span style={{ fontSize:13, fontWeight:600, lineHeight:1.5, flex:1, color:'var(--text)' }}>{item}</span>
+              <span style={{ fontSize:'clamp(12px,3vw,13px)', fontWeight:600, lineHeight:1.5, flex:1, color:'var(--text)' }}>{item}</span>
               <ArrowRight size={13} style={{ color:'var(--text-faint)', flexShrink:0 }} />
             </button>
           ))}
@@ -308,7 +310,7 @@ function ConformSection({ title, sectionId, items, total, defaultOpen, onDetail 
 function DayStrip({ days, selected, occCountByDay, onSelect }: { days: string[]; selected: string; occCountByDay: Record<string, number>; onSelect: (d: string) => void }) {
   const todayKey = toLocalDateKey(new Date().toISOString());
   return (
-    <div style={{ overflowX:'auto', display:'flex', gap:8, padding:'4px 2px 12px', scrollbarWidth:'none' }}>
+    <div style={{ overflowX:'auto', display:'flex', gap:8, padding:'4px 2px 12px', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' } as any}>
       {days.map(dk => {
         const { dayNum, dayName, monthShort } = formatDayStrip(dk);
         const isSelected = dk === selected;
@@ -323,25 +325,26 @@ function DayStrip({ days, selected, occCountByDay, onSelect }: { days: string[];
               flexShrink: 0,
               display: 'flex', flexDirection: 'column', alignItems: 'center',
               gap: 4,
-              padding: '14px 18px',
+              padding: 'clamp(10px,3vw,14px) clamp(14px,4vw,18px)',
               borderRadius: 20,
               border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
               background: isSelected
                 ? 'linear-gradient(145deg,rgba(13,148,136,0.2),rgba(13,148,136,0.08))'
                 : 'var(--surface)',
               cursor: 'pointer',
-              minWidth: 72,
+              minWidth: 'clamp(60px,16vw,72px)',
+              minHeight: 44,
               transition: 'all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1)',
               position: 'relative',
               boxShadow: isSelected ? '0 8px 24px rgba(13,148,136,0.25),0 0 0 1px rgba(13,148,136,0.15)' : 'none',
               transform: isSelected ? 'translateY(-3px) scale(1.05)' : 'scale(1)',
-            }}
+            } as any}
           >
             {isToday && (
               <span style={{ position:'absolute', top:-9, background:'linear-gradient(90deg,#0d9488,#0891b2)', color:'#fff', fontSize:8, fontWeight:900, padding:'2px 7px', borderRadius:99, letterSpacing:'0.1em', boxShadow:'0 4px 10px rgba(13,148,136,0.4)' }}>HOJE</span>
             )}
             <span style={{ fontSize:10, fontWeight:800, color: isSelected ? 'var(--primary)' : 'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em' }}>{dayName}</span>
-            <span style={{ fontSize:22, fontWeight:900, lineHeight:1, color: isSelected ? 'var(--primary)' : 'var(--text)' }}>{dayNum}</span>
+            <span style={{ fontSize:'clamp(18px,5vw,22px)', fontWeight:900, lineHeight:1, color: isSelected ? 'var(--primary)' : 'var(--text)' }}>{dayNum}</span>
             <span style={{ fontSize:10, color: isSelected ? 'var(--primary)' : 'var(--text-muted)', fontWeight:700, letterSpacing:'0.05em' }}>{monthShort.toUpperCase()}</span>
             <div style={{ marginTop:4 }}>
               {count > 0 ? (
@@ -366,39 +369,39 @@ function DateSectionHeader({ dateKey, count }: { dateKey: string; count: number 
   const year = fullDate.getFullYear();
 
   return (
-    <div style={{ display:'flex', alignItems:'center', gap:16, margin:'8px 0 16px' }}>
+    <div style={{ display:'flex', alignItems:'center', gap:'clamp(8px,3vw,16px)', margin:'8px 0 16px', flexWrap:'wrap' } as any}>
       {/* Date block */}
       <div style={{
         display:'flex', flexDirection:'column', alignItems:'center',
-        padding:'10px 16px', borderRadius:16,
+        padding:'clamp(8px,2vw,10px) clamp(12px,3vw,16px)', borderRadius:16,
         background: isToday
           ? 'linear-gradient(135deg,rgba(13,148,136,0.25),rgba(8,145,178,0.15))'
           : 'var(--surface-2)',
         border: isToday ? '1px solid rgba(13,148,136,0.3)' : '1px solid var(--border)',
         boxShadow: isToday ? '0 4px 16px rgba(13,148,136,0.2)' : 'none',
-        minWidth:56, flexShrink:0,
-      }}>
+        minWidth:'clamp(48px,12vw,56px)', flexShrink:0,
+      } as any}>
         <span style={{ fontSize:9, fontWeight:900, textTransform:'uppercase', letterSpacing:'0.12em', color: isToday ? 'var(--primary)' : 'var(--text-muted)' }}>{dayName}</span>
-        <span style={{ fontSize:22, fontWeight:900, lineHeight:1.1, color: isToday ? 'var(--primary)' : 'var(--text)' }}>{dayNum}</span>
+        <span style={{ fontSize:'clamp(18px,5vw,22px)', fontWeight:900, lineHeight:1.1, color: isToday ? 'var(--primary)' : 'var(--text)' }}>{dayNum}</span>
         <span style={{ fontSize:9, fontWeight:800, color: isToday ? 'var(--primary)' : 'var(--text-muted)', textTransform:'uppercase' }}>{monthShort} {year}</span>
       </div>
 
-      {/* Divider line */}
-      <div style={{ flex:1, height:1, background:'var(--border)', position:'relative' }}>
+      {/* Divider line — hidden on very small screens */}
+      <div style={{ flex:1, height:1, background:'var(--border)', position:'relative', minWidth:20 }}>
         <div style={{ position:'absolute', top:'50%', left:0, transform:'translateY(-50%)', width:60, height:2, background: isToday ? 'linear-gradient(90deg,var(--primary),transparent)' : 'linear-gradient(90deg,var(--border),transparent)', borderRadius:99 }} />
       </div>
 
       {/* Badge */}
-      <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+      <div style={{ display:'flex', alignItems:'center', gap:6, flexShrink:0, flexWrap:'wrap' }}>
         {isToday && (
           <span style={{ fontSize:9, fontWeight:900, padding:'3px 8px', borderRadius:99, background:'linear-gradient(90deg,#0d9488,#0891b2)', color:'#fff', letterSpacing:'0.1em', boxShadow:'0 4px 10px rgba(13,148,136,0.35)' }}>HOJE</span>
         )}
         {count > 0 ? (
-          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, fontWeight:800, padding:'4px 12px', borderRadius:99, background:'rgba(217,119,6,0.1)', color:'#d97706', border:'1px solid rgba(217,119,6,0.2)' }}>
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:'clamp(10px,2.5vw,11px)', fontWeight:800, padding:'4px clamp(8px,2vw,12px)', borderRadius:99, background:'rgba(217,119,6,0.1)', color:'#d97706', border:'1px solid rgba(217,119,6,0.2)' }}>
             <Flame size={11} /> {count} {count === 1 ? 'alerta' : 'alertas'}
           </span>
         ) : (
-          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:11, fontWeight:800, padding:'4px 12px', borderRadius:99, background:'rgba(22,163,74,0.08)', color:'#16a34a', border:'1px solid rgba(22,163,74,0.15)' }}>
+          <span style={{ display:'inline-flex', alignItems:'center', gap:5, fontSize:'clamp(10px,2.5vw,11px)', fontWeight:800, padding:'4px clamp(8px,2vw,12px)', borderRadius:99, background:'rgba(22,163,74,0.08)', color:'#16a34a', border:'1px solid rgba(22,163,74,0.15)' }}>
             <Shield size={11} /> Sem alertas
           </span>
         )}
@@ -415,10 +418,10 @@ function EmployeeCard({ reporter, occs, onSelectOcc }: { reporter: string; occs:
   return (
     <div style={{ background:'var(--surface)', border:'1px solid var(--border)', borderRadius:20, overflow:'hidden', boxShadow:'0 4px 16px rgba(0,0,0,0.06)', transition:'box-shadow 0.2s' }}>
       {/* Card header */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', background:'linear-gradient(90deg, var(--surface-2) 0%, var(--surface) 100%)', borderBottom: expanded ? '1px solid var(--border)' : 'none' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:14, minWidth:0 }}>
-          <div style={{ position:'relative' }}>
-            <div style={{ width:48, height:48, borderRadius:'50%', background:avatar.bg, border:`2px solid ${avatar.fg}44`, color:avatar.fg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:900, flexShrink:0, boxShadow:`0 4px 14px ${avatar.glow}` }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)', background:'linear-gradient(90deg, var(--surface-2) 0%, var(--surface) 100%)', borderBottom: expanded ? '1px solid var(--border)' : 'none', gap:10 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:'clamp(10px,3vw,14px)', minWidth:0, flex:1 }}>
+          <div style={{ position:'relative', flexShrink:0 }}>
+            <div style={{ width:48, height:48, borderRadius:'50%', background:avatar.bg, border:`2px solid ${avatar.fg}44`, color:avatar.fg, display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:900, boxShadow:`0 4px 14px ${avatar.glow}` }}>
               {initials(reporter)}
             </div>
             <div style={{ position:'absolute', bottom:0, right:0, width:14, height:14, borderRadius:'50%', background:'#f59e0b', border:'2px solid var(--surface)', display:'flex', alignItems:'center', justifyContent:'center' }}>
@@ -426,13 +429,13 @@ function EmployeeCard({ reporter, occs, onSelectOcc }: { reporter: string; occs:
             </div>
           </div>
           <div style={{ minWidth:0 }}>
-            <div style={{ fontSize:15, fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{reporter}</div>
-            <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:5 }}>
-              <span style={{ display:'inline-flex', alignItems:'center', gap:4, height:22, padding:'0 10px', borderRadius:99, fontSize:10, fontWeight:900, background:'rgba(217,119,6,0.1)', color:'#d97706', border:'1px solid rgba(217,119,6,0.15)' }}>
+            <div style={{ fontSize:'clamp(13px,3.5vw,15px)', fontWeight:800, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{reporter}</div>
+            <div style={{ display:'flex', alignItems:'center', gap:6, marginTop:5, flexWrap:'wrap' }}>
+              <span style={{ display:'inline-flex', alignItems:'center', gap:4, height:22, padding:'0 10px', borderRadius:99, fontSize:10, fontWeight:900, background:'rgba(217,119,6,0.1)', color:'#d97706', border:'1px solid rgba(217,119,6,0.15)', whiteSpace:'nowrap' }}>
                 <AlertTriangle size={10} /> {occs.length} {occs.length === 1 ? 'alerta' : 'alertas'}
               </span>
               {occs.some(o => o.photos.length > 0) && (
-                <span style={{ display:'inline-flex', alignItems:'center', gap:4, height:22, padding:'0 10px', borderRadius:99, fontSize:10, fontWeight:900, background:'rgba(13,148,136,0.1)', color:'var(--primary)', border:'1px solid rgba(13,148,136,0.15)' }}>
+                <span style={{ display:'inline-flex', alignItems:'center', gap:4, height:22, padding:'0 10px', borderRadius:99, fontSize:10, fontWeight:900, background:'rgba(13,148,136,0.1)', color:'var(--primary)', border:'1px solid rgba(13,148,136,0.15)', whiteSpace:'nowrap' }}>
                   <Camera size={10} /> {occs.reduce((a, o) => a + o.photos.length, 0)}
                 </span>
               )}
@@ -440,36 +443,36 @@ function EmployeeCard({ reporter, occs, onSelectOcc }: { reporter: string; occs:
           </div>
         </div>
         <button type="button" onClick={() => setExpanded(e => !e)}
-          style={{ width:34, height:34, borderRadius:10, background:'var(--surface-2)', border:'1px solid var(--border)', color:'var(--text-muted)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
+          style={{ width:44, height:44, borderRadius:10, background:'var(--surface-2)', border:'1px solid var(--border)', color:'var(--text-muted)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', flexShrink:0 }}>
           {expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
         </button>
       </div>
 
       {expanded && (
-        <div>
+        <div style={{ display:'flex', flexDirection:'column' }}>
           {occs.map((occ, i) => (
             <button
               key={occ.id}
               type="button"
               onClick={() => onSelectOcc(occ)}
-              style={{ width:'100%', display:'flex', alignItems:'center', gap:14, padding:'16px 20px', borderBottom: i < occs.length - 1 ? '1px solid var(--border)' : 'none', background:'transparent', cursor:'pointer', textAlign:'left', transition:'background 0.15s' }}
+              style={{ width:'100%', display:'flex', alignItems:'flex-start', gap:'clamp(10px,3vw,14px)', padding:'clamp(12px,3vw,16px) clamp(14px,4vw,20px)', borderBottom: i < occs.length - 1 ? '1px solid var(--border)' : 'none', background:'transparent', cursor:'pointer', textAlign:'left', transition:'background 0.15s', minHeight:44 }}
               onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
               onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
             >
-              <div style={{ width:3, height:36, background:'linear-gradient(180deg,#f59e0b,rgba(217,119,6,0.3))', borderRadius:99, flexShrink:0 }} />
+              <div style={{ width:3, height:36, background:'linear-gradient(180deg,#f59e0b,rgba(217,119,6,0.3))', borderRadius:99, flexShrink:0, marginTop:2 }} />
               <div style={{ flex:1, minWidth:0 }}>
                 <div style={{ fontSize:10, fontWeight:900, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>{occ.section}</div>
-                <div style={{ fontSize:14, fontWeight:800, color:'var(--text)', lineHeight:1.4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{occ.item}</div>
+                <div style={{ fontSize:'clamp(12px,3.5vw,14px)', fontWeight:800, color:'var(--text)', lineHeight:1.4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{occ.item}</div>
                 {occ.comment && (
                   <div style={{ fontSize:12, color:'var(--text-muted)', marginTop:4, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', fontWeight:500, fontStyle:'italic' }}>"{occ.comment}"</div>
                 )}
               </div>
               <div style={{ flexShrink:0, display:'flex', flexDirection:'column', alignItems:'flex-end', gap:6 }}>
-                <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:800, color:'var(--text-muted)', fontVariantNumeric:'tabular-nums' }}>
+                <span style={{ display:'flex', alignItems:'center', gap:4, fontSize:12, fontWeight:800, color:'var(--text-muted)', fontVariantNumeric:'tabular-nums', whiteSpace:'nowrap' }}>
                   <Clock size={11} /> {occ.time}
                 </span>
                 {occ.photos.length > 0 && (
-                  <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:10, fontWeight:700, color:'var(--primary)' }}>
+                  <span style={{ display:'flex', alignItems:'center', gap:3, fontSize:10, fontWeight:700, color:'var(--primary)', whiteSpace:'nowrap' }}>
                     <Camera size={10} /> {occ.photos.length}
                   </span>
                 )}
@@ -486,21 +489,23 @@ function EmployeeCard({ reporter, occs, onSelectOcc }: { reporter: string; occs:
 /* ─── Stat Card ─────────────────────────────────────────────── */
 function StatCard({ label, value, sub, icon: Icon, color, bg, gradient }: { label: string; value: string; sub?: string; icon: any; color: string; bg: string; gradient: string }) {
   return (
-    <div style={{ padding:'22px', display:'flex', flexDirection:'column', gap:16, background:gradient, border:'1px solid var(--border)', borderRadius:20, position:'relative', overflow:'hidden', boxShadow:'0 4px 16px rgba(0,0,0,0.06)', transition:'transform 0.2s, box-shadow 0.2s' }}
+    <div
+      style={{ padding:'clamp(16px,4vw,22px)', display:'flex', flexDirection:'column', gap:'clamp(10px,3vw,16px)', background:gradient, border:'1px solid var(--border)', borderRadius:20, position:'relative', overflow:'hidden', boxShadow:'0 4px 16px rgba(0,0,0,0.06)', transition:'transform 0.2s, box-shadow 0.2s' }}
       onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.transform='translateY(-3px)'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 12px 28px rgba(0,0,0,0.1)'; }}
-      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform='none'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 4px 16px rgba(0,0,0,0.06)'; }}>
+      onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.transform='none'; (e.currentTarget as HTMLDivElement).style.boxShadow='0 4px 16px rgba(0,0,0,0.06)'; }}
+    >
       {/* Decorative circle */}
       <div style={{ position:'absolute', top:-20, right:-20, width:90, height:90, borderRadius:'50%', background:bg, opacity:0.35 }} />
       <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', position:'relative' }}>
-        <div style={{ width:48, height:48, borderRadius:14, background:bg, color:color, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 4px 14px ${color}33` }}>
+        <div style={{ width:'clamp(38px,10vw,48px)', height:'clamp(38px,10vw,48px)', borderRadius:14, background:bg, color:color, display:'flex', alignItems:'center', justifyContent:'center', boxShadow:`0 4px 14px ${color}33` }}>
           <Icon size={22} />
         </div>
         <Zap size={14} style={{ color, opacity:0.4, marginTop:4 }} />
       </div>
       <div style={{ position:'relative' }}>
-        <div style={{ fontSize:11, fontWeight:900, color:'var(--text-muted)', letterSpacing:'0.12em', marginBottom:6 }}>{label}</div>
-        <div style={{ fontSize:30, fontWeight:900, color:'var(--text)', lineHeight:1, letterSpacing:'-0.02em' }}>{value}</div>
-        {sub && <div style={{ fontSize:11, color:'var(--text-muted)', fontWeight:700, marginTop:5 }}>{sub}</div>}
+        <div style={{ fontSize:'clamp(9px,2.5vw,11px)', fontWeight:900, color:'var(--text-muted)', letterSpacing:'0.12em', marginBottom:6, textTransform:'uppercase' }}>{label}</div>
+        <div style={{ fontSize:'clamp(22px,6vw,30px)', fontWeight:900, color:'var(--text)', lineHeight:1, letterSpacing:'-0.02em' }}>{value}</div>
+        {sub && <div style={{ fontSize:'clamp(10px,2.5vw,11px)', color:'var(--text-muted)', fontWeight:700, marginTop:5 }}>{sub}</div>}
       </div>
     </div>
   );
@@ -537,7 +542,6 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
 
   const [selectedDay, setSelectedDay] = useState<string>(() => allDayKeys[0] || toLocalDateKey(new Date().toISOString()));
 
-  // For "all" timeline mode: group occurrences by date
   const allGroupedByDate = useMemo(() => {
     const map: Record<string, OccurrenceData[]> = {};
     occurrences.forEach(o => {
@@ -578,47 +582,150 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
           0%,100%{transform:scale(1);opacity:1}
           50%{transform:scale(1.4);opacity:0.6}
         }
+
+        /* ── Stats Grid ── */
         .dash-stats-grid {
-          padding:24px 24px 0;
-          display:grid;
-          grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
-          gap:14px;
+          padding: clamp(12px,4vw,24px) clamp(12px,4vw,24px) 0;
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: clamp(8px,2vw,14px);
         }
-        @media(max-width:520px){
-          .dash-stats-grid{grid-template-columns:repeat(2,1fr);padding:16px 16px 0;gap:10px;}
+        @media (max-width: 700px) {
+          .dash-stats-grid { grid-template-columns: repeat(2, 1fr); }
         }
-        @media(max-width:340px){
-          .dash-stats-grid{grid-template-columns:1fr;}
+        @media (max-width: 340px) {
+          .dash-stats-grid { grid-template-columns: 1fr; }
         }
-        .dash-tab-bar{
-          display:flex;gap:0;
-          border-bottom:1px solid var(--divider);
-          background:var(--surface);
-          margin-top:24px;
-          padding:0 24px;
+
+        /* ── Tab Bar ── */
+        .dash-tab-bar {
+          display: flex;
+          border-bottom: 1px solid var(--divider);
+          background: var(--surface);
+          margin-top: clamp(14px,4vw,24px);
+          padding: 0 clamp(12px,4vw,24px);
+          overflow-x: auto;
+          scrollbar-width: none;
         }
-        .dash-tab-btn{
-          padding:14px 24px;
-          font-size:12px;font-weight:900;
-          border-bottom:3px solid transparent;
-          background:transparent;
-          display:flex;align-items:center;gap:8px;
-          cursor:pointer;transition:all 0.2s;
-          letter-spacing:0.08em;flex:1;justify-content:center;
+        .dash-tab-btn {
+          padding: clamp(10px,3vw,14px) clamp(10px,3vw,24px);
+          font-size: clamp(10px,2.5vw,12px);
+          font-weight: 900;
+          border-bottom: 3px solid transparent;
+          background: transparent;
+          display: flex;
+          align-items: center;
+          gap: clamp(5px,2vw,8px);
+          cursor: pointer;
+          transition: all 0.2s;
+          letter-spacing: 0.06em;
+          flex: 1;
+          justify-content: center;
+          white-space: nowrap;
+          min-height: 44px;
         }
-        .timeline-toggle{
-          display:flex;align-items:center;gap:0;
-          background:var(--surface-2);
-          border:1px solid var(--border);
-          border-radius:12px;overflow:hidden;
+        .dash-tab-btn .tab-count {
+          padding: 2px 6px;
+          border-radius: 99px;
+          font-size: 10px;
+          font-weight: 900;
         }
-        .tgl-btn{
-          padding:8px 16px;font-size:11px;font-weight:800;
-          cursor:pointer;transition:all 0.2s;
-          border:none;letter-spacing:0.06em;
+        @media (max-width: 400px) {
+          .dash-tab-btn .tab-label { display: none; }
         }
-        .content-scroll{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:24px;}
-        @media(max-width:500px){.content-scroll{padding:16px;gap:16px;}}
+
+        /* ── Timeline toggle ── */
+        .timeline-toggle {
+          display: flex;
+          align-items: center;
+          background: var(--surface-2);
+          border: 1px solid var(--border);
+          border-radius: 12px;
+          overflow: hidden;
+        }
+        .tgl-btn {
+          padding: clamp(6px,2vw,8px) clamp(10px,3vw,16px);
+          font-size: clamp(9px,2.5vw,11px);
+          font-weight: 800;
+          cursor: pointer;
+          transition: all 0.2s;
+          border: none;
+          letter-spacing: 0.06em;
+          min-height: 36px;
+          white-space: nowrap;
+        }
+
+        /* ── Content scroll ── */
+        .content-scroll {
+          flex: 1;
+          overflow-y: auto;
+          padding: clamp(12px,4vw,24px);
+          display: flex;
+          flex-direction: column;
+          gap: clamp(14px,4vw,24px);
+        }
+
+        /* ── Employee grid ── */
+        .emp-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr));
+          gap: clamp(10px,3vw,16px);
+        }
+
+        /* ── Conform grid ── */
+        .conform-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+          gap: clamp(8px,2vw,12px);
+        }
+
+        /* ── Calendar card ── */
+        .cal-card {
+          padding: clamp(14px,4vw,20px) clamp(14px,4vw,24px);
+        }
+        .cal-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          margin-bottom: clamp(10px,3vw,16px);
+          flex-wrap: wrap;
+          gap: 10px;
+        }
+
+        /* ── Conform progress card ── */
+        .conf-prog-card {
+          padding: clamp(16px,4vw,24px);
+          border-radius: 20px;
+          background: linear-gradient(135deg,rgba(22,163,74,0.08),rgba(13,148,136,0.04));
+          border: 1px solid rgba(22,163,74,0.2);
+          position: relative;
+          overflow: hidden;
+        }
+        .conf-prog-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          margin-bottom: clamp(12px,3vw,18px);
+          position: relative;
+          gap: 12px;
+          flex-wrap: wrap;
+        }
+
+        /* ── Lightbox ── */
+        .lightbox-nav-row {
+          display: flex;
+          align-items: center;
+          gap: clamp(8px,3vw,12px);
+        }
+        .lb-btn {
+          width: 44px; height: 44px;
+          border-radius: 50%;
+          background: rgba(255,255,255,0.1);
+          border: 1px solid rgba(255,255,255,0.15);
+          color: #fff;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer;
+        }
       `}</style>
 
       {/* ── Stats Grid ── */}
@@ -636,8 +743,8 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
             onClick={() => setActiveTab(tab.id)}
             style={{ color: activeTab === tab.id ? tab.color : 'var(--text-muted)', borderBottomColor: activeTab === tab.id ? tab.color : 'transparent' }}>
             <tab.icon size={15} />
-            <span>{tab.label}</span>
-            <span style={{ padding:'2px 8px', borderRadius:99, fontSize:10, background: activeTab === tab.id ? `${tab.color}18` : 'var(--surface-2)', color: activeTab === tab.id ? tab.color : 'var(--text-muted)', fontWeight:900 }}>{tab.count}</span>
+            <span className="tab-label">{tab.label}</span>
+            <span className="tab-count" style={{ background: activeTab === tab.id ? `${tab.color}18` : 'var(--surface-2)', color: activeTab === tab.id ? tab.color : 'var(--text-muted)' }}>{tab.count}</span>
           </button>
         ))}
       </div>
@@ -648,11 +755,11 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
         {activeTab === 'ocorrencias' && (
           <>
             {/* Day Strip card */}
-            <div className="card" style={{ padding:'20px 24px' }}>
-              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:16, flexWrap:'wrap', gap:12 }}>
+            <div className="card cal-card">
+              <div className="cal-header">
                 <div style={{ display:'flex', alignItems:'center', gap:8 }}>
                   <Calendar size={14} style={{ color:'var(--primary)' }} />
-                  <span style={{ fontSize:12, fontWeight:900, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em' }}>Histórico Operacional</span>
+                  <span style={{ fontSize:'clamp(10px,2.5vw,12px)', fontWeight:900, color:'var(--text-muted)', textTransform:'uppercase', letterSpacing:'0.1em' }}>Histórico Operacional</span>
                 </div>
                 <div className="timeline-toggle">
                   <button className="tgl-btn"
@@ -670,20 +777,20 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
               <DayStrip days={allDayKeys} selected={selectedDay} occCountByDay={occCountByDay} onSelect={dk => { setSelectedDay(dk); setTimelineMode('filter'); }} />
             </div>
 
-            {/* ── FILTER MODE: single day view ── */}
+            {/* ── FILTER MODE ── */}
             {timelineMode === 'filter' && (
               <div>
                 <DateSectionHeader dateKey={selectedDay} count={dayOccurrences.length} />
                 {dayOccurrences.length === 0 ? (
-                  <div style={{ padding:'56px 24px', textAlign:'center', background:'var(--surface)', border:'2px dashed var(--border)', borderRadius:20 }}>
+                  <div style={{ padding:'clamp(32px,8vw,56px) clamp(16px,4vw,24px)', textAlign:'center', background:'var(--surface)', border:'2px dashed var(--border)', borderRadius:20 }}>
                     <div style={{ width:60, height:60, borderRadius:'50%', background:'rgba(22,163,74,0.1)', color:'#16a34a', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px', boxShadow:'0 0 24px rgba(22,163,74,0.2)' }}>
                       <Shield size={28} />
                     </div>
-                    <p style={{ fontSize:16, fontWeight:800, color:'var(--text)' }}>Dia sem intercorrências</p>
-                    <p style={{ fontSize:14, color:'var(--text-muted)', marginTop:6, fontWeight:500 }}>A operação fluiu dentro do padrão neste período.</p>
+                    <p style={{ fontSize:'clamp(13px,4vw,16px)', fontWeight:800, color:'var(--text)' }}>Dia sem intercorrências</p>
+                    <p style={{ fontSize:'clamp(12px,3vw,14px)', color:'var(--text-muted)', marginTop:6, fontWeight:500 }}>A operação fluiu dentro do padrão neste período.</p>
                   </div>
                 ) : (
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(380px,1fr))', gap:16 }}>
+                  <div className="emp-grid">
                     {Object.entries(employeeGroups).map(([rep, occs]) => (
                       <EmployeeCard key={rep} reporter={rep} occs={occs} onSelectOcc={setSelectedOcc} />
                     ))}
@@ -692,15 +799,15 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
               </div>
             )}
 
-            {/* ── ALL MODE: grouped by date timeline ── */}
+            {/* ── ALL MODE ── */}
             {timelineMode === 'all' && (
-              <div style={{ display:'flex', flexDirection:'column', gap:32 }}>
+              <div style={{ display:'flex', flexDirection:'column', gap:'clamp(20px,5vw,32px)' }}>
                 {allGroupedByDate.length === 0 ? (
-                  <div style={{ padding:'56px 24px', textAlign:'center', background:'var(--surface)', border:'2px dashed var(--border)', borderRadius:20 }}>
+                  <div style={{ padding:'clamp(32px,8vw,56px) clamp(16px,4vw,24px)', textAlign:'center', background:'var(--surface)', border:'2px dashed var(--border)', borderRadius:20 }}>
                     <div style={{ width:60, height:60, borderRadius:'50%', background:'rgba(22,163,74,0.1)', color:'#16a34a', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 16px' }}>
                       <Shield size={28} />
                     </div>
-                    <p style={{ fontSize:16, fontWeight:800, color:'var(--text)' }}>Nenhuma ocorrência registrada</p>
+                    <p style={{ fontSize:'clamp(13px,4vw,16px)', fontWeight:800, color:'var(--text)' }}>Nenhuma ocorrência registrada</p>
                   </div>
                 ) : (
                   allGroupedByDate.map(([dateKey, dayOccs]) => {
@@ -713,7 +820,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
                     return (
                       <div key={dateKey}>
                         <DateSectionHeader dateKey={dateKey} count={dayOccs.length} />
-                        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(380px,1fr))', gap:16 }}>
+                        <div className="emp-grid">
                           {Object.entries(empGroups).map(([rep, occs]) => (
                             <EmployeeCard key={rep} reporter={rep} occs={occs} onSelectOcc={setSelectedOcc} />
                           ))}
@@ -728,21 +835,21 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
         )}
 
         {activeTab === 'conformidades' && (
-          <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+          <div style={{ display:'flex', flexDirection:'column', gap:'clamp(14px,4vw,20px)' }}>
             {/* Progress card */}
-            <div style={{ padding:'24px', borderRadius:20, background:'linear-gradient(135deg,rgba(22,163,74,0.08),rgba(13,148,136,0.04))', border:'1px solid rgba(22,163,74,0.2)', position:'relative', overflow:'hidden' }}>
+            <div className="conf-prog-card">
               <div style={{ position:'absolute', top:-30, right:-30, width:140, height:140, borderRadius:'50%', background:'rgba(22,163,74,0.06)' }} />
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:18, position:'relative' }}>
+              <div className="conf-prog-header">
                 <div>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:6 }}>
                     <div style={{ width:8, height:8, borderRadius:'50%', background:'#22c55e', boxShadow:'0 0 8px rgba(34,197,94,0.6)' }} />
-                    <h3 style={{ fontSize:12, fontWeight:900, color:'#16a34a', letterSpacing:'0.1em' }}>CONFORMIDADE DA PLANTA</h3>
+                    <h3 style={{ fontSize:'clamp(10px,2.5vw,12px)', fontWeight:900, color:'#16a34a', letterSpacing:'0.1em' }}>CONFORMIDADE DA PLANTA</h3>
                   </div>
-                  <p style={{ fontSize:13, fontWeight:600, color:'var(--text-muted)' }}>{verifiedCount} de {maxChecks} pontos de controle verificados</p>
+                  <p style={{ fontSize:'clamp(11px,3vw,13px)', fontWeight:600, color:'var(--text-muted)' }}>{verifiedCount} de {maxChecks} pontos de controle verificados</p>
                 </div>
                 <div style={{ textAlign:'right' }}>
-                  <div style={{ fontSize:36, fontWeight:900, color:'#16a34a', lineHeight:1, letterSpacing:'-0.03em' }}>{validationProgress}%</div>
-                  <div style={{ fontSize:11, fontWeight:700, color:'var(--text-muted)', marginTop:4 }}>
+                  <div style={{ fontSize:'clamp(28px,7vw,36px)', fontWeight:900, color:'#16a34a', lineHeight:1, letterSpacing:'-0.03em' }}>{validationProgress}%</div>
+                  <div style={{ fontSize:'clamp(10px,2.5vw,11px)', fontWeight:700, color:'var(--text-muted)', marginTop:4 }}>
                     {validationProgress >= 90 ? '🏆 Excelente' : validationProgress >= 70 ? '✅ Bom' : '⚡ Em progresso'}
                   </div>
                 </div>
@@ -753,7 +860,7 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
             </div>
 
             {/* Sections */}
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(300px,1fr))', gap:12 }}>
+            <div className="conform-grid">
               {conformSections.map(({ section, conformItems }, i) => (
                 <ConformSection key={section.id} title={section.title} sectionId={section.id} items={conformItems} total={section.items.length} defaultOpen={i === 0} onDetail={setSelectedConform} />
               ))}
@@ -766,24 +873,25 @@ export default function DashboardView({ occurrences, checklistState }: Dashboard
       {selectedOcc && <OccurrenceDetailModal occurrence={selectedOcc} onClose={() => setSelectedOcc(null)} onOpenPhoto={(p, i) => { setSelectedOcc(null); setLightbox({ photos: p, index: i }); }} />}
       {selectedConform && <ConformDetailModal detail={selectedConform} onClose={() => setSelectedConform(null)} />}
 
+      {/* Lightbox */}
       {lightbox && (
-        <div style={{ position:'fixed', inset:0, background:'rgba(2,6,23,0.96)', backdropFilter:'blur(16px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:4000, padding:24 }}>
-          <button onClick={() => setLightbox(null)} style={{ position:'absolute', top:24, right:24, width:48, height:48, borderRadius:'50%', background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', backdropFilter:'blur(8px)' }}>
+        <div style={{ position:'fixed', inset:0, background:'rgba(2,6,23,0.96)', backdropFilter:'blur(16px)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:4000, padding:'clamp(12px,4vw,24px)' }}>
+          <button onClick={() => setLightbox(null)} style={{ position:'absolute', top:'clamp(12px,3vw,24px)', right:'clamp(12px,3vw,24px)', width:48, height:48, borderRadius:'50%', background:'rgba(255,255,255,0.08)', color:'#fff', border:'1px solid rgba(255,255,255,0.15)', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', backdropFilter:'blur(8px)' }}>
             <X size={24}/>
           </button>
-          <div style={{ maxWidth:'min(1200px,94vw)', display:'flex', flexDirection:'column', alignItems:'center', gap:16 }}>
-            <img src={lightbox.photos[lightbox.index]} alt={`Foto ${lightbox.index + 1}`} style={{ maxWidth:'100%', maxHeight:'80vh', objectFit:'contain', borderRadius:20, boxShadow:'0 40px 80px rgba(0,0,0,0.8)' }}/>
-            <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          <div style={{ maxWidth:'min(1200px,94vw)', width:'100%', display:'flex', flexDirection:'column', alignItems:'center', gap:'clamp(10px,3vw,16px)' }}>
+            <img src={lightbox.photos[lightbox.index]} alt={`Foto ${lightbox.index + 1}`} style={{ maxWidth:'100%', maxHeight:'80dvh', objectFit:'contain', borderRadius:'clamp(12px,4vw,20px)', boxShadow:'0 40px 80px rgba(0,0,0,0.8)' }}/>
+            <div className="lightbox-nav-row">
               {lightbox.index > 0 && (
-                <button onClick={() => setLightbox(l => l && { ...l, index: l.index - 1 })} style={{ width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                <button className="lb-btn" onClick={() => setLightbox(l => l && { ...l, index: l.index - 1 })}>
                   <ChevronLeft size={18} />
                 </button>
               )}
-              <div style={{ background:'rgba(255,255,255,0.08)', padding:'6px 16px', borderRadius:99, color:'rgba(255,255,255,0.8)', fontSize:13, fontWeight:700, backdropFilter:'blur(8px)' }}>
+              <div style={{ background:'rgba(255,255,255,0.08)', padding:'6px clamp(12px,4vw,16px)', borderRadius:99, color:'rgba(255,255,255,0.8)', fontSize:13, fontWeight:700, backdropFilter:'blur(8px)', whiteSpace:'nowrap' }}>
                 {lightbox.index + 1} / {lightbox.photos.length}
               </div>
               {lightbox.index < lightbox.photos.length - 1 && (
-                <button onClick={() => setLightbox(l => l && { ...l, index: l.index + 1 })} style={{ width:40, height:40, borderRadius:'50%', background:'rgba(255,255,255,0.1)', border:'1px solid rgba(255,255,255,0.15)', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer' }}>
+                <button className="lb-btn" onClick={() => setLightbox(l => l && { ...l, index: l.index + 1 })}>
                   <ChevronRight size={18} />
                 </button>
               )}
