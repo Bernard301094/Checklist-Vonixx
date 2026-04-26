@@ -357,10 +357,8 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         </button>
       </div>
 
-      {/* Botão de Relatório flutuante — visível em qualquer aba */}
-      <div style={{
-        position: 'fixed', bottom: 24, right: 20, zIndex: 100,
-      }}>
+      {/* Botão flutuante de relatório */}
+      <div className="report-btn-fixed">
         <button
           onClick={() => setShowReportModal(true)}
           style={{
@@ -406,13 +404,13 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
             ].map(stat => {
               const Icon = stat.icon;
               return (
-                <div key={stat.label} className="card" style={{ padding: 'var(--s5)', display: 'flex', alignItems: 'center', gap: 'var(--s4)' }}>
-                  <div style={{ width: 46, height: 46, borderRadius: 'var(--r-xl)', background: stat.bg, color: stat.tone, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <div key={stat.label} className="card animate-in" style={{ padding:'var(--s5)', display:'flex', alignItems:'center', gap:'var(--s4)', minWidth: 0 }}>
+                  <div style={{ width:46, height:46, borderRadius:'var(--r-xl)', background:stat.bg, color:stat.tone, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
                     <Icon size={21} />
                   </div>
-                  <div>
-                    <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 'var(--s1)' }}>{stat.label}</div>
-                    <div style={{ fontFamily: 'var(--font-display)', fontSize: 'var(--text-lg)', fontWeight: 700 }}>{stat.value}</div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize:'var(--text-xs)', textTransform:'uppercase', letterSpacing:'0.08em', fontWeight:700, color:'var(--text-muted)', marginBottom:'var(--s1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.label}</div>
+                    <div style={{ fontFamily:'var(--font-display)', fontSize:'var(--text-lg)', fontWeight:700, lineHeight:1.1 }}>{stat.value}</div>
                   </div>
                 </div>
               );
@@ -477,41 +475,39 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
               ) : users.length === 0 ? (
                 <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum usuário encontrado.</div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--s4)' }}>
                   {users.map(user => {
-                    const pwd = user.temp_password;
                     const pwdVisible = visiblePasswords[user.id];
+                    const ini = user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
                     return (
-                      <div key={user.id} style={{ padding: 'var(--s4)', background: 'var(--surface-2)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)', display: 'flex', flexDirection: 'column', gap: 'var(--s3)' }}>
-                        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--s3)', flexWrap: 'wrap' }}>
-                          <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{user.full_name || 'Usuário sem nome'}</div>
-                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 2, wordBreak: 'break-word' }}>{user.email}</div>
+                      <div key={user.id} className="card card-hover animate-in" style={{ padding: 'var(--s5)', display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s4)' }}>
+                          <div style={{ width: 44, height: 44, borderRadius: 'var(--r-xl)', background: 'var(--primary-hl)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>
+                            {ini}
                           </div>
-                          {user.role !== 'admin' ? (
-                            <div style={{ display: 'flex', gap: 'var(--s2)', flexShrink: 0 }}>
-                              <button type="button" onClick={() => openEditModal(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
-                                <UserPlus size={14} /> Editar
-                              </button>
-                              <button type="button" onClick={() => handleResetPassword(user)} className="btn-secondary" disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px' }}>
-                                <KeyRound size={14} /> Redefinir
-                              </button>
-                              <button type="button" onClick={() => setConfirmDelete(user)} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.25)', color: 'var(--danger)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
-                                <Trash2 size={14} />
-                              </button>
-                            </div>
-                          ) : (
-                            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Admin</span>
-                          )}
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.full_name || 'Usuário sem nome'}</div>
+                            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.email}</div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 'var(--s2)', flexShrink: 0 }}>
+                            <button onClick={() => openEditModal(user)} className="btn-ghost" style={{ padding: 8, minHeight: 0, borderRadius: 'var(--r-md)' }} title="Editar"><UserPlus size={14} /></button>
+                            <button onClick={() => setConfirmDelete(user)} className="btn-ghost" style={{ padding: 8, minHeight: 0, borderRadius: 'var(--r-md)', color: 'var(--danger)' }} title="Excluir"><Trash2 size={14} /></button>
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', gap: 'var(--s2)', flexWrap: 'wrap', alignItems: 'center' }}>
-                          <span className="badge">{user.role}</span>
-                          <span className="badge">{user.shift || 'Sem turno'}</span>
+                        
+                        <div style={{ display: 'flex', gap: 'var(--s2)', flexWrap: 'wrap' }}>
+                          <span className={`badge ${user.role === 'admin' ? 'badge-amber' : user.role === 'supervisor' ? 'badge-teal' : 'badge-green'}`} style={{ textTransform: 'capitalize' }}>{user.role}</span>
+                          <span className="badge" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>{user.shift || 'Sem turno'}</span>
                           <StatusBadge user={user} />
                         </div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-faint)', display: 'flex', gap: 'var(--s4)', flexWrap: 'wrap', marginTop: 'var(--s3)' }}>
-                          <span>Criado: {formatDate(user.created_at)}</span>
-                          <span>Último acesso: {formatDate(user.last_sign_in_at)}</span>
+
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--s1)', paddingTop: 'var(--s3)', borderTop: '1px solid var(--divider)' }}>
+                          <div style={{ fontSize: 10, color: 'var(--text-faint)', fontWeight: 600 }}>
+                            Acesso: {formatDate(user.last_sign_in_at)}
+                          </div>
+                          <button onClick={() => handleResetPassword(user)} className="btn-ghost" style={{ padding: '4px 10px', minHeight: 0, fontSize: 10, borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                            <KeyRound size={12} /> Reset Senha
+                          </button>
                         </div>
                       </div>
                     );
@@ -660,6 +656,20 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
           currentUserEmail={currentUserEmail}
         />
       )}
+
+      <style>{`
+        .report-btn-fixed {
+          position: fixed;
+          bottom: 24px;
+          right: 20px;
+          z-index: 100;
+        }
+        @media (max-width: 640px) {
+          .report-btn-fixed {
+            bottom: 100px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

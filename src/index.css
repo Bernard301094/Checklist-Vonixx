@@ -9,18 +9,27 @@
 
 /* ── TOKENS ───────────────────────────────────────────────── */
 :root {
-  /* Type */
-  --text-xs:   clamp(0.75rem, 0.7rem + 0.25vw, 0.875rem);
-  --text-sm:   clamp(0.875rem, 0.8rem + 0.35vw, 1rem);
-  --text-base: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-  --text-lg:   clamp(1.125rem, 1rem + 0.75vw, 1.5rem);
-  --text-xl:   clamp(1.5rem, 1.2rem + 1.25vw, 2.25rem);
-  --text-2xl:  clamp(2rem, 1.2rem + 2.5vw, 3.5rem);
+  /* Type - More fluid scaling from watch (200px) to TV (4K) */
+  --text-xs:   clamp(0.65rem, 0.6rem + 0.3vw, 0.875rem);
+  --text-sm:   clamp(0.75rem, 0.7rem + 0.5vw, 1rem);
+  --text-base: clamp(0.875rem, 0.8rem + 0.7vw, 1.25rem);
+  --text-lg:   clamp(1.125rem, 1rem + 1vw, 2rem);
+  --text-xl:   clamp(1.25rem, 1rem + 2vw, 3rem);
+  --text-2xl:  clamp(1.5rem, 1rem + 4vw, 5rem);
 
-  /* Spacing (4px grid) */
-  --s1: 0.25rem; --s2: 0.5rem;  --s3: 0.75rem; --s4: 1rem;
-  --s5: 1.25rem; --s6: 1.5rem;  --s8: 2rem;    --s10: 2.5rem;
-  --s12: 3rem;   --s16: 4rem;   --s20: 5rem;   --s24: 6rem;
+  /* Spacing (Fluid grid) */
+  --s1: clamp(0.125rem, 0.1rem + 0.1vw, 0.25rem);
+  --s2: clamp(0.25rem, 0.2rem + 0.2vw, 0.5rem);
+  --s3: clamp(0.375rem, 0.3rem + 0.3vw, 0.75rem);
+  --s4: clamp(0.5rem, 0.4rem + 0.5vw, 1rem);
+  --s5: clamp(0.625rem, 0.5rem + 0.7vw, 1.25rem);
+  --s6: clamp(0.75rem, 0.6rem + 1vw, 1.5rem);
+  --s8: clamp(1rem, 0.8rem + 1.5vw, 2rem);
+  --s10: clamp(1.25rem, 1rem + 2vw, 2.5rem);
+  --s12: clamp(1.5rem, 1.2rem + 2.5vw, 3rem);
+  --s16: clamp(2rem, 1.5rem + 3vw, 4rem);
+  --s20: clamp(2.5rem, 2rem + 4vw, 5rem);
+  --s24: clamp(3rem, 2.5rem + 5vw, 6rem);
 
   /* Radius */
   --r-sm: 0.375rem; --r-md: 0.5rem; --r-lg: 0.75rem;
@@ -76,43 +85,6 @@
   --sh-xl: 0 24px 64px rgba(15,23,42,0.16), 0 8px 24px rgba(15,23,42,0.08);
 }
 
-/* ── DARK MODE ────────────────────────────────────────────── */
-[data-theme="dark"] {
-  --bg:           #0a0d12;
-  --surface:      #111418;
-  --surface-2:    #181c23;
-  --surface-3:    #1e232c;
-  --border:       rgba(255,255,255,0.08);
-  --divider:      rgba(255,255,255,0.05);
-
-  --text:         #e2e8f0;
-  --text-muted:   #64748b;
-  --text-faint:   #334155;
-  --text-inv:     #0f172a;
-
-  --primary:      #2dd4bf;
-  --primary-h:    #5eead4;
-  --primary-hl:   rgba(45,212,191,0.12);
-
-  --sidebar-bg:   #070a0e;
-  --sidebar-surface: #0f1318;
-  --sidebar-border: rgba(255,255,255,0.06);
-  --sidebar-text: #94a3b8;
-  --sidebar-muted: #334155;
-
-  --success:      #4ade80;
-  --success-hl:   rgba(74,222,128,0.12);
-  --warning:      #fbbf24;
-  --warning-hl:   rgba(251,191,36,0.12);
-  --danger:       #f87171;
-  --danger-hl:    rgba(248,113,113,0.12);
-
-  --sh-sm: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  --sh-md: 0 4px 16px rgba(0,0,0,0.4), 0 2px 6px rgba(0,0,0,0.2);
-  --sh-lg: 0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3);
-  --sh-xl: 0 24px 64px rgba(0,0,0,0.6), 0 8px 24px rgba(0,0,0,0.4);
-}
-
 /* ── BASE ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -145,9 +117,10 @@ button { cursor: pointer; background: none; border: none; }
 ::selection { background: var(--primary-hl); color: var(--text); }
 
 :focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  outline: 3px solid var(--primary);
+  outline-offset: 3px;
   border-radius: var(--r-sm);
+  box-shadow: 0 0 0 6px var(--primary-hl);
 }
 
 a, button, [role="button"], input, textarea, select {
@@ -171,6 +144,25 @@ a, button, [role="button"], input, textarea, select {
   overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border-width: 0;
 }
 
+/* Visibility Utilities */
+.hide-watch { display: inherit; }
+@media (max-width: 320px) { .hide-watch { display: none !important; } }
+
+.show-watch { display: none; }
+@media (max-width: 320px) { .show-watch { display: inherit !important; } }
+
+.hide-mobile { display: inherit; }
+@media (max-width: 640px) { .hide-mobile { display: none !important; } }
+
+.tv-optimized {
+  max-width: 1800px;
+  margin-inline: auto;
+}
+@media (min-width: 2000px) {
+  html { font-size: 1.25em; } /* Scale up for TVs */
+  .tv-optimized { max-width: 2400px; }
+}
+
 /*
  * app-content-wrapper
  * Envuelve el contenido debajo del Header con max-width centrado.
@@ -188,6 +180,15 @@ a, button, [role="button"], input, textarea, select {
   border: 1px solid var(--border);
   border-radius: var(--r-xl);
   box-shadow: var(--sh-sm);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.2s ease,
+              border-color 0.2s ease;
+}
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--sh-md);
+  border-color: var(--primary);
 }
 
 /* Btn Primary */

@@ -109,15 +109,15 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
         position: 'relative', zIndex: 1,
       }}>
         <div style={{ textAlign: 'center', marginBottom: 'var(--s2)' }}>
-          <div style={{
-            width: 56, height: 56, borderRadius: 'var(--r-xl)',
-            background: 'var(--primary)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto var(--s4)',
-            boxShadow: '0 8px 24px rgba(13,148,136,0.35)',
-          }}>
-            <ShieldCheck size={28} color="#fff" strokeWidth={1.5} />
-          </div>
+            <div className="pulse-shield" style={{
+              width: 56, height: 56, borderRadius: 'var(--r-xl)',
+              background: 'var(--primary)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto var(--s4)',
+              boxShadow: '0 8px 24px rgba(13,148,136,0.35)',
+            }}>
+              <ShieldCheck size={28} color="#fff" strokeWidth={1.5} />
+            </div>
           <h1 style={{
             fontFamily: 'var(--font-display)', fontSize: 'var(--text-xl)',
             fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em',
@@ -218,7 +218,15 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
         </p>
       </div>
 
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes pulse-shield {
+          0% { transform: scale(1); box-shadow: 0 8px 24px rgba(13,148,136,0.35); }
+          50% { transform: scale(1.05); box-shadow: 0 12px 32px rgba(13,148,136,0.5); }
+          100% { transform: scale(1); box-shadow: 0 8px 24px rgba(13,148,136,0.35); }
+        }
+        .pulse-shield { animation: pulse-shield 2s infinite ease-in-out; }
+      `}</style>
     </div>
   );
 }

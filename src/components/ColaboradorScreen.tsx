@@ -150,7 +150,7 @@ export default function ColaboradorScreen({
       />
 
       {/* ── Tab bar principal ─────────────────────────────── */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 50 }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)', position: 'sticky', top: 0, zIndex: 50, overflowX: 'auto', scrollbarWidth: 'none' }}>
         {[
           { id: 'checklist' as const, label: 'Checklist', icon: CheckCircle2 },
           { id: 'registros' as const, label: 'Meus Registros', icon: FileText, count: myOccCount },
@@ -159,11 +159,11 @@ export default function ColaboradorScreen({
           const active = mainTab === tab.id;
           return (
             <button key={tab.id} onClick={() => setMainTab(tab.id)}
-              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 'var(--s3) var(--s4)', fontWeight: 700, fontSize: 'var(--text-sm)', color: active ? 'var(--primary)' : 'var(--text-muted)', borderBottom: active ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', cursor: 'pointer', transition: 'color 150ms' }}>
-              <Icon size={16} />
-              {tab.label}
+              style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 'var(--s3) var(--s4)', fontWeight: 700, fontSize: 'var(--text-sm)', color: active ? 'var(--primary)' : 'var(--text-muted)', borderBottom: active ? '2px solid var(--primary)' : '2px solid transparent', background: 'none', cursor: 'pointer', transition: 'color 150ms', minWidth: 0, whiteSpace: 'nowrap' }}>
+              <Icon size={16} className="hide-watch" />
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
               {'count' in tab && tab.count > 0 && (
-                <span style={{ minWidth: 18, height: 18, borderRadius: 999, background: active ? 'var(--primary-hl)' : 'var(--surface-2)', color: active ? 'var(--primary)' : 'var(--text-muted)', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
+                <span className="hide-watch" style={{ minWidth: 18, height: 18, borderRadius: 999, background: active ? 'var(--primary-hl)' : 'var(--surface-2)', color: active ? 'var(--primary)' : 'var(--text-muted)', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 5px' }}>
                   {tab.count}
                 </span>
               )}
@@ -211,22 +211,22 @@ export default function ColaboradorScreen({
                   <span className="badge badge-teal">Perfil ativo</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--s3)' }}>
-                  <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--primary-hl)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div className="card animate-in" style={{ padding: 'var(--s4)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 'var(--s3)', minWidth: 0, transition: 'transform 0.2s, box-shadow 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--sh-md)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--sh-sm)'; }}>
+                    <div className="hide-watch" style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--primary-hl)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <User2 size={17} />
                     </div>
-                    <div>
-                      <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>Operador</div>
-                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{reporterName}</div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Operador</div>
+                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>{reporterName}</div>
                     </div>
                   </div>
-                  <div className="card" style={{ padding: 'var(--s4)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 'var(--s3)' }}>
-                    <div style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--warning-hl)', color: 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  <div className="card animate-in" style={{ padding: 'var(--s4)', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', gap: 'var(--s3)', minWidth: 0, transition: 'transform 0.2s, box-shadow 0.2s' }} onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = 'var(--sh-md)'; }} onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'var(--sh-sm)'; }}>
+                    <div className="hide-watch" style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--warning-hl)', color: 'var(--warning)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                       <Clock3 size={17} />
                     </div>
-                    <div>
-                      <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2 }}>Turno</div>
-                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>{shift}</div>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700, color: 'var(--text-muted)', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Turno</div>
+                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--text)' }}>{shift}</div>
                     </div>
                   </div>
                 </div>

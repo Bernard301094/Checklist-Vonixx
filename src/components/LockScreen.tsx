@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Lock, LogOut, Fingerprint } from 'lucide-react';
 import { NativeBiometric } from 'capacitor-native-biometric';
 
@@ -12,6 +12,13 @@ export default function LockScreen({ onUnlock, onLogout, userEmail }: LockScreen
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
   const [bioLoading, setBioLoading] = useState(false);
+
+  useEffect(() => {
+    // Só dispara biometria automática se for mobile/tablet
+    if (window.innerWidth < 1024) {
+      handleBiometric();
+    }
+  }, []);
 
   const handleBiometric = async () => {
     setBioLoading(true);

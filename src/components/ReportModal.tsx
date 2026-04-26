@@ -272,9 +272,10 @@ export default function ReportModal({
                   border: '1px solid var(--border)',
                   borderRadius: 'var(--r-lg)',
                   textAlign: 'center',
+                  minWidth: 0
                 }}>
-                  <div style={{ fontSize: 'var(--text-lg)', fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 3 }}>{stat.label}</div>
+                  <div style={{ fontSize: 'var(--text-base)', fontWeight: 800, color: stat.color, lineHeight: 1 }}>{stat.value}</div>
+                  <div className="hide-watch" style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{stat.label}</div>
                 </div>
               ))}
             </div>

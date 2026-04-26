@@ -41,7 +41,7 @@ export default function SupervisorScreen({
       <SupervisorDashboard occurrences={occurrences} checklistState={checklistState} />
 
       {/* Botão flutuante de relatório */}
-      <div style={{ position: 'fixed', bottom: 24, right: 20, zIndex: 100 }}>
+      <div className="report-btn-fixed">
         <button
           onClick={() => setShowReportModal(true)}
           style={{
@@ -79,6 +79,20 @@ export default function SupervisorScreen({
           currentUserEmail={userEmail}
         />
       )}
+
+      <style>{`
+        .report-btn-fixed {
+          position: fixed;
+          bottom: 24px;
+          right: 20px;
+          z-index: 100;
+        }
+        @media (max-width: 640px) {
+          .report-btn-fixed {
+            bottom: 100px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

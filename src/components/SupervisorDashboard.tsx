@@ -1,7 +1,7 @@
 /**
- * SupervisorDashboard v3 — Clean tab-based layout
+ * SupervisorDashboard v4 — Premium Industrial Design
  * 4 tabs: Visão Geral | Ocorrências | Conformidades | Operadores
- * Mobile A55 (412px): bottom tab bar, full-width panels
+ * Improved glassmorphism, typography (Sora) and data visualization.
  */
 import { useState, useMemo } from 'react';
 import {
@@ -65,14 +65,14 @@ function groupByDate(occs: OccurrenceData[]) {
 function Lightbox({photos,index,onClose}:{photos:string[];index:number;onClose:()=>void}) {
   const [cur,setCur]=useState(index);
   return (
-    <div style={{position:'fixed',inset:0,background:'rgba(2,6,23,0.97)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9000,padding:16}}>
-      <button onClick={onClose} style={{position:'absolute',top:20,right:20,width:44,height:44,borderRadius:'50%',background:'rgba(255,255,255,0.1)',color:'#fff',border:'1px solid rgba(255,255,255,0.18)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><X size={20}/></button>
-      {photos.length>1&&<button onClick={()=>setCur(i=>i===0?photos.length-1:i-1)} style={{position:'absolute',left:12,width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.1)',color:'#fff',border:'1px solid rgba(255,255,255,0.18)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><ChevronLeft size={22}/></button>}
-      <div style={{maxWidth:'min(1100px,90vw)',display:'flex',flexDirection:'column',alignItems:'center',gap:12}}>
-        <img src={photos[cur]} alt={`Foto ${cur+1}`} style={{maxWidth:'100%',maxHeight:'80vh',objectFit:'contain',borderRadius:12,boxShadow:'0 24px 64px rgba(0,0,0,0.6)'}}/>
-        <div style={{color:'rgba(255,255,255,0.7)',fontSize:13,fontWeight:600}}>Foto {cur+1} de {photos.length}</div>
+    <div style={{position:'fixed',inset:0,background:'rgba(2,6,23,0.98)',backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9000,padding:16}}>
+      <button onClick={onClose} style={{position:'absolute',top:24,right:24,width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.1)',color:'#fff',border:'1px solid rgba(255,255,255,0.2)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer', transition:'all 0.2s'}} onMouseEnter={e => e.currentTarget.style.transform='scale(1.1)'} onMouseLeave={e => e.currentTarget.style.transform='scale(1)'}><X size={24}/></button>
+      {photos.length>1&&<button onClick={()=>setCur(i=>i===0?photos.length-1:i-1)} style={{position:'absolute',left:16,width:56,height:56,borderRadius:'50%',background:'rgba(255,255,255,0.08)',color:'#fff',border:'1px solid rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><ChevronLeft size={28}/></button>}
+      <div style={{maxWidth:'min(1200px,94vw)',display:'flex',flexDirection:'column',alignItems:'center',gap:16}}>
+        <img src={photos[cur]} alt={`Foto ${cur+1}`} style={{maxWidth:'100%',maxHeight:'82vh',objectFit:'contain',borderRadius:16,boxShadow:'0 32px 80px rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)'}}/>
+        <div style={{background:'rgba(255,255,255,0.1)', padding: '6px 16px', borderRadius: 99, color:'#fff',fontSize:13,fontWeight:700, backdropFilter: 'blur(4px)'}}>Foto {cur+1} de {photos.length}</div>
       </div>
-      {photos.length>1&&<button onClick={()=>setCur(i=>i===photos.length-1?0:i+1)} style={{position:'absolute',right:12,width:48,height:48,borderRadius:'50%',background:'rgba(255,255,255,0.1)',color:'#fff',border:'1px solid rgba(255,255,255,0.18)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><ChevronRight size={22}/></button>}
+      {photos.length>1&&<button onClick={()=>setCur(i=>i===photos.length-1?0:i+1)} style={{position:'absolute',right:16,width:56,height:56,borderRadius:'50%',background:'rgba(255,255,255,0.08)',color:'#fff',border:'1px solid rgba(255,255,255,0.15)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><ChevronRight size={28}/></button>}
     </div>
   );
 }
@@ -83,64 +83,71 @@ function OccSheet({occ,onClose,onPhoto}:{occ:OccurrenceData;onClose:()=>void;onP
   return (
     <>
       <style>{`
-        .occ-ov{position:fixed;inset:0;background:rgba(2,6,23,0.88);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:6000;padding:16px;animation:occFade .15s ease;}
-        .occ-box{width:100%;max-width:560px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-xl);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;animation:occSlide .2s ease;}
-        @media(max-width:480px){.occ-ov{align-items:flex-end;padding:0;}.occ-box{max-width:100%;border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:94dvh;}}
+        .occ-ov{position:fixed;inset:0;background:rgba(2,6,23,0.85);backdrop-filter:blur(12px);display:flex;align-items:center;justify-content:center;z-index:6000;padding:16px;animation:occFade .2s ease;}
+        .occ-box{width:100%;max-width:600px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-xl);max-height:92dvh;display:flex;flex-direction:column;overflow:hidden;animation:occSlide .3s cubic-bezier(0.16, 1, 0.3, 1);}
+        @media(max-width:480px){.occ-ov{align-items:flex-end;padding:0;}.occ-box{max-width:100%;border-bottom-left-radius:0;border-bottom-right-radius:0;max-height:96dvh;}}
         @keyframes occFade{from{opacity:0}to{opacity:1}}
-        @keyframes occSlide{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+        @keyframes occSlide{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:none}}
       `}</style>
       <div className="occ-ov" onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
         <div className="occ-box">
-          <div style={{padding:'14px 18px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--sidebar-bg)',flexShrink:0}}>
-            <div style={{display:'flex',alignItems:'center',gap:10}}>
-              <div style={{width:36,height:36,borderRadius:'var(--r-lg)',background:'rgba(217,119,6,0.15)',color:'var(--warning)',display:'flex',alignItems:'center',justifyContent:'center'}}><AlertTriangle size={16}/></div>
+          <div style={{padding:'18px 24px',borderBottom:'1px solid var(--sidebar-border)',display:'flex',alignItems:'center',justifyContent:'space-between',background:'var(--sidebar-bg)',flexShrink:0}}>
+            <div style={{display:'flex',alignItems:'center',gap:12}}>
+              <div style={{width:42,height:42,borderRadius:'var(--r-xl)',background:'rgba(217,119,6,0.2)',color:'var(--warning)',display:'flex',alignItems:'center',justifyContent:'center', boxShadow:'0 4px 12px rgba(217,119,6,0.2)'}}><AlertTriangle size={20}/></div>
               <div>
-                <div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.08em',fontWeight:700,color:'rgba(255,255,255,0.4)',marginBottom:1}}>Ocorrência</div>
-                <div style={{fontSize:14,fontWeight:800,color:'#fff',maxWidth:280,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{occ.section}</div>
+                <div style={{fontSize:10,textTransform:'uppercase',letterSpacing:'0.12em',fontWeight:800,color:'rgba(255,255,255,0.4)',marginBottom:2}}>Relatório de Ocorrência</div>
+                <div style={{fontSize:15,fontWeight:800,color:'#fff',maxWidth:320,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:'var(--font-display)'}}>{occ.section}</div>
               </div>
             </div>
-            <button onClick={onClose} style={{width:32,height:32,borderRadius:'var(--r-lg)',background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',color:'rgba(255,255,255,0.6)',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer'}}><X size={14}/></button>
+            <button onClick={onClose} className="action-btn" style={{width:36,height:36}}><X size={16}/></button>
           </div>
-          <div style={{display:'flex',gap:8,padding:'10px 18px',borderBottom:'1px solid var(--border)',background:'var(--surface-2)',flexShrink:0}}>
+          
+          <div style={{display:'flex',gap:10,padding:'12px 24px',borderBottom:'1px solid var(--border)',background:'var(--surface-2)',flexShrink:0}}>
             {[{icon:Calendar,label:'Data',value:dateStr},{icon:Clock,label:'Hora',value:occ.time},{icon:Users,label:'Operador',value:cleanName(occ.reporter)}].map(({icon:Icon,label,value})=>(
-              <div key={label} style={{flex:1,display:'flex',flexDirection:'column',gap:2,padding:'7px 10px',background:'var(--surface)',borderRadius:'var(--r-lg)',border:'1px solid var(--border)',minWidth:0}}>
-                <div style={{display:'flex',alignItems:'center',gap:3,color:'var(--text-muted)'}}><Icon size={10}/><span style={{fontSize:9,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em'}}>{label}</span></div>
-                <div style={{fontSize:12,fontWeight:700,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{value}</div>
+              <div key={label} style={{flex:1,display:'flex',flexDirection:'column',gap:4,padding:'8px 12px',background:'var(--surface)',borderRadius:'var(--r-lg)',border:'1px solid var(--border)',minWidth:0}}>
+                <div style={{display:'flex',alignItems:'center',gap:4,color:'var(--text-muted)'}}><Icon size={12}/><span style={{fontSize:10,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.06em'}}>{label}</span></div>
+                <div style={{fontSize:13,fontWeight:700,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{value}</div>
               </div>
             ))}
           </div>
-          <div style={{overflowY:'auto',flex:1,padding:'16px 18px',display:'flex',flexDirection:'column',gap:14}}>
+
+          <div style={{overflowY:'auto',flex:1,padding:'24px',display:'flex',flexDirection:'column',gap:20}}>
             <div>
-              <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
-                <Hash size={12} style={{color:'var(--warning)'}}/>
-                <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',color:'var(--warning)'}}>Item não conforme</span>
+              <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'var(--warning)'}}/>
+                <span style={{fontSize:12,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--warning)'}}>Item não conforme</span>
               </div>
-              <div style={{padding:'12px 14px',background:'var(--warning-hl)',border:'1px solid rgba(217,119,6,0.2)',borderRadius:'var(--r-xl)'}}>
-                <p style={{fontSize:14,fontWeight:700,lineHeight:1.5,color:'var(--text)'}}>{occ.item}</p>
+              <div style={{padding:'16px 20px',background:'var(--warning-hl)',border:'1px solid rgba(217,119,6,0.25)',borderRadius:'var(--r-xl)', boxShadow:'inset 0 1px 2px rgba(217,119,6,0.05)'}}>
+                <p style={{fontSize:15,fontWeight:700,lineHeight:1.6,color:'var(--text)',fontFamily:'var(--font-display)'}}>{occ.item}</p>
               </div>
             </div>
+
             {occ.comment&&(
               <div>
-                <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
-                  <MessageSquare size={12} style={{color:'var(--text-muted)'}}/>
-                  <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',color:'var(--text-muted)'}}>Observação</span>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                  <div style={{width:8,height:8,borderRadius:'50%',background:'var(--primary)'}}/>
+                  <span style={{fontSize:12,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--text-muted)'}}>Observação do Operador</span>
                 </div>
-                <div style={{padding:'12px 14px',background:'var(--surface-2)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)'}}>
-                  <p style={{fontSize:13,lineHeight:1.7,color:'var(--text)'}}>{occ.comment}</p>
+                <div style={{padding:'16px 20px',background:'var(--surface-2)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)', position:'relative'}}>
+                  <MessageSquare size={14} style={{position:'absolute', top:16, right:16, opacity:0.1}} />
+                  <p style={{fontSize:14,lineHeight:1.8,color:'var(--text)', fontWeight:500}}>{occ.comment}</p>
                 </div>
               </div>
             )}
+
             {occ.photos.length>0&&(
               <div>
-                <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:8}}>
-                  <Camera size={12} style={{color:'var(--primary)'}}/>
-                  <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',color:'var(--primary)'}}>Fotos ({occ.photos.length})</span>
+                <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:10}}>
+                  <Camera size={14} style={{color:'var(--primary)'}}/>
+                  <span style={{fontSize:12,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--primary)'}}>Evidências Fotográficas ({occ.photos.length})</span>
                 </div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(90px,1fr))',gap:8}}>
+                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(120px,1fr))',gap:12}}>
                   {occ.photos.map((p,i)=>(
                     <button key={i} type="button" onClick={()=>onPhoto(occ.photos,i)}
-                      style={{position:'relative',borderRadius:'var(--r-lg)',overflow:'hidden',border:'1px solid var(--border)',aspectRatio:'1',padding:0,cursor:'zoom-in',background:'var(--surface-2)'}}>
+                      style={{position:'relative',borderRadius:'var(--r-xl)',overflow:'hidden',border:'1px solid var(--border)',aspectRatio:'1',padding:0,cursor:'zoom-in',background:'var(--surface-2)', transition:'transform 0.2s'}}
+                      onMouseEnter={e=>e.currentTarget.style.transform='scale(1.03)'} onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}>
                       <img src={p} alt={`Foto ${i+1}`} style={{width:'100%',height:'100%',objectFit:'cover'}} loading="lazy"/>
+                      <div style={{position:'absolute', bottom:8, left:8, background:'rgba(0,0,0,0.6)', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4, backdropFilter:'blur(2px)'}}>{i+1}</div>
                     </button>
                   ))}
                 </div>
@@ -156,18 +163,20 @@ function OccSheet({occ,onClose,onPhoto}:{occ:OccurrenceData;onClose:()=>void;onP
 /* ─── KPI Card ───────────────────────────────────────── */
 function KpiCard({label,value,sub,icon:Icon,color,bg,trend}:{label:string;value:string|number;sub?:string;icon:any;color:string;bg:string;trend?:string}) {
   return (
-    <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',padding:'16px',display:'flex',flexDirection:'column',gap:12}}>
+    <div className="card card-hover" style={{padding:'20px',display:'flex',flexDirection:'column',gap:16, background:'linear-gradient(180deg, var(--surface) 0%, var(--surface-2) 100%)'}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',color:'var(--text-muted)',lineHeight:1.3}}>{label}</span>
-        <div style={{width:34,height:34,borderRadius:'var(--r-lg)',background:bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-          <Icon size={16} style={{color}}/>
+        <div style={{width:40,height:40,borderRadius:'var(--r-xl)',background:bg,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0, boxShadow:`0 4px 12px ${bg}`}}>
+          <Icon size={18} style={{color}}/>
+        </div>
+        {trend&&<div style={{fontSize:11,color:'var(--success)',fontWeight:800, background:'var(--success-hl)', padding:'2px 8px', borderRadius:99}}>{trend}</div>}
+      </div>
+      <div>
+        <div style={{fontSize:11,fontWeight:800,textTransform:'uppercase',letterSpacing:'0.1em',color:'var(--text-muted)',marginBottom:4}}>{label}</div>
+        <div style={{display:'flex',alignItems:'baseline',gap:4}}>
+          <span style={{fontSize:36,fontWeight:800,lineHeight:1,color:'var(--text)',fontFamily:'var(--font-display)',letterSpacing:'-0.02em'}}>{value}</span>
+          {sub&&<span style={{fontSize:14,fontWeight:700,color:'var(--text-muted)'}}>{sub}</span>}
         </div>
       </div>
-      <div style={{display:'flex',alignItems:'flex-end',gap:4}}>
-        <span style={{fontSize:32,fontWeight:800,lineHeight:1,color:'var(--text)',fontVariantNumeric:'tabular-nums'}}>{value}</span>
-        {sub&&<span style={{fontSize:13,fontWeight:600,color:'var(--text-muted)',marginBottom:3,lineHeight:1}}>{sub}</span>}
-      </div>
-      {trend&&<span style={{fontSize:11,color:'var(--text-muted)',fontWeight:600}}>{trend}</span>}
     </div>
   );
 }
@@ -176,12 +185,12 @@ function KpiCard({label,value,sub,icon:Icon,color,bg,trend}:{label:string;value:
 function DateSep({dateKey,count}:{dateKey:string;count:number}) {
   const isToday=dateKey===todayKey();
   return (
-    <div style={{display:'flex',alignItems:'center',gap:8,margin:'4px 0'}}>
-      <div style={{flex:1,height:1,background:'var(--divider)'}}/>
-      <div style={{display:'flex',alignItems:'center',gap:5,padding:'3px 10px',borderRadius:999,background:isToday?'var(--primary-hl)':'var(--surface-2)',border:`1px solid ${isToday?'rgba(1,105,111,0.3)':'var(--border)'}`,flexShrink:0}}>
-        <Calendar size={10} style={{color:isToday?'var(--primary)':'var(--text-muted)'}}/>
-        <span style={{fontSize:11,fontWeight:800,color:isToday?'var(--primary)':'var(--text-muted)',whiteSpace:'nowrap'}}>{dateLabel(dateKey)}</span>
-        <span style={{fontSize:10,fontWeight:700,color:isToday?'var(--primary)':'var(--text-faint)',background:isToday?'transparent':'var(--surface)',padding:'0 3px',borderRadius:4}}>{count}</span>
+    <div style={{display:'flex',alignItems:'center',gap:12,margin:'12px 0 8px'}}>
+      <div style={{display:'flex',alignItems:'center',gap:8,padding:'6px 14px',borderRadius:999,background:isToday?'var(--primary-hl)':'var(--surface)',border:`1px solid ${isToday?'rgba(1,105,111,0.25)':'var(--border)'}`,boxShadow:isToday?'var(--sh-sm)':'none',flexShrink:0}}>
+        <Calendar size={12} style={{color:isToday?'var(--primary)':'var(--text-muted)'}}/>
+        <span style={{fontSize:12,fontWeight:800,color:isToday?'var(--primary)':'var(--text)',letterSpacing:'0.02em'}}>{dateLabel(dateKey).toUpperCase()}</span>
+        <div style={{width:4,height:4,borderRadius:'50%',background:isToday?'var(--primary)':'var(--divider)'}}/>
+        <span style={{fontSize:11,fontWeight:800,color:isToday?'var(--primary)':'var(--text-muted)'}}>{count} {count===1?'REGISTRO':'REGISTROS'}</span>
       </div>
       <div style={{flex:1,height:1,background:'var(--divider)'}}/>
     </div>
@@ -192,26 +201,24 @@ function DateSep({dateKey,count}:{dateKey:string;count:number}) {
 function OccRow({occ,onSelect}:{occ:OccurrenceData;onSelect:()=>void}) {
   const color=avatarColor(occ.reporter);
   return (
-    <button type="button" onClick={onSelect}
-      style={{display:'flex',alignItems:'flex-start',gap:10,padding:'12px 14px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',cursor:'pointer',textAlign:'left',width:'100%',transition:'background 150ms,border-color 150ms'}}
-      onMouseEnter={e=>{e.currentTarget.style.background='var(--surface-2)';e.currentTarget.style.borderColor='var(--primary)'; }}
-      onMouseLeave={e=>{e.currentTarget.style.background='var(--surface)';e.currentTarget.style.borderColor='var(--border)';}}>
-      <div style={{width:36,height:36,borderRadius:'50%',background:color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-        <span style={{fontSize:11,fontWeight:800,color:'#fff'}}>{initials(occ.reporter)}</span>
+    <button type="button" onClick={onSelect} className="card-hover"
+      style={{display:'flex',alignItems:'center',gap:14,padding:'16px 20px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-2xl)',cursor:'pointer',textAlign:'left',width:'100%', transition:'all 0.2s'}}>
+      <div style={{width:44,height:44,borderRadius:'50%',background:color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0, boxShadow:`0 4px 10px ${color}44`, border:'2px solid #fff'}}>
+        <span style={{fontSize:13,fontWeight:800,color:'#fff'}}>{initials(occ.reporter)}</span>
       </div>
       <div style={{flex:1,minWidth:0}}>
-        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:3}}>
-          <span style={{fontSize:12,fontWeight:800,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{occ.item}</span>
-          {occ.photos.length>0&&<span style={{display:'flex',alignItems:'center',gap:2,fontSize:10,color:'var(--primary)',flexShrink:0}}><Camera size={10}/>{occ.photos.length}</span>}
+        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:2}}>
+          <span style={{fontSize:14,fontWeight:800,color:'var(--text)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1,fontFamily:'var(--font-display)'}}>{occ.item}</span>
+          <span style={{fontSize:10,color:'var(--text-muted)',fontWeight:700,background:'var(--surface-2)',padding:'2px 8px',borderRadius:99,border:'1px solid var(--border)'}}>{occ.time}</span>
         </div>
-        <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{occ.section}</div>
-        {occ.comment&&<div style={{fontSize:11,color:'var(--text-faint)',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontStyle:'italic'}}>"{occ.comment}"</div>}
-        <div style={{display:'flex',alignItems:'center',gap:8,marginTop:4}}>
-          <span style={{fontSize:10,color:'var(--text-faint)',display:'flex',alignItems:'center',gap:2}}><Clock size={9}/>{occ.time}</span>
-          <span style={{fontSize:10,color:'var(--text-faint)',fontWeight:600}}>{cleanName(occ.reporter)}</span>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:12,color:'var(--text-muted)',fontWeight:600}}>{occ.section}</span>
+          {occ.photos.length>0&&<span style={{display:'flex',alignItems:'center',gap:3,fontSize:11,fontWeight:800,color:'var(--primary)'}}><Camera size={11}/>{occ.photos.length}</span>}
         </div>
       </div>
-      <ChevronRight size={14} style={{color:'var(--text-faint)',flexShrink:0,marginTop:4}}/>
+      <div style={{width:32,height:32,borderRadius:'50%',background:'var(--surface-2)',display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-faint)'}}>
+        <ChevronRight size={16}/>
+      </div>
     </button>
   );
 }
@@ -220,20 +227,20 @@ function OccRow({occ,onSelect}:{occ:OccurrenceData;onSelect:()=>void}) {
 function GroupedList({occs,onSelect}:{occs:OccurrenceData[];onSelect:(o:OccurrenceData)=>void}) {
   const groups=useMemo(()=>groupByDate(occs),[occs]);
   if(!occs.length) return (
-    <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'48px 24px',color:'var(--text-muted)',gap:12}}>
-      <Shield size={36} style={{color:'var(--success)',opacity:0.7}}/>
-      <p style={{fontWeight:700,fontSize:14,color:'var(--text)'}}>Nenhuma ocorrência</p>
-      <p style={{fontSize:13,textAlign:'center',maxWidth:240}}>Operação dentro da normalidade</p>
+    <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'80px 24px',color:'var(--text-muted)',gap:16, background:'var(--surface-2)', borderRadius:'var(--r-2xl)', border:'2px dashed var(--border)'}}>
+      <div style={{width:64,height:64,borderRadius:'50%',background:'var(--success-hl)',color:'var(--success)',display:'flex',alignItems:'center',justifyContent:'center'}}><Shield size={32}/></div>
+      <div style={{textAlign:'center'}}>
+        <p style={{fontWeight:800,fontSize:16,color:'var(--text)',fontFamily:'var(--font-display)'}}>Nenhuma ocorrência encontrada</p>
+        <p style={{fontSize:14,marginTop:4, fontWeight:500}}>Toda a operação está operando dentro dos parâmetros de normalidade.</p>
+      </div>
     </div>
   );
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:6}}>
+    <div style={{display:'flex',flexDirection:'column',gap:8}}>
       {groups.map(({dateKey,items})=>(
-        <div key={dateKey}>
+        <div key={dateKey} style={{display:'flex',flexDirection:'column',gap:8}}>
           <DateSep dateKey={dateKey} count={items.length}/>
-          <div style={{display:'flex',flexDirection:'column',gap:6,marginTop:6}}>
-            {items.map(o=><OccRow key={o.id} occ={o} onSelect={()=>onSelect(o)}/>)}
-          </div>
+          {items.map(o=><OccRow key={o.id} occ={o} onSelect={()=>onSelect(o)}/>)}
         </div>
       ))}
     </div>
@@ -245,24 +252,24 @@ function SectionBar({title,total,checked,occs}:{title:string;total:number;checke
   const pct=total>0?Math.round((checked/total)*100):0;
   const color=pct===100?'var(--success)':pct>60?'var(--primary)':'var(--warning)';
   return (
-    <div style={{padding:'12px 14px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',display:'flex',flexDirection:'column',gap:8}}>
-      <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'space-between'}}>
-        <span style={{fontSize:13,fontWeight:700,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{title.replace(/^\d+\.\s*/,'')}</span>
-        <div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>
+    <div className="card-hover" style={{padding:'16px 20px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-2xl)',display:'flex',flexDirection:'column',gap:12}}>
+      <div style={{display:'flex',alignItems:'center',gap:12,justifyContent:'space-between'}}>
+        <span style={{fontSize:14,fontWeight:800,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',fontFamily:'var(--font-display)'}}>{title.replace(/^\d+\.\s*/,'')}</span>
+        <div style={{display:'flex',alignItems:'center',gap:8,flexShrink:0}}>
           {occs>0&&(
-            <span style={{display:'flex',alignItems:'center',gap:3,fontSize:10,fontWeight:700,color:'var(--warning)',background:'var(--warning-hl)',padding:'2px 7px',borderRadius:999}}>
-              <AlertTriangle size={9}/>{occs}
-            </span>
+            <div style={{display:'flex',alignItems:'center',gap:4,fontSize:11,fontWeight:800,color:'var(--warning)',background:'var(--warning-hl)',padding:'3px 10px',borderRadius:999, border:'1px solid rgba(217,119,6,0.2)'}}>
+              <AlertTriangle size={10}/>{occs}
+            </div>
           )}
-          <span style={{fontSize:13,fontWeight:800,color,minWidth:36,textAlign:'right'}}>{pct}%</span>
+          <span style={{fontSize:16,fontWeight:800,color,fontFamily:'var(--font-display)'}}>{pct}%</span>
         </div>
       </div>
-      <div style={{height:6,background:'var(--divider)',borderRadius:999,overflow:'hidden'}}>
-        <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:999,transition:'width 0.6s ease'}}/>
+      <div style={{height:8,background:'var(--divider)',borderRadius:999,overflow:'hidden', position:'relative'}}>
+        <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:999,transition:'width 0.8s cubic-bezier(0.34, 1.56, 0.64, 1)'}}/>
       </div>
       <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-        <span style={{fontSize:11,color:'var(--text-muted)',fontWeight:600}}>{checked} de {total} itens verificados</span>
-        {pct===100&&<span style={{fontSize:10,fontWeight:700,color:'var(--success)',display:'flex',alignItems:'center',gap:3}}><CheckCircle2 size={11}/>Completo</span>}
+        <span style={{fontSize:12,color:'var(--text-muted)',fontWeight:700}}>{checked} de {total} itens conferidos</span>
+        {pct===100&&<div style={{fontSize:11,fontWeight:800,color:'var(--success)',display:'flex',alignItems:'center',gap:4, background:'var(--success-hl)', padding:'2px 8px', borderRadius:99}}><CheckCircle2 size={12}/>PRONTO</div>}
       </div>
     </div>
   );
@@ -272,12 +279,12 @@ function SectionBar({title,total,checked,occs}:{title:string;total:number;checke
 function WeekChart({data}:{data:{day:string;occs:number}[]}) {
   const max=Math.max(...data.map(d=>d.occs),1);
   return (
-    <div style={{display:'flex',alignItems:'flex-end',gap:4,height:64,paddingBottom:18,position:'relative'}}>
+    <div style={{display:'flex',alignItems:'flex-end',gap:8,height:100,paddingBottom:24,position:'relative', marginTop:10}}>
       {data.map((d,i)=>(
         <div key={i} style={{flex:1,display:'flex',flexDirection:'column',alignItems:'center',height:'100%',justifyContent:'flex-end',position:'relative'}}>
-          <div style={{width:'100%',height:`${Math.max((d.occs/max)*46,d.occs>0?4:2)}px`,background:d.occs>0?'var(--warning)':'var(--divider)',borderRadius:'3px 3px 0 0',transition:'height 0.5s ease',minHeight:2}} title={`${d.occs} ocorr.`}/>
-          {d.occs>0&&<span style={{position:'absolute',top:-16,fontSize:9,fontWeight:700,color:'var(--warning)'}}>{d.occs}</span>}
-          <span style={{fontSize:9,fontWeight:700,color:'var(--text-muted)',position:'absolute',bottom:0,letterSpacing:'0.03em'}}>{d.day}</span>
+          <div style={{width:'100%',maxWidth:40,height:`${Math.max((d.occs/max)*70,d.occs>0?6:3)}px`,background:d.occs>0?'var(--warning)':'var(--divider)',borderRadius:'6px 6px 2px 2px',transition:'all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)',minHeight:3, boxShadow:d.occs>0?'0 4px 12px rgba(217,119,6,0.2)':'none'}} title={`${d.occs} ocorr.`}/>
+          {d.occs>0&&<span style={{position:'absolute',top:-20,fontSize:11,fontWeight:800,color:'var(--warning)', fontFamily:'var(--font-display)'}}>{d.occs}</span>}
+          <span style={{fontSize:10,fontWeight:800,color:'var(--text-muted)',position:'absolute',bottom:0,letterSpacing:'0.05em'}}>{d.day.toUpperCase()}</span>
         </div>
       ))}
     </div>
@@ -288,15 +295,20 @@ function WeekChart({data}:{data:{day:string;occs:number}[]}) {
 function OperatorCard({name,occs,rank}:{name:string;occs:number;rank:number}) {
   const color=avatarColor(name);
   return (
-    <div style={{display:'flex',alignItems:'center',gap:12,padding:'12px 14px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)'}}>
-      <span style={{fontSize:11,fontWeight:800,color:'var(--text-faint)',width:18,textAlign:'center',flexShrink:0}}>#{rank}</span>
-      <div style={{width:38,height:38,borderRadius:'50%',background:color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0}}>
-        <span style={{fontSize:12,fontWeight:800,color:'#fff'}}>{initials(name)}</span>
+    <div className="card-hover" style={{display:'flex',alignItems:'center',gap:16,padding:'16px 20px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-2xl)'}}>
+      <div style={{width:24,textAlign:'center',flexShrink:0}}>
+        <span style={{fontSize:14,fontWeight:900,color:rank<=3?'var(--primary)':'var(--text-faint)',fontFamily:'var(--font-display)'}}>{rank}</span>
       </div>
-      <span style={{flex:1,fontSize:13,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cleanName(name)}</span>
-      <div style={{flexShrink:0,textAlign:'right'}}>
-        <div style={{fontSize:18,fontWeight:800,color:'var(--warning)',lineHeight:1}}>{occs}</div>
-        <div style={{fontSize:10,color:'var(--text-muted)',fontWeight:600}}>ocorrências</div>
+      <div style={{width:48,height:48,borderRadius:'50%',background:color,display:'flex',alignItems:'center',justifyContent:'center',flexShrink:0, border:'2px solid #fff', boxShadow:`0 4px 12px ${color}33`}}>
+        <span style={{fontSize:14,fontWeight:800,color:'#fff'}}>{initials(name)}</span>
+      </div>
+      <div style={{flex:1, minWidth:0}}>
+        <div style={{fontSize:15,fontWeight:800,color:'var(--text)',fontFamily:'var(--font-display)', overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{cleanName(name)}</div>
+        <div style={{fontSize:11, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase', letterSpacing:'0.04em'}}>Operador de Campo</div>
+      </div>
+      <div style={{flexShrink:0,textAlign:'right', background:'var(--warning-hl)', padding:'6px 12px', borderRadius:'var(--r-xl)', border:'1px solid rgba(217,119,6,0.15)'}}>
+        <div style={{fontSize:20,fontWeight:900,color:'var(--warning)',lineHeight:1, fontFamily:'var(--font-display)'}}>{occs}</div>
+        <div style={{fontSize:9,color:'var(--warning)',fontWeight:800, textTransform:'uppercase', letterSpacing:'0.04em'}}>Alertas</div>
       </div>
     </div>
   );
@@ -344,7 +356,7 @@ export default function SupervisorDashboard({occurrences,checklistState}:Props) 
   },[occurrences,sectionFilter]);
 
   const TABS:Array<{id:Tab;label:string;icon:any;badge?:number;badgeColor?:string}>=[
-    {id:'overview', label:'Visão Geral', icon:LayoutDashboard},
+    {id:'overview', label:'Dashboard', icon:LayoutDashboard},
     {id:'ocorrencias', label:'Ocorrências', icon:AlertTriangle, badge:occurrences.length, badgeColor:'var(--warning)'},
     {id:'conformidades', label:'Conformidades', icon:CheckCircle2, badge:conformPct, badgeColor:'var(--success)'},
     {id:'operadores', label:'Operadores', icon:Users, badge:uniqueOps, badgeColor:'var(--primary)'},
@@ -354,49 +366,70 @@ export default function SupervisorDashboard({occurrences,checklistState}:Props) 
     <>
       <style>{`
         /* — Tab bar — */
-        .sd-tabs{display:flex;background:var(--surface);border-bottom:2px solid var(--divider);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+        .sd-tabs{display:flex;background:var(--sidebar-bg);padding:4px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch; gap:4px;}
         .sd-tabs::-webkit-scrollbar{display:none;}
-        .sd-tab{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:12px 18px;font-size:13px;font-weight:700;color:var(--text-muted);border-bottom:2px solid transparent;margin-bottom:-2px;cursor:pointer;background:none;border-top:none;border-left:none;border-right:none;white-space:nowrap;transition:color 150ms;}
-        .sd-tab.active{color:var(--primary);border-bottom-color:var(--primary);}
-        .sd-tab:hover:not(.active){color:var(--text);}
-        .sd-badge{font-size:10px;font-weight:800;padding:1px 6px;border-radius:999px;line-height:1.4;}
+        .sd-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 20px;font-size:13px;font-weight:800;color:rgba(255,255,255,0.5);border-radius:var(--r-lg);cursor:pointer;background:transparent;border:none;white-space:nowrap;transition:all 0.2s;}
+        .sd-tab.active{color:#fff;background:rgba(255,255,255,0.08);box-shadow:inset 0 1px 1px rgba(255,255,255,0.1);}
+        .sd-tab:hover:not(.active){color:#fff;background:rgba(255,255,255,0.04);}
+        .sd-tab-badge{font-size:10px;font-weight:900;padding:2px 8px;border-radius:999px;line-height:1;background:rgba(255,255,255,0.12);color:#fff;}
 
         /* — Panel — */
-        .sd-panel{padding:18px 20px;display:flex;flex-direction:column;gap:16px;}
-        @media(max-width:480px){.sd-panel{padding:14px 14px;gap:14px;}}
+        .sd-panel{padding:24px;display:flex;flex-direction:column;gap:24px; animation:tabEnter 0.3s ease-out;}
+        @keyframes tabEnter{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+        @media(max-width:480px){.sd-panel{padding:16px;gap:16px;}}
 
         /* — KPI grid — */
-        .sd-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
-        @media(max-width:900px){.sd-kpi-grid{grid-template-columns:repeat(2,1fr);}}
-        @media(max-width:480px){.sd-kpi-grid{grid-template-columns:repeat(2,1fr);gap:10px;}}
+        .sd-kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+        @media(max-width:1024px){.sd-kpi-grid{grid-template-columns:repeat(2,1fr);gap:12px;}}
+        @media(max-width:360px){.sd-kpi-grid{grid-template-columns:1fr; gap:8px;}}
 
         /* — Overview 2-col — */
-        .sd-overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-        @media(max-width:768px){.sd-overview-grid{grid-template-columns:1fr;}}
+        .sd-overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+        @media(max-width:860px){.sd-overview-grid{grid-template-columns:1fr; gap:16px;}}
 
         /* — Section heading — */
-        .sd-section-hd{display:flex;align-items:center;gap:8px;margin-bottom:2px;}
-        .sd-section-hd span{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:0.06em;color:var(--text-muted);}
+        .sd-section-hd{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+        .sd-section-hd span{font-size:13px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:var(--text-muted);font-family:var(--font-display);}
+        @media(max-width:360px){ .sd-section-hd span{ font-size:11px; } }
 
         /* — Filter bar — */
-        .sd-filter{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--surface-2);border-radius:var(--r-xl);border:1px solid var(--border);}
-        .sd-filter select{font:inherit;font-size:13px;font-weight:600;color:var(--text);background:transparent;border:none;outline:none;flex:1;cursor:pointer;min-width:0;}
+        .sd-filter{display:flex;align-items:center;gap:10px;padding:12px 18px;background:var(--surface);border-radius:var(--r-2xl);border:1px solid var(--border);box-shadow:var(--sh-sm);}
+        @media(max-width:360px){ .sd-filter{ padding:10px 12px; } }
+        .sd-filter select{font:inherit;font-size:14px;font-weight:700;color:var(--text);background:transparent;border:none;outline:none;flex:1;cursor:pointer;min-width:0;}
 
         /* — Mobile bottom tabs — */
         @media(max-width:640px){
-          .sd-tabs{position:sticky;bottom:0;z-index:100;border-top:1px solid var(--divider);border-bottom:none;padding-bottom:env(safe-area-inset-bottom);background:var(--surface);box-shadow:0 -4px 16px rgba(0,0,0,0.12);}
-          .sd-tab{flex:1;flex-direction:column;gap:3px;padding:10px 4px 8px;font-size:10px;justify-content:center;align-items:center;border-bottom:none;border-top:2px solid transparent;margin-bottom:0;margin-top:-2px;}
-          .sd-tab.active{border-top-color:var(--primary);border-bottom-color:transparent;}
+          .sd-tabs{position:fixed;bottom:0;left:0;right:0;z-index:100;border-top:1px solid var(--sidebar-border);padding:8px 8px calc(8px + env(safe-area-inset-bottom));background:var(--sidebar-bg);box-shadow:0 -10px 30px rgba(0,0,0,0.3);}
+          .sd-tab{flex:1;flex-direction:column;gap:4px;padding:10px 4px;font-size:10px;border-radius:var(--r-md); min-width:0;}
+          .sd-tab span { 
+            font-size: 9px; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            width: 100%;
+            text-align: center;
+          }
+          .sd-tab-badge{position:absolute;top:4px;right:4px;}
+          .sd-panel{padding-bottom:140px;}
+        }
+        @media(max-width:360px){
+          .sd-tab{ gap: 2px; padding: 8px 2px; }
+          .sd-tab svg { width: 14px; height: 14px; }
+          .sd-tab span { font-size: 8px; letter-spacing: -0.02em; }
+        }
+        @media(max-width:320px){
+          .sd-tab span { display: none; }
+          .sd-tab { padding: 12px 0; }
         }
       `}</style>
 
-      {/* ─ Top tabs (desktop) / Bottom tabs (mobile) ─ */}
+      {/* ─ Navigation ─ */}
       <div className="sd-tabs">
         {TABS.map(t=>(
           <button key={t.id} type="button" className={`sd-tab${tab===t.id?' active':''}`} onClick={()=>setTab(t.id)}>
-            <t.icon size={15}/>
-            <span>{t.label}</span>
-            {t.badge!==undefined&&<span className="sd-badge" style={{background:tab===t.id?t.badgeColor:'var(--surface-2)',color:tab===t.id?'#fff':t.badgeColor}}>{t.badge}</span>}
+            <t.icon size={18} />
+            <span className="hide-watch">{t.label}</span>
+            {t.badge!==undefined&&<span className="sd-tab-badge">{t.badge}{t.id==='conformidades'?'%':''}</span>}
           </button>
         ))}
       </div>
@@ -406,63 +439,51 @@ export default function SupervisorDashboard({occurrences,checklistState}:Props) 
         <div className="sd-panel">
           {/* KPIs */}
           <div className="sd-kpi-grid">
-            <KpiCard label="Ocorr. Hoje" value={todayOccs.length} icon={AlertTriangle} color="var(--warning)" bg="var(--warning-hl)" trend={`${occurrences.length} total`}/>
-            <KpiCard label="Conformidade" value={`${conformPct}%`} icon={TrendingUp} color="var(--success)" bg="var(--success-hl)" trend={`${totalChecked}/${totalItems} itens`}/>
-            <KpiCard label="Itens OK" value={totalChecked} sub={`/${totalItems}`} icon={CheckCircle2} color="var(--primary)" bg="var(--primary-hl)"/>
-            <KpiCard label="Operadores" value={uniqueOps} icon={Users} color="var(--blue)" bg="rgba(0,100,148,0.12)"/>
+            <KpiCard label="Ocorr. Hoje" value={todayOccs.length} icon={AlertTriangle} color="var(--warning)" bg="var(--warning-hl)" trend={`TOTAL: ${occurrences.length}`}/>
+            <KpiCard label="Conformidade" value={`${conformPct}%`} icon={TrendingUp} color="var(--success)" bg="var(--success-hl)" trend="META: 100%"/>
+            <KpiCard label="Itens Verif." value={totalChecked} sub={`/${totalItems}`} icon={CheckCircle2} color="var(--primary)" bg="var(--primary-hl)"/>
+            <KpiCard label="Equipe Ativa" value={uniqueOps} icon={Users} color="#0891b2" bg="rgba(8,145,178,0.12)"/>
           </div>
 
-          {/* 2-col: chart + recent occs */}
           <div className="sd-overview-grid">
             {/* Weekly chart */}
-            <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',padding:'16px'}}>
-              <div className="sd-section-hd"><BarChart2 size={13} style={{color:'var(--primary)'}}/><span>Ocorrências — 7 dias</span></div>
+            <div className="card" style={{padding:'24px', display:'flex', flexDirection:'column'}}>
+              <div className="sd-section-hd"><BarChart2 size={16} style={{color:'var(--primary)'}}/><span>Histórico 7 Dias</span></div>
               <WeekChart data={weekData}/>
             </div>
             {/* Recent occurrences */}
-            <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',padding:'16px',display:'flex',flexDirection:'column',gap:8}}>
-              <div className="sd-section-hd"><AlertTriangle size={13} style={{color:'var(--warning)'}}/><span>Recentes</span></div>
+            <div className="card" style={{padding:'24px',display:'flex',flexDirection:'column',gap:12}}>
+              <div className="sd-section-hd"><AlertTriangle size={16} style={{color:'var(--warning)'}}/><span>Ocorrências Recentes</span></div>
               {todayOccs.length===0?(
-                <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'16px 0',color:'var(--text-muted)',gap:6}}>
-                  <Shield size={24} style={{color:'var(--success)'}}/>
-                  <span style={{fontSize:12,fontWeight:700}}>Nenhuma ocorrência hoje</span>
+                <div style={{flex:1, display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',padding:'20px 0',color:'var(--text-muted)',gap:10, background:'var(--surface-2)', borderRadius:'var(--r-xl)', border:'1px dashed var(--border)'}}>
+                  <Shield size={28} style={{color:'var(--success)', opacity:0.6}}/>
+                  <span style={{fontSize:13,fontWeight:800, fontFamily:'var(--font-display)'}}>Operação Estável</span>
                 </div>
-              ):todayOccs.slice(0,4).map(o=>(
-                <button key={o.id} type="button" onClick={()=>setSelectedOcc(o)}
-                  style={{display:'flex',alignItems:'center',gap:8,padding:'8px 10px',background:'var(--surface-2)',border:'1px solid var(--border)',borderRadius:'var(--r-lg)',cursor:'pointer',textAlign:'left',width:'100%',transition:'background 150ms'}}
-                  onMouseEnter={e=>e.currentTarget.style.background='var(--surface-offset, #e8e6e2)'}
-                  onMouseLeave={e=>e.currentTarget.style.background='var(--surface-2)'}>
-                  <AlertTriangle size={13} style={{color:'var(--warning)',flexShrink:0}}/>
-                  <span style={{fontSize:12,fontWeight:700,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{o.item}</span>
-                  <span style={{fontSize:10,color:'var(--text-faint)',flexShrink:0}}>{o.time}</span>
-                </button>
-              ))}
-              {todayOccs.length>4&&(
-                <button type="button" onClick={()=>setTab('ocorrencias')} style={{fontSize:12,fontWeight:700,color:'var(--primary)',background:'none',border:'none',cursor:'pointer',padding:'4px 0',textAlign:'center'}}>Ver todas ({todayOccs.length}) →</button>
+              ): (
+                <div style={{display:'flex', flexDirection:'column', gap:8}}>
+                  {todayOccs.slice(0,4).map(o=>(
+                    <button key={o.id} type="button" onClick={()=>setSelectedOcc(o)} className="card-hover"
+                      style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',background:'var(--surface-2)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',cursor:'pointer',textAlign:'left',width:'100%', transition:'all 0.2s'}}>
+                      <div style={{width:8, height:8, borderRadius:'50%', background:'var(--warning)', flexShrink:0}} />
+                      <span style={{fontSize:13,fontWeight:700,flex:1,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap', color:'var(--text)'}}>{o.item}</span>
+                      <span style={{fontSize:11,color:'var(--text-faint)',fontWeight:700, fontVariantNumeric:'tabular-nums'}}>{o.time}</span>
+                    </button>
+                  ))}
+                  {todayOccs.length>4&&(
+                    <button type="button" onClick={()=>setTab('ocorrencias')} style={{fontSize:13,fontWeight:800,color:'var(--primary)',background:'none',border:'none',cursor:'pointer',padding:'8px 0',textAlign:'center', fontFamily:'var(--font-display)'}}>VER TODOS OS ALERTAS →</button>
+                  )}
+                </div>
               )}
             </div>
           </div>
 
           {/* Section health summary */}
-          <div>
-            <div className="sd-section-hd" style={{marginBottom:10}}><Activity size={13} style={{color:'var(--primary)'}}/><span>Saúde por seção</span></div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:8}}>
-              {sectionStats.map(({section,checked,occs})=>{
-                const pct=section.items.length>0?Math.round((checked/section.items.length)*100):0;
-                const color=pct===100?'var(--success)':pct>60?'var(--primary)':'var(--warning)';
-                return (
-                  <div key={section.id} style={{padding:'10px 12px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-lg)',display:'flex',flexDirection:'column',gap:6}}>
-                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:4}}>
-                      <span style={{fontSize:12,fontWeight:700,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',flex:1}}>{section.title.replace(/^\d+\.\s*/,'')}</span>
-                      <span style={{fontSize:13,fontWeight:800,color,flexShrink:0}}>{pct}%</span>
-                    </div>
-                    <div style={{height:4,background:'var(--divider)',borderRadius:999}}>
-                      <div style={{height:'100%',width:`${pct}%`,background:color,borderRadius:999,transition:'width 0.6s'}}/>
-                    </div>
-                    {occs>0&&<span style={{fontSize:10,color:'var(--warning)',fontWeight:700,display:'flex',alignItems:'center',gap:3}}><AlertTriangle size={9}/>{occs} ocorrência(s)</span>}
-                  </div>
-                );
-              })}
+          <div className="card" style={{padding:'24px'}}>
+            <div className="sd-section-hd" style={{marginBottom:16}}><Activity size={16} style={{color:'var(--primary)'}}/><span>Status Operacional por Área</span></div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))',gap:12}}>
+              {sectionStats.map(({section,checked,occs})=> (
+                <SectionBar key={section.id} title={section.title} total={section.items.length} checked={checked} occs={occs}/>
+              ))}
             </div>
           </div>
         </div>
@@ -471,17 +492,15 @@ export default function SupervisorDashboard({occurrences,checklistState}:Props) 
       {/* ─ Ocorrências ──────────────────────────────── */}
       {tab==='ocorrencias'&&(
         <div className="sd-panel">
-          {/* Filter */}
           <div className="sd-filter">
-            <Filter size={13} style={{color:'var(--text-muted)',flexShrink:0}}/>
+            <Filter size={14} style={{color:'var(--primary)',flexShrink:0}}/>
             <select value={sectionFilter} onChange={e=>setSectionFilter(e.target.value)}>
-              <option value="all">Todas as seções ({occurrences.length})</option>
+              <option value="all">TODAS AS ÁREAS ({occurrences.length})</option>
               {allSections.map(s=>(
-                <option key={s} value={s}>{s.replace(/^\d+\.\s*/,'')} ({occurrences.filter(o=>o.section===s).length})</option>
+                <option key={s} value={s}>{s.toUpperCase()} ({occurrences.filter(o=>o.section===s).length})</option>
               ))}
             </select>
           </div>
-          {/* List */}
           <GroupedList occs={filteredOccs} onSelect={setSelectedOcc}/>
         </div>
       )}
@@ -489,21 +508,19 @@ export default function SupervisorDashboard({occurrences,checklistState}:Props) 
       {/* ─ Conformidades ───────────────────────────── */}
       {tab==='conformidades'&&(
         <div className="sd-panel">
-          {/* Summary bar */}
-          <div style={{padding:'14px 16px',background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',display:'flex',alignItems:'center',gap:16}}>
-            <div style={{flex:1}}>
-              <div style={{display:'flex',justifyContent:'space-between',marginBottom:6}}>
-                <span style={{fontSize:13,fontWeight:700}}>Conformidade geral</span>
-                <span style={{fontSize:20,fontWeight:800,color:conformPct>=80?'var(--success)':conformPct>=50?'var(--primary)':'var(--warning)'}}>{conformPct}%</span>
+          <div className="card" style={{padding:'24px', background:'linear-gradient(135deg, var(--success-hl) 0%, var(--surface) 100%)', borderLeft:'6px solid var(--success)'}}>
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start', marginBottom:20}}>
+              <div>
+                <h3 style={{fontSize:14,fontWeight:900,textTransform:'uppercase',letterSpacing:'0.1em',color:'var(--success)', marginBottom:4, fontFamily:'var(--font-display)'}}>Conformidade Geral</h3>
+                <p style={{fontSize:13, fontWeight:600, color:'var(--text-muted)'}}>{totalChecked} de {totalItems} itens verificados</p>
               </div>
-              <div style={{height:8,background:'var(--divider)',borderRadius:999,overflow:'hidden'}}>
-                <div style={{height:'100%',width:`${conformPct}%`,background:conformPct>=80?'var(--success)':conformPct>=50?'var(--primary)':'var(--warning)',borderRadius:999,transition:'width 0.8s ease'}}/>
-              </div>
-              <div style={{fontSize:11,color:'var(--text-muted)',marginTop:4,fontWeight:600}}>{totalChecked} de {totalItems} itens verificados</div>
+              <div style={{fontSize:32,fontWeight:900,color:'var(--success)',fontFamily:'var(--font-display)'}}>{conformPct}%</div>
+            </div>
+            <div style={{height:10,background:'rgba(22,163,74,0.1)',borderRadius:999,overflow:'hidden', border:'1px solid rgba(22,163,74,0.1)'}}>
+              <div style={{height:'100%',width:`${conformPct}%`,background:'var(--success)',borderRadius:999,transition:'width 1s cubic-bezier(0.34, 1.56, 0.64, 1)', boxShadow:'0 0 10px rgba(22,163,74,0.4)'}}/>
             </div>
           </div>
-          {/* Sections */}
-          <div style={{display:'flex',flexDirection:'column',gap:8}}>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:12}}>
             {sectionStats.map(({section,checked,occs})=>(
               <SectionBar key={section.id} title={section.title} total={section.items.length} checked={checked} occs={occs}/>
             ))}
@@ -514,13 +531,14 @@ export default function SupervisorDashboard({occurrences,checklistState}:Props) 
       {/* ─ Operadores ───────────────────────────────── */}
       {tab==='operadores'&&(
         <div className="sd-panel">
+          <div className="sd-section-hd"><Users size={16} style={{color:'var(--primary)'}}/><span>Performance da Equipe</span></div>
           {operatorStats.length===0?(
-            <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'48px 24px',color:'var(--text-muted)',gap:12}}>
-              <Users size={36} style={{opacity:0.4}}/>
-              <p style={{fontWeight:700,fontSize:14,color:'var(--text)'}}>Nenhum operador ainda</p>
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',padding:'80px 24px',color:'var(--text-muted)',gap:16, background:'var(--surface-2)', borderRadius:'var(--r-2xl)', border:'2px dashed var(--border)'}}>
+              <Users size={40} style={{opacity:0.3}}/>
+              <p style={{fontWeight:800,fontSize:16,color:'var(--text)',fontFamily:'var(--font-display)'}}>Nenhum operador registrado</p>
             </div>
           ):(
-            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:12}}>
               {operatorStats.map(([name,occs],i)=>(
                 <OperatorCard key={name} name={name} occs={occs} rank={i+1}/>
               ))}

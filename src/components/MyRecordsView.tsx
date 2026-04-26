@@ -496,7 +496,7 @@ export default function MyRecordsView({ occurrences, checklistState, reporterNam
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)' }}>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--divider)', background: 'var(--surface)', overflowX: 'auto', scrollbarWidth: 'none' }}>
         {[
           { id: 'ocorrencias' as const, label: 'Ocorrências', count: myOccs.length, icon: AlertTriangle, active: 'var(--warning)', hl: 'var(--warning-hl)' },
           { id: 'conformidades' as const, label: 'Conformidades', count: totalConforms, icon: CheckCircle2, active: 'var(--success)', hl: 'var(--success-hl)' },
@@ -505,10 +505,10 @@ export default function MyRecordsView({ occurrences, checklistState, reporterNam
           const isActive = activeTab === tab.id;
           return (
             <button key={tab.id} type="button" onClick={() => setActiveTab(tab.id)}
-              style={{ flex: 1, padding: 'var(--s3) var(--s4)', fontSize: 'var(--text-sm)', fontWeight: 700, color: isActive ? tab.active : 'var(--text-muted)', borderBottom: isActive ? `2px solid ${tab.active}` : '2px solid transparent', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--s2)', cursor: 'pointer', transition: 'color 150ms ease' }}>
-              <Icon size={14} />
+              style={{ flex: 1, padding: 'var(--s3) var(--s4)', fontSize: 'var(--text-sm)', fontWeight: 700, color: isActive ? tab.active : 'var(--text-muted)', borderBottom: isActive ? `2px solid ${tab.active}` : '2px solid transparent', background: 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--s2)', cursor: 'pointer', transition: 'color 150ms ease', minWidth: 0 }}>
+              <Icon size={14} className="hide-watch" />
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{tab.label}</span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 18, height: 18, borderRadius: 999, fontSize: 11, fontWeight: 700, background: isActive ? tab.hl : 'var(--surface-2)', color: isActive ? tab.active : 'var(--text-muted)', padding: '0 5px' }}>
+              <span className="hide-watch" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 18, height: 18, borderRadius: 999, fontSize: 11, fontWeight: 700, background: isActive ? tab.hl : 'var(--surface-2)', color: isActive ? tab.active : 'var(--text-muted)', padding: '0 5px' }}>
                 {tab.count}
               </span>
             </button>

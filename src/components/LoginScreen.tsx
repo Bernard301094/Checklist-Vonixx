@@ -74,7 +74,7 @@ export default function LoginScreen() {
       }} />
 
       <div className="animate-in" style={{
-        width: '100%', maxWidth: '440px',
+        width: '100%', maxWidth: 'min(440px, 100%)',
         display: 'flex', flexDirection: 'column', gap: 'var(--s6)',
         position: 'relative', zIndex: 1,
       }}>
@@ -93,7 +93,7 @@ export default function LoginScreen() {
             fontWeight: 800, color: 'var(--text)', letterSpacing: '-0.03em',
             lineHeight: 1.1,
           }}>Indústria 4.0 Pro</h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginTop: 'var(--s2)', fontWeight: 500 }}>
+          <p className="hide-watch" style={{ color: 'var(--text-muted)', fontSize: 'var(--text-sm)', marginTop: 'var(--s2)', fontWeight: 500 }}>
             Acesse o painel de gestão industrial
           </p>
         </div>

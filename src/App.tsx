@@ -68,7 +68,10 @@ export default function App() {
 
   useEffect(() => {
     const listener = CapacitorApp.addListener('appStateChange', ({ isActive }) => {
-      if (!isActive && role !== 'login' && useBiometrics) {
+      // Bloqueio biométrico apenas para dispositivos móveis/tablets (< 1024px)
+      const isMobile = window.innerWidth < 1024;
+      
+      if (!isActive && role !== 'login' && useBiometrics && isMobile) {
         const skip = localStorage.getItem('skipBiometric');
         if (skip === 'true') {
           localStorage.removeItem('skipBiometric');
@@ -151,7 +154,8 @@ export default function App() {
     resolvedUserIdRef.current = user.id;
 
     const isBioEnabled = localStorage.getItem('useBiometrics') === 'true';
-    if (isBioEnabled) setIsLocked(true);
+    const isMobile = window.innerWidth < 1024;
+    if (isBioEnabled && isMobile) setIsLocked(true);
 
     const dbRole = await fetchRoleFromDB(user.id);
     setRole(dbRole);
