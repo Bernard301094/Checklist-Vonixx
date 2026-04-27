@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Camera, AlertTriangle, X, CheckCircle2, ChevronDown, User2, Clock3, ImagePlus, Loader2, Factory, FileText } from 'lucide-react';
-import { OccurrenceData } from '../types';
+import { OccurrenceData, ChecklistEntry } from '../types';
 import { CHECKLIST_DATA } from '../constants';
 import Header from './Header';
 import { uploadPhoto } from '../lib/uploadPhoto';
@@ -11,6 +11,7 @@ import MyRecordsView from './MyRecordsView';
 interface ColaboradorScreenProps {
   onLogout: () => void;
   checklistState: Record<string, boolean>;
+  checklistEntries?: ChecklistEntry[];
   onCheck: (key: string, checked: boolean) => void;
   onSaveOccurrence: (occurrence: Omit<OccurrenceData, 'id'>) => void;
   onUpdateOccurrence: (id: string, patch: { comment?: string; photos?: string[] }) => Promise<void>;
@@ -23,7 +24,7 @@ interface ColaboradorScreenProps {
 }
 
 export default function ColaboradorScreen({
-  onLogout, checklistState, onCheck, onSaveOccurrence, onUpdateOccurrence,
+  onLogout, checklistState, checklistEntries, onCheck, onSaveOccurrence, onUpdateOccurrence,
   occurrences, userEmail, reporterName, shift, useBiometrics, onToggleBiometrics
 }: ColaboradorScreenProps) {
   const { toasts, removeToast, toast } = useToast();
@@ -42,8 +43,35 @@ export default function ColaboradorScreen({
     Object.fromEntries(CHECKLIST_DATA.map(s => [s.id, true]))
   );
 
+  // ── Isola o checklist para mostrar apenas itens marcados pelo utilizador HOJE
+  const myChecklistState = useMemo(() => {
+    const state: Record<string, boolean> = {};
+    if (!checklistEntries) return state;
+
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const normalEmail = userEmail?.trim().toLowerCase() ?? '';
+    const normalName = reporterName.trim().toLowerCase();
+
+    checklistEntries.forEach(entry => {
+      // Filtra por data (apenas hoje)
+      const entryDate = entry.checked_at ? new Date(entry.checked_at).toISOString().slice(0, 10) : '';
+      if (entryDate !== todayStr) return;
+
+      const rep = (entry.reporter || '').toLowerCase();
+      
+      // Valida de forma estrita se o email da autoria ou o nome batem com o logado
+      const isMe = (normalEmail && rep.includes(normalEmail)) || rep.includes(normalName);
+
+      if (isMe) {
+        state[entry.item_key] = entry.is_checked;
+      }
+    });
+
+    return state;
+  }, [checklistEntries, reporterName, userEmail]);
+
   const totalItems = useMemo(() => CHECKLIST_DATA.reduce((acc, s) => acc + s.items.length, 0), []);
-  const checkedCount = Object.values(checklistState).filter(Boolean).length;
+  const checkedCount = Object.values(myChecklistState).filter(Boolean).length;
   const progress = totalItems ? Math.round((checkedCount / totalItems) * 100) : 0;
   const progressColor = progress >= 100 ? 'var(--success)' : progress >= 50 ? 'var(--warning)' : 'var(--primary)';
 
@@ -123,18 +151,27 @@ export default function ColaboradorScreen({
   };
 
   const getSectionProgress = (sectionId: string, len: number) => {
-    const checked = Array.from({ length: len }).filter((_, i) => checklistState[`${sectionId}-${i}`]).length;
+    const checked = Array.from({ length: len }).filter((_, i) => myChecklistState[`${sectionId}-${i}`]).length;
     return { checked, total: len, percent: len ? Math.round((checked / len) * 100) : 0 };
   };
 
   // ── Contagem de registros próprios para badge na tab ──────
   const myOccCount = useMemo(() => {
+    const normalEmail = userEmail?.trim().toLowerCase() ?? '';
+    const normalName  = reporterName.trim().toLowerCase();
+    
     return occurrences.filter(o => {
-      const rep = o.reporter.split(' - Auth:')[0].trim().toLowerCase();
-      const me = reporterName.trim().toLowerCase();
-      return rep.includes(me) || me.includes(rep);
+      const match = o.reporter.match(/ - Auth:\s*(.+)$/);
+      const embeddedEmail = match ? match[1].trim().toLowerCase() : null;
+      
+      if (embeddedEmail && normalEmail) {
+        return embeddedEmail === normalEmail;
+      }
+      
+      const label = o.reporter.split(' - Auth:')[0].split(' | Máquina:')[0].replace(/\s*\(.*?\)\s*$/, '').trim().toLowerCase();
+      return label === normalName;
     }).length;
-  }, [occurrences, reporterName]);
+  }, [occurrences, reporterName, userEmail]);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text)' }}>
@@ -272,7 +309,7 @@ export default function ColaboradorScreen({
                         <div style={{ padding: '0 var(--s3) var(--s3)', display: 'flex', flexDirection: 'column', gap: 'var(--s2)' }}>
                           {section.items.map((item, idx) => {
                             const itemKey = `${section.id}-${idx}`;
-                            const checked = checklistState[itemKey] || false;
+                            const checked = myChecklistState[itemKey] || false;
                             return (
                               <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 'var(--s3)', padding: 'var(--s3)', borderRadius: 'var(--r-lg)', background: checked ? 'var(--success-hl)' : 'var(--surface-2)', border: `1px solid ${checked ? 'rgba(22,163,74,0.18)' : 'var(--border)'}` }}>
                                 <label style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--s3)', flex: 1, cursor: 'pointer' }}>
@@ -312,7 +349,7 @@ export default function ColaboradorScreen({
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--s4) var(--s4) var(--s8)' }}>
           <MyRecordsView
             occurrences={occurrences}
-            checklistState={checklistState}
+            checklistState={myChecklistState}
             reporterName={reporterName}
             onUpdateOccurrence={onUpdateOccurrence}
             reporterEmail={userEmail}
