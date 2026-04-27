@@ -71,7 +71,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [errorMsg, setErrorMsg] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState(() => generatePassword());
   
-  // Estado modificado para guardar las contraseñas recién creadas/reseteadas
+  // Estado para guardar las contraseñas recién creadas/reseteadas
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
   
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
@@ -166,8 +166,19 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const functionUrl = 'https://aogzdxwruaqgiaprmvuz.supabase.co/functions/v1/create-user';
   const listUrl = 'https://aogzdxwruaqgiaprmvuz.supabase.co/functions/v1/list-users';
 
+  // FIX: Lógica mejorada de getToken para recuperar sesión si venimos de un bloqueo de huella dactilar
   const getToken = async () => {
-    const { data } = await supabase.auth.getSession();
+    let { data, error } = await supabase.auth.getSession();
+    
+    // Si no hay sesión o hubo un error al obtenerla, forzamos un refresh
+    if (error || !data.session) {
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshData.session) {
+        throw new Error('Sessão inválida. Faça login novamente.');
+      }
+      return refreshData.session.access_token;
+    }
+    
     const token = data.session?.access_token;
     if (!token) throw new Error('Sessão inválida. Faça login novamente.');
     return token;
@@ -212,6 +223,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
 
   const loadUsers = async () => {
     setLoadingUsers(true);
+    setErrorMsg(''); // Limpia posibles errores previos al recargar
     try {
       const token = await getToken();
       const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } });
@@ -225,6 +237,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
+  // Vuelve a cargar usuarios automáticamente si cambia la pestaña o componente se monta
   useEffect(() => { loadUsers(); }, []);
 
   const resetForm = () => {
