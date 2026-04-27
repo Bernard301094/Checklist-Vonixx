@@ -71,10 +71,10 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [errorMsg, setErrorMsg] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState(() => generatePassword());
   
-  // Estado para guardar las contraseñas recién creadas/reseteadas
+  // Estados para contraseñas y animaciones
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
-  // Estado para controlar la animación del botón de reset del usuario individual
   const [resettingId, setResettingId] = useState<string | null>(null);
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
   
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -191,7 +191,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setEditShift(user.shift || 'TURNO A');
   };
 
-  // 1. EDICIÓN OPTIMISTA: Actualiza localmente sin recargar toda la lista
+  // 1. EDICIÓN OPTIMISTA
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUser) return;
@@ -214,7 +214,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao atualizar usuário');
       
-      // Actualizamos directamente el estado local para reflejar los cambios instantáneamente
       setUsers(prevUsers => prevUsers.map(u => 
         u.id === editUser.id 
           ? { ...u, full_name: editFullName.trim(), role: editRole, shift: editShift } 
@@ -245,7 +244,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
-  // Cargar usuarios solo al entrar al panel por primera vez
   useEffect(() => { loadUsers(); }, []);
 
   const resetForm = () => {
@@ -257,7 +255,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setErrorMsg('');
   };
 
-  // 2. CREACIÓN OPTIMISTA: Inserta el nuevo usuario al instante en la pantalla
+  // 2. CREACIÓN OPTIMISTA
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -276,7 +274,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const newUserId = result.user_id;
       setNewPasswords(prev => ({ ...prev, [newUserId]: pwd }));
       
-      // Construimos el objeto del usuario nuevo para mostrarlo sin llamar a la base de datos
       const newUserLocal: ManagedUser = {
         id: newUserId,
         email: email.trim(),
@@ -289,7 +286,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         user_metadata: { force_password_change: true }
       };
 
-      // Lo agregamos de primero en la lista actual
       setUsers(prev => [newUserLocal, ...prev]);
       resetForm();
 
@@ -300,7 +296,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
-  // 3. RESETEO OPTIMISTA: Muestra la nueva contraseña solo en esa tarjeta
+  // 3. RESETEO OPTIMISTA
   const handleResetPassword = async (user: ManagedUser) => {
     setErrorMsg('');
     setResettingId(user.id);
@@ -320,10 +316,8 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao redefinir senha');
       
-      // Guarda la contraseña nueva para mostrarla
       setNewPasswords(prev => ({ ...prev, [user.id]: newPassword }));
       
-      // Actualiza localmente para forzar el badge amarillo de "Senha pendente"
       setUsers(prevUsers => 
         prevUsers.map(u => 
           u.id === user.id 
@@ -343,7 +337,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
-  // 4. ELIMINACIÓN OPTIMISTA: Quita la tarjeta de la vista sin recargar
+  // 4. ELIMINACIÓN OPTIMISTA
   const handleDeleteUser = async () => {
     if (!confirmDelete) return;
     setDeleting(true);
@@ -358,7 +352,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao excluir usuário');
       
-      // Eliminamos al usuario directamente del estado local
       setUsers(prevUsers => prevUsers.filter(u => u.id !== confirmDelete.id));
       setConfirmDelete(null);
     } catch (err: any) {
@@ -366,6 +359,15 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     } finally {
       setDeleting(false);
     }
+  };
+
+  // Función para copiar y animar el botón individual
+  const handleCopyUserPassword = (userId: string, password: string) => {
+    navigator.clipboard.writeText(password);
+    setCopiedUserId(userId);
+    setTimeout(() => {
+      setCopiedUserId(null);
+    }, 2000); // El botón vuelve a la normalidad después de 2 segundos
   };
 
   const StatusBadge = ({ user }: { user: ManagedUser }) => {
@@ -539,7 +541,10 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
               ) : users.length === 0 ? (
                 <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum usuário encontrado.</div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--s4)' }}>
+                {/* ¡NUEVO! alignItems: 'start' evita que las tarjetas se estiren 
+                  y cambien el tamaño de las otras tarjetas en la misma fila 
+                */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--s4)', alignItems: 'start' }}>
                   {users.map(user => {
                     const ini = user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
                     const isResetting = resettingId === user.id;
@@ -573,8 +578,32 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>Código de acesso:</span>
                               <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.1em' }}>{newPasswords[user.id]}</div>
                             </div>
-                            <button onClick={() => navigator.clipboard.writeText(newPasswords[user.id])} style={{ padding: '6px 12px', borderRadius: 'var(--r-md)', background: 'var(--primary)', color: '#fff', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
-                              Copiar
+                            
+                            {/* ¡NUEVO! Botón Copiar con animación de estado */}
+                            <button 
+                              onClick={() => handleCopyUserPassword(user.id, newPasswords[user.id])} 
+                              style={{ 
+                                padding: '6px 12px', 
+                                borderRadius: 'var(--r-md)', 
+                                background: copiedUserId === user.id ? 'var(--success)' : 'var(--primary)', 
+                                color: '#fff', 
+                                fontSize: 11, 
+                                fontWeight: 700, 
+                                border: 'none', 
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 4,
+                                transition: 'background 0.2s ease, transform 0.1s ease'
+                              }}
+                            >
+                              {copiedUserId === user.id ? (
+                                <span style={{ display: 'flex', alignItems: 'center', gap: 4, animation: 'scalePop 0.2s ease-out' }}>
+                                  <CheckCircle2 size={12} /> Copiado
+                                </span>
+                              ) : (
+                                'Copiar'
+                              )}
                             </button>
                           </div>
                         )}
@@ -788,6 +817,12 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         @keyframes popInCustom {
           0% { opacity: 0; transform: translateY(-10px) scale(0.95); }
           100% { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        
+        /* Animación simple de pop para el icono de check al copiar */
+        @keyframes scalePop {
+          0% { transform: scale(0.8); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
         }
       `}</style>
     </div>
