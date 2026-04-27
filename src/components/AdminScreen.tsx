@@ -71,10 +71,19 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [errorMsg, setErrorMsg] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState(() => generatePassword());
   
-  // Estados para contraseñas y animaciones
-  const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
+  // 1. PERSISTENCIA CONTRA F5: Cargar las contraseñas del sessionStorage inicial
+  const [newPasswords, setNewPasswords] = useState<Record<string, string>>(() => {
+    const saved = sessionStorage.getItem('vonixx_temp_passwords');
+    return saved ? JSON.parse(saved) : {};
+  });
+
+  // Guardar en sessionStorage cada vez que se genera o borra una contraseña
+  useEffect(() => {
+    sessionStorage.setItem('vonixx_temp_passwords', JSON.stringify(newPasswords));
+  }, [newPasswords]);
+
   const [resettingId, setResettingId] = useState<string | null>(null);
-  const [copiedUserId, setCopiedUserId] = useState<string | null>(null); // Estado para la animación de copiar
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null); 
   
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -84,7 +93,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [editShift, setEditShift] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
 
-  // --- Checklist Management State ---
   const [checklistTemplate, setChecklistTemplate] = useState<ChecklistSection[]>(() => {
     const saved = localStorage.getItem('checklist_template');
     return saved ? JSON.parse(saved) : CHECKLIST_DATA;
@@ -191,7 +199,35 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setEditShift(user.shift || 'TURNO A');
   };
 
-  // 1. EDICIÓN OPTIMISTA
+  // 2. ACTUALIZACIÓN AUTOMÁTICA SILENCIOSA
+  const loadUsers = async (isSilent = false) => {
+    if (!isSilent) setLoadingUsers(true);
+    if (!isSilent) setErrorMsg(''); 
+    try {
+      const token = await getToken();
+      const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erro ao carregar usuários');
+      setUsers(data.users as ManagedUser[]);
+    } catch (err: any) {
+      if (!isSilent) setErrorMsg('Erro ao carregar usuários: ' + err.message);
+    } finally {
+      if (!isSilent) setLoadingUsers(false);
+    }
+  };
+
+  useEffect(() => { 
+    // Carga inicial con pantalla de carga (spinner)
+    loadUsers(); 
+    
+    // Auto-polling silencioso cada 15 segundos para mantener actualizado sin que parpadee
+    const intervalId = setInterval(() => {
+      loadUsers(true);
+    }, 15000);
+    
+    return () => clearInterval(intervalId);
+  }, []);
+
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUser) return;
@@ -221,30 +257,13 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       ));
       
       setEditUser(null);
+      loadUsers(true); // Sincroniza silenciosamente en segundo plano
     } catch (err: any) {
       setErrorMsg('Erro na edição: ' + err.message);
     } finally {
       setSavingEdit(false);
     }
   };
-
-  const loadUsers = async () => {
-    setLoadingUsers(true);
-    setErrorMsg(''); 
-    try {
-      const token = await getToken();
-      const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao carregar usuários');
-      setUsers(data.users as ManagedUser[]);
-    } catch (err: any) {
-      setErrorMsg('Erro ao carregar usuários: ' + err.message);
-    } finally {
-      setLoadingUsers(false);
-    }
-  };
-
-  useEffect(() => { loadUsers(); }, []);
 
   const resetForm = () => {
     setEmail('');
@@ -255,7 +274,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setErrorMsg('');
   };
 
-  // 2. CREACIÓN OPTIMISTA
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -288,6 +306,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
 
       setUsers(prev => [newUserLocal, ...prev]);
       resetForm();
+      loadUsers(true); // Sincroniza silenciosamente en segundo plano
 
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
@@ -296,7 +315,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
-  // 3. RESETEO OPTIMISTA
   const handleResetPassword = async (user: ManagedUser) => {
     setErrorMsg('');
     setResettingId(user.id);
@@ -329,6 +347,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
             : u
         )
       );
+      loadUsers(true); // Sincroniza silenciosamente en segundo plano
 
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
@@ -337,7 +356,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
-  // 4. ELIMINACIÓN OPTIMISTA
   const handleDeleteUser = async () => {
     if (!confirmDelete) return;
     setDeleting(true);
@@ -354,6 +372,14 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       
       setUsers(prevUsers => prevUsers.filter(u => u.id !== confirmDelete.id));
       setConfirmDelete(null);
+      
+      // Borrar de sessionStorage por limpieza
+      setNewPasswords(prev => {
+        const copy = { ...prev };
+        delete copy[confirmDelete.id];
+        return copy;
+      });
+
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
     } finally {
@@ -361,13 +387,12 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
-  // Función para copiar y animar el botón
   const handleCopyUserPassword = (userId: string, password: string) => {
     navigator.clipboard.writeText(password);
     setCopiedUserId(userId);
     setTimeout(() => {
       setCopiedUserId(null);
-    }, 2000); // El botón vuelve a la normalidad después de 2 segundos
+    }, 2000); 
   };
 
   const StatusBadge = ({ user }: { user: ManagedUser }) => {
@@ -489,7 +514,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                 <UserPlus size={20} color="var(--primary)" />
                 <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Criar novo usuário</h2>
               </div>
-              {errorMsg && (
+              {errorMsg && !loadingUsers && (
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 'var(--s3)', padding: 'var(--s3) var(--s4)', borderRadius: 'var(--r-lg)', background: 'var(--danger-hl)', border: '1px solid rgba(220,38,38,0.2)', marginBottom: 'var(--s5)', fontSize: 'var(--text-sm)', fontWeight: 500, color: 'var(--danger)' }}>
                   <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
                   <span>{errorMsg}</span>
@@ -532,7 +557,8 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                 <div>
                   <h2 style={{ fontSize: 'var(--text-lg)', fontWeight: 700 }}>Usuários cadastrados</h2>
                 </div>
-                <button type="button" onClick={loadUsers} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
+                {/* Botón manual con retroalimentación visual si deciden darle click (con isSilent=false) */}
+                <button type="button" onClick={() => loadUsers(false)} className="btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: 'var(--s2)' }}>
                   <RefreshCcw size={15} /> Atualizar
                 </button>
               </div>
@@ -541,7 +567,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
               ) : users.length === 0 ? (
                 <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum usuário encontrado.</div>
               ) : (
-                {/* SOLUCIÓN: alignItems: 'start' previene que las tarjetas de los lados se estiren */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--s4)', alignItems: 'start' }}>
                   {users.map(user => {
                     const ini = user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
@@ -569,7 +594,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                           <StatusBadge user={user} />
                         </div>
 
-                        {/* Visualización con animación de la nueva contraseña y el botón Copiar animado */}
                         {newPasswords[user.id] && (
                           <div className="new-password-anim" style={{ marginTop: 'var(--s2)', padding: 'var(--s3)', borderRadius: 'var(--r-md)', background: 'rgba(13, 148, 136, 0.1)', border: '1px dashed var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div>
@@ -577,7 +601,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                               <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.1em' }}>{newPasswords[user.id]}</div>
                             </div>
                             
-                            {/* SOLUCIÓN: Botón Copiar con animación y cambio de estado */}
                             <button 
                               onClick={() => handleCopyUserPassword(user.id, newPasswords[user.id])} 
                               style={{ 
@@ -817,7 +840,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
         
-        /* SOLUCIÓN: Animación para el icono de check al copiar */
         @keyframes scalePop {
           0% { transform: scale(0.8); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
