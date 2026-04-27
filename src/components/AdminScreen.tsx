@@ -71,9 +71,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [errorMsg, setErrorMsg] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState(() => generatePassword());
   
-  // Estado para guardar las contraseñas recién creadas/reseteadas
+  // Estado para guardar as senhas recém criadas/resetadas
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
-  // Estado para controlar especificamente a animação do botão de reset do usuário
+  // Estado para controlar a animação do botão de reset do usuário individual
   const [resettingId, setResettingId] = useState<string | null>(null);
   
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
@@ -213,7 +213,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao atualizar usuário');
       setEditUser(null);
-      await loadUsers();
+      await loadUsers(); // A edição geral recarrega para garantir coerência de dados de nome/turno
     } catch (err: any) {
       setErrorMsg('Erro na edição: ' + err.message);
     } finally {
@@ -265,7 +265,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       
       setNewPasswords(prev => ({ ...prev, [result.user_id]: pwd }));
       resetForm();
-      await loadUsers();
+      await loadUsers(); // Atualiza a lista para o novo usuário aparecer
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
     } finally {
@@ -275,7 +275,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
 
   const handleResetPassword = async (user: ManagedUser) => {
     setErrorMsg('');
-    setResettingId(user.id); // Ativa apenas a animação deste usuário específico
+    setResettingId(user.id);
     
     const newPassword = generatePassword();
     try {
@@ -292,8 +292,23 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao redefinir senha');
       
+      // Salva a nova senha para exibi-la apenas no card desse usuário
       setNewPasswords(prev => ({ ...prev, [user.id]: newPassword }));
-      await loadUsers();
+      
+      // Atualiza o estado do usuário localmente para exibir o badge "Senha Pendente"
+      // SEM precisar recarregar todos os usuários do banco (evita piscar a tela inteira)
+      setUsers(prevUsers => 
+        prevUsers.map(u => 
+          u.id === user.id 
+            ? { 
+                ...u, 
+                force_password_change: true,
+                user_metadata: { ...(u.user_metadata || {}), force_password_change: true }
+              } 
+            : u
+        )
+      );
+
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
     } finally {
@@ -314,8 +329,10 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao excluir usuário');
+      
+      // Atualiza localmente removendo da lista, evitando chamar loadUsers()
+      setUsers(prevUsers => prevUsers.filter(u => u.email !== confirmDelete.email));
       setConfirmDelete(null);
-      await loadUsers();
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
     } finally {
@@ -539,7 +556,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                             Acesso: {formatDate(user.last_sign_in_at)}
                           </div>
                           
-                          {/* Botão de reset com animação */}
+                          {/* Botão de reset otimizado (não recarrega a lista toda) */}
                           <button 
                             onClick={() => handleResetPassword(user)} 
                             disabled={isResetting}
@@ -728,7 +745,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
           }
         }
         
-        /* Animações novas para o reset de senha */
         .spin-anim {
           animation: spinCustom 1s linear infinite;
         }
