@@ -422,10 +422,11 @@ export default function App() {
     <ColaboradorScreen
       onLogout={handleLogout}
       checklistState={checklistState}
+      checklistEntries={checklistEntries}
       onCheck={handleCheck}
       onSaveOccurrence={handleAddOccurrence}
       onUpdateOccurrence={handleUpdateOccurrence}
-      onSaveSession={handleSaveSession}
+      onSaveSession={handleSaveSession as any}
       occurrences={occurrences}
       userEmail={currentUser?.email || ''}
       reporterName={reporterName}
