@@ -15,15 +15,22 @@ interface DashboardViewProps {
 
 /* --- Helpers --- */
 function reporterLabel(raw: string): string {
+  if (!raw) return '';
   return raw.split(' - Auth:')[0].split(' | Máquina:')[0].split(' | maquina:')[0].trim();
 }
 
 function machineLabel(raw: string): string {
+  if (!raw) return '';
+  const upper = raw.toUpperCase();
+  if (upper.includes('ROMI 02') || upper.includes('ROMI 2') || upper.includes('ROMI2')) return 'ROMI 02';
+  if (upper.includes('ROMI 01') || upper.includes('ROMI 1') || upper.includes('ROMI1')) return 'ROMI 01';
+  
   const m = raw.split(' - Auth:')[0].match(/\|\s*[Mm]á?quina:\s*(.+)$/);
   return m ? m[1].trim() : '';
 }
 
 function initials(name: string): string {
+  if (!name) return '??';
   return name.split(/[\s@._-]+/).filter(Boolean).map(p => p[0]?.toUpperCase()).slice(0, 2).join('');
 }
 
@@ -43,6 +50,7 @@ function todayISO(): string {
 }
 
 function isoDateKey(iso: string): string {
+  if (!iso) return '';
   return new Date(iso).toISOString().split('T')[0];
 }
 
@@ -116,7 +124,7 @@ function CollaboratorCard({ reporter, occs, onOpenPhoto }: { reporter: string; o
   const [open, setOpen] = useState(false);
   const machineGroups = useMemo(() => {
     const map: Record<string, OccurrenceData[]> = {};
-    occs.forEach(o => { const m = machineLabel(o.reporter); if (!map[m]) map[m] = []; map[m].push(o); });
+    occs.forEach(o => { const m = machineLabel(o.reporter) || 'MÁQUINA NÃO IDENTIFICADA'; if (!map[m]) map[m] = []; map[m].push(o); });
     return Object.entries(map);
   }, [occs]);
   return (
@@ -178,6 +186,7 @@ function MachineBadge({ machine }: { machine: string }) {
   const bg = isRomi1 ? '#eff6ff' : '#f5f3ff';
   const color = isRomi1 ? '#2563eb' : '#7c3aed';
   const border = isRomi1 ? '#bfdbfe' : '#ddd6fe';
+  
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 3,
@@ -249,8 +258,10 @@ function ConformSectionCard({ section }: { section: ConformSectionData }) {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', lineHeight: 1.4 }}>{item.itemText}</div>
+                
                 <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 }}>
                   {item.machine && <MachineBadge machine={item.machine} />}
+                  
                   {(item.reporter || item.time) && (
                     <span style={{ fontSize: 11, color: '#64748b', display: 'flex', alignItems: 'center', gap: 4 }}>
                       <User size={10} /> {item.reporter || 'Colaborador não identificado'}
@@ -271,7 +282,6 @@ function ConformSectionCard({ section }: { section: ConformSectionData }) {
    CONFORMIDADES — grupos por categoría
    ====================================================== */
 
-// Agrupación de secciones del checklist en categorías
 const SECTION_GROUPS: { label: string; sectionIds: string[] }[] = [
   { label: 'Periféricos e Esteiras',         sectionIds: ['perifericos', 'esteiras'] },
   { label: 'Moinho e Componentes',           sectionIds: ['moinho', 'componentes'] },
@@ -279,14 +289,7 @@ const SECTION_GROUPS: { label: string; sectionIds: string[] }[] = [
   { label: 'Parâmetros e Documentação',      sectionIds: ['parametros', 'documentacao'] },
 ];
 
-/** Grupo colapsable con pill divisor — igual estilo que el divisor de fecha en Alertas */
-function ConformCategoryGroup({
-  groupLabel,
-  sections,
-}: {
-  groupLabel: string;
-  sections: ConformSectionData[];
-}) {
+function ConformCategoryGroup({ groupLabel, sections }: { groupLabel: string; sections: ConformSectionData[]; }) {
   const [open, setOpen] = useState(true);
   const totalItems  = sections.reduce((a, s) => a + s.totalCount,   0);
   const checkedItms = sections.reduce((a, s) => a + s.checkedCount, 0);
@@ -295,7 +298,6 @@ function ConformCategoryGroup({
 
   return (
     <div style={{ marginBottom: '20px' }}>
-      {/* Pill divisor — idéntico al de Alertas pero con ícono Layers */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: open ? '12px' : 0 }}>
         <button
           type="button"
@@ -334,8 +336,8 @@ function ConformCategoryGroup({
    ====================================================== */
 
 export default function DashboardView({
-  occurrences,
-  checklistState,
+  occurrences = [],
+  checklistState = {},
   checklistEntries = [],
   checklistSessions = [],
 }: DashboardViewProps) {
@@ -349,6 +351,74 @@ export default function DashboardView({
     checklistEntries.forEach(e => { if (e.item_key) map[e.item_key] = e; });
     return map;
   }, [checklistEntries]);
+
+
+  /* ===================================================================
+     MAPAS DE EXTRACCIÓN DE MÁQUINAS (SÚPER ROBUSTOS)
+     =================================================================== */
+
+  // 1. Mapa de Ocurrencias: Si un ítem tuvo alerta en la ROMI 02, lo recordamos.
+  const occurrenceMachineMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    occurrences.forEach(o => {
+      const mach = machineLabel(o.reporter);
+      if (mach && o.item) map[o.item.trim()] = mach;
+    });
+    return map;
+  }, [occurrences]);
+
+  // 2. Mapa de Sesiones: Extrae la máquina por CADA ítem analizando objetos y arrays
+  const sessionMachineMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    if (!checklistSessions || checklistSessions.length === 0) return map;
+    
+    const sorted = [...checklistSessions].sort((a, b) => new Date(a.submitted_at).getTime() - new Date(b.submitted_at).getTime());
+    
+    sorted.forEach(session => {
+      const mach = session.machine || machineLabel(session.reporter || '');
+      if (!mach) return;
+
+      let parsed: any = null;
+      if (typeof session.items === 'string') {
+        try { parsed = JSON.parse(session.items); } catch(e) {}
+      } else {
+        parsed = session.items;
+      }
+
+      if (parsed) {
+        if (Array.isArray(parsed)) {
+          // Si está guardado como Array
+          parsed.forEach((item: any) => {
+            const k = item.key || item.item_key || item.id;
+            if (k) map[k] = mach;
+          });
+        } else if (typeof parsed === 'object') {
+          // Si está guardado como un Record / Objeto ({"perifericos-0": true})
+          Object.keys(parsed).forEach(k => {
+            map[k] = mach;
+          });
+        }
+      }
+    });
+    return map;
+  }, [checklistSessions]);
+
+  // 3. Mapa Global: Última máquina usada por un colaborador en específico
+  const globalMachineMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    occurrences.forEach(o => {
+      const rep = reporterLabel(o.reporter);
+      const mach = machineLabel(o.reporter);
+      if (rep && mach) map[rep] = mach;
+    });
+    checklistSessions?.forEach(session => {
+      const rep = reporterLabel(session.reporter || '');
+      const mach = session.machine || machineLabel(session.reporter || '');
+      if (rep && mach) map[rep] = mach;
+    });
+    return map;
+  }, [occurrences, checklistSessions]);
+
 
   /* ---- Alertas agrupadas por fecha → colaborador ---- */
   const occurrencesByDate = useMemo(() => {
@@ -388,7 +458,6 @@ export default function DashboardView({
     const days = Array.from(daySet).sort((a, b) => b.localeCompare(a));
 
     return days.map(day => {
-      // Para este día, construir todas las secciones del checklist
       const allSections: ConformSectionData[] = CHECKLIST_DATA.map((sec, sIdx) => {
         const items: ConformItem[] = sec.items.map((itemText, iIdx) => {
           const key = `${sec.id}-${iIdx}`;
@@ -398,12 +467,21 @@ export default function DashboardView({
             : '';
           const belongsToDay = entryDateKey === day || (!entryDateKey && day === todayISO());
           const checked      = belongsToDay ? (checklistState[key] === true) : false;
+          
           const rawReporter  = belongsToDay && entry?.reporter ? entry.reporter : '';
           const reporter     = rawReporter ? reporterLabel(rawReporter) : '';
-          const machine      = rawReporter ? machineLabel(rawReporter) : '';
+          
+          // ESTRATEGIA EN CASCADA PARA ENCONTRAR LA MÁQUINA
+          let machine = machineLabel(rawReporter); // 1. Del entry directo
+          if (!machine) machine = sessionMachineMap[key]; // 2. De las sesiones guardadas (soporta Arrays y Objetos)
+          if (!machine) machine = occurrenceMachineMap[itemText.trim()]; // 3. De las alertas reportadas de ese mismo ítem
+          if (!machine && reporter) machine = globalMachineMap[reporter]; // 4. Del perfil histórico del usuario
+          if (!machine) machine = 'ROMI 01 / ROMI 02'; // 5. Fallback final
+
           const timeStr      = belongsToDay && (entry?.updated_at || entry?.checked_at)
             ? formatTime(entry.updated_at || entry.checked_at || '')
             : '';
+
           return { key, itemText, checked, reporter, machine, time: timeStr };
         });
         return {
@@ -416,17 +494,14 @@ export default function DashboardView({
         };
       });
 
-      // Agrupar secciones según SECTION_GROUPS
       const groups = SECTION_GROUPS.map(group => {
-        const sections = allSections.filter(s =>
-          group.sectionIds.includes(s.sectionId)
-        );
+        const sections = allSections.filter(s => group.sectionIds.includes(s.sectionId));
         return { label: group.label, sections };
       }).filter(g => g.sections.length > 0);
 
       return { date: day, groups };
     });
-  }, [checklistEntries, checklistState, entryMap]);
+  }, [checklistEntries, checklistState, entryMap, sessionMachineMap, occurrenceMachineMap, globalMachineMap]);
 
   /* ---- Estadísticas generales ---- */
   const totalItems  = useMemo(() => CHECKLIST_DATA.reduce((a, s) => a + s.items.length, 0), []);
@@ -535,15 +610,12 @@ export default function DashboardView({
           ) : (
             conformByDay.map(({ date, groups }) => (
               <div key={date} style={{ marginBottom: '28px' }}>
-                {/* Divisor de fecha igual que en Alertas */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', borderRadius: '999px', background: '#e2e8f0', color: '#475569', fontSize: '12px', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', flexShrink: 0 }}>
                     <Calendar size={13} /> {formatDateLabel(date)}
                   </div>
                   <div style={{ flex: 1, height: 1, background: '#e2e8f0' }} />
                 </div>
-
-                {/* Categorías */}
                 {groups.map(group => (
                   <ConformCategoryGroup
                     key={group.label}
