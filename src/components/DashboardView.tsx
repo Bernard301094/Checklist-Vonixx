@@ -49,7 +49,15 @@ function dateLabel(dk: string) {
 }
 function reporterLabel(raw: string): string {
   if (!raw) return 'Desconhecido';
-  return raw.split(' - Auth:')[0].split(' | Máquina:')[0].split(' | maquina:')[0].trim();
+  let label = raw.split(' - Auth:')[0].split(' | Máquina:')[0].split(' | maquina:')[0].trim();
+  // Remove o turno (ex: "(TURNO A)") para agrupar corretamente
+  label = label.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  return label;
+}
+function extractShift(raw: string): string {
+  if (!raw) return '';
+  const match = raw.match(/\(([^)]+)\)/);
+  return match ? match[1].trim() : '';
 }
 function machineLabel(raw: string): string {
   if (!raw) return '';
@@ -92,7 +100,21 @@ export default function DashboardView({
   const [searchTerm, setSearchTerm] = useState('');
   const [lightbox, setLightbox] = useState<{photos:string[];index:number}|null>(null);
 
-  /* ================== MAPAS DE EXTRACCIÓN (MÁQUINAS) ================== */
+  /* ================== MAPAS DE EXTRACCIÓN (MÁQUINAS E TURNOS) ================== */
+  const globalShiftMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    occurrences.forEach(o => {
+      const rep = reporterLabel(o.reporter);
+      const shift = extractShift(o.reporter);
+      if (rep && shift) map[rep] = shift;
+    });
+    checklistSessions?.forEach(session => {
+      const rep = reporterLabel(session.reporter || '');
+      if (rep && session.shift) map[rep] = session.shift;
+    });
+    return map;
+  }, [occurrences, checklistSessions]);
+
   const occurrenceMachineMap = useMemo(() => {
     const map: Record<string, string> = {};
     occurrences.forEach(o => {
@@ -143,7 +165,6 @@ export default function DashboardView({
 
   /* ================== DADOS DE CONFORMIDADES ================== */
   const conformByDate = useMemo(() => {
-    // Agrupa: Data -> Operador -> Máquina -> Set de items marcados
     const dateMap: Record<string, Record<string, Record<string, Set<string>>>> = {};
     
     checklistEntries.forEach(entry => {
@@ -154,7 +175,6 @@ export default function DashboardView({
       let mach = machineLabel(entry.reporter || '');
       let actualKey = entry.item_key;
       
-      // ALGORITMO INTELIGENTE: Separa la máquina de la key
       if (entry.item_key && entry.item_key.includes('#')) {
          const parts = entry.item_key.split('#');
          mach = parts[0];
@@ -204,12 +224,12 @@ export default function DashboardView({
           const totalChecked = machines.reduce((sum, m) => sum + m.checked, 0);
           const pct = Math.round((totalChecked / totalMachineItems) * 100) || 0;
 
-          return { name: repName, machines, checked: totalChecked, total: totalMachineItems, pct };
+          return { name: repName, shift: globalShiftMap[repName] || 'Turno N/A', machines, checked: totalChecked, total: totalMachineItems, pct };
         }).sort((a,b) => b.pct - a.pct);
 
         return { date, reporters };
       });
-  }, [checklistEntries, totalItems, sessionMachineMap, occurrenceMachineMap, globalMachineMap]);
+  }, [checklistEntries, totalItems, sessionMachineMap, occurrenceMachineMap, globalMachineMap, globalShiftMap]);
 
 
   /* ================== CÁLCULOS KPI SEGUROS ================== */
@@ -370,7 +390,7 @@ export default function DashboardView({
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                     {reporters.map(([reporter, repOccs]) => (
-                      <CollaboratorAccordion key={reporter} reporter={reporter} occs={repOccs} onOpenPhoto={(p, i) => setLightbox({ photos: p, index: i })} />
+                      <CollaboratorAccordion key={reporter} reporter={reporter} shift={globalShiftMap[reporter] || 'Turno N/A'} occs={repOccs} onOpenPhoto={(p, i) => setLightbox({ photos: p, index: i })} />
                     ))}
                   </div>
                 </div>
@@ -380,7 +400,7 @@ export default function DashboardView({
         </div>
       )}
 
-      {/* ─ Conformidades (DETALHE POR MÁQUINA) ─────────────────────── */}
+      {/* ─ Conformidades ─────────────────────── */}
       {tab === 'conformidades' && (
         <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
           {conformByDate.length === 0 || (conformByDate.length === 1 && conformByDate[0].reporters.length === 0) ? (
@@ -418,18 +438,25 @@ export default function DashboardView({
    Sub-Componentes
    ====================================================== */
 
-function CollaboratorAccordion({ reporter, occs, onOpenPhoto }: { reporter: string; occs: OccurrenceData[]; onOpenPhoto: (photos: string[], index: number) => void }) {
+function CollaboratorAccordion({ reporter, shift, occs, onOpenPhoto }: { reporter: string; shift: string; occs: OccurrenceData[]; onOpenPhoto: (photos: string[], index: number) => void }) {
   const [open, setOpen] = useState(false);
   const color = avatarColor(reporter);
 
   return (
     <div className="card animate-in" style={{ padding: '16px', background: open ? 'var(--surface-2)' : 'var(--surface)', border: open ? '1px solid var(--primary)' : '1px solid var(--border)', transition: 'all 0.2s' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => setOpen(!open)}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ width: 44, height: 44, borderRadius: '12px', background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, boxShadow: `0 4px 12px ${color}40` }}>{initials(reporter)}</div>
-          <div>
-            <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--font-display)' }}>{reporter}</div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: 4 }}><span style={{ fontSize: '11px', fontWeight: 800, background: 'var(--warning-hl)', color: 'var(--warning)', padding: '2px 8px', borderRadius: '6px' }}>{occs.length} Alertas</span></div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
+          <div style={{ width: 44, height: 44, borderRadius: '12px', background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 900, boxShadow: `0 4px 12px ${color}40`, flexShrink: 0 }}>{initials(reporter)}</div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: '15px', fontWeight: 800, color: 'var(--text)', fontFamily: 'var(--font-display)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{reporter}</div>
+              {shift && (
+                <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(37,99,235,0.1)', color: '#2563eb', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Clock size={10} /> {shift}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: '8px', marginTop: 6 }}><span style={{ fontSize: '11px', fontWeight: 800, background: 'var(--warning-hl)', color: 'var(--warning)', padding: '2px 8px', borderRadius: '6px' }}>{occs.length} Alertas</span></div>
           </div>
         </div>
         <div style={{ color: 'var(--text-muted)', padding: '6px', borderRadius: '8px', background: 'var(--surface-2)' }}>{open ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</div>
@@ -476,8 +503,15 @@ function ConformityCollaboratorAccordion({ rep }: { rep: any }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1, minWidth: 0 }}>
           <div style={{ width: 48, height: 48, borderRadius: '50%', background: color, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, boxShadow: `0 4px 12px ${color}44`, flexShrink: 0 }}>{initials(rep.name)}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rep.name}</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rep.name}</div>
+              {rep.shift && (
+                <span style={{ fontSize: 10, fontWeight: 800, background: 'rgba(37,99,235,0.1)', color: '#2563eb', padding: '2px 6px', borderRadius: 4, textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Clock size={10} /> {rep.shift}
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
               <div style={{ flex: 1, height: 6, background: 'var(--divider)', borderRadius: 99, overflow: 'hidden', maxWidth: 180 }}>
                 <div style={{ height: '100%', width: `${rep.pct}%`, background: rep.pct === 100 ? 'var(--success)' : 'var(--primary)', transition: 'width 0.5s ease' }} />
               </div>
