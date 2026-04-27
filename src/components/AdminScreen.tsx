@@ -74,7 +74,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   // Estados para contraseñas y animaciones
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
   const [resettingId, setResettingId] = useState<string | null>(null);
-  const [copiedUserId, setCopiedUserId] = useState<string | null>(null);
+  const [copiedUserId, setCopiedUserId] = useState<string | null>(null); // Estado para la animación de copiar
   
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -361,7 +361,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
-  // Función para copiar y animar el botón individual
+  // Función para copiar y animar el botón
   const handleCopyUserPassword = (userId: string, password: string) => {
     navigator.clipboard.writeText(password);
     setCopiedUserId(userId);
@@ -541,9 +541,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
               ) : users.length === 0 ? (
                 <div style={{ padding: 'var(--s8)', textAlign: 'center', color: 'var(--text-muted)' }}>Nenhum usuário encontrado.</div>
               ) : (
-                {/* ¡NUEVO! alignItems: 'start' evita que las tarjetas se estiren 
-                  y cambien el tamaño de las otras tarjetas en la misma fila 
-                */}
+                {/* SOLUCIÓN: alignItems: 'start' previene que las tarjetas de los lados se estiren */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--s4)', alignItems: 'start' }}>
                   {users.map(user => {
                     const ini = user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
@@ -571,7 +569,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                           <StatusBadge user={user} />
                         </div>
 
-                        {/* Visualização com animação da nova senha */}
+                        {/* Visualización con animación de la nueva contraseña y el botón Copiar animado */}
                         {newPasswords[user.id] && (
                           <div className="new-password-anim" style={{ marginTop: 'var(--s2)', padding: 'var(--s3)', borderRadius: 'var(--r-md)', background: 'rgba(13, 148, 136, 0.1)', border: '1px dashed var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div>
@@ -579,7 +577,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                               <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.1em' }}>{newPasswords[user.id]}</div>
                             </div>
                             
-                            {/* ¡NUEVO! Botón Copiar con animación de estado */}
+                            {/* SOLUCIÓN: Botón Copiar con animación y cambio de estado */}
                             <button 
                               onClick={() => handleCopyUserPassword(user.id, newPasswords[user.id])} 
                               style={{ 
@@ -819,7 +817,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
         
-        /* Animación simple de pop para el icono de check al copiar */
+        /* SOLUCIÓN: Animación para el icono de check al copiar */
         @keyframes scalePop {
           0% { transform: scale(0.8); opacity: 0; }
           100% { transform: scale(1); opacity: 1; }
