@@ -70,7 +70,10 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [users, setUsers] = useState<ManagedUser[]>([]);
   const [errorMsg, setErrorMsg] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState(() => generatePassword());
-  const [visiblePasswords, setVisiblePasswords] = useState<Record<string, boolean>>({});
+  
+  // Estado modificado para guardar las contraseñas recién creadas/reseteadas
+  const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
+  
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [editUser, setEditUser] = useState<ManagedUser | null>(null);
@@ -233,10 +236,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setErrorMsg('');
   };
 
-  const togglePasswordVisible = (userId: string) => {
-    setVisiblePasswords(prev => ({ ...prev, [userId]: !prev[userId] }));
-  };
-
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -251,7 +250,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao criar usuário');
-      setVisiblePasswords(prev => ({ ...prev, [result.user_id]: true }));
+      
+      // Guarda la contraseña generada para mostrarla en la lista
+      setNewPasswords(prev => ({ ...prev, [result.user_id]: pwd }));
       resetForm();
       await loadUsers();
     } catch (err: any) {
@@ -278,7 +279,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao redefinir senha');
-      setVisiblePasswords(prev => ({ ...prev, [user.id]: true }));
+      
+      // Guarda la nueva contraseña para mostrarla en la lista
+      setNewPasswords(prev => ({ ...prev, [user.id]: newPassword }));
       await loadUsers();
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
@@ -484,7 +487,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
               ) : (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--s4)' }}>
                   {users.map(user => {
-                    const pwdVisible = visiblePasswords[user.id];
                     const ini = user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
                     return (
                       <div key={user.id} className="card card-hover animate-in" style={{ padding: 'var(--s5)', display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
@@ -507,6 +509,19 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                           <span className="badge" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>{user.shift || 'Sem turno'}</span>
                           <StatusBadge user={user} />
                         </div>
+
+                        {/* Visualización del código de acceso generado */}
+                        {newPasswords[user.id] && (
+                          <div style={{ marginTop: 'var(--s2)', padding: 'var(--s3)', borderRadius: 'var(--r-md)', background: 'rgba(13, 148, 136, 0.1)', border: '1px dashed var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                            <div>
+                              <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>Código de acesso:</span>
+                              <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.1em' }}>{newPasswords[user.id]}</div>
+                            </div>
+                            <button onClick={() => navigator.clipboard.writeText(newPasswords[user.id])} style={{ padding: '6px 12px', borderRadius: 'var(--r-md)', background: 'var(--primary)', color: '#fff', fontSize: 11, fontWeight: 700, border: 'none', cursor: 'pointer' }}>
+                              Copiar
+                            </button>
+                          </div>
+                        )}
 
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'var(--s1)', paddingTop: 'var(--s3)', borderTop: '1px solid var(--divider)' }}>
                           <div style={{ fontSize: 10, color: 'var(--text-faint)', fontWeight: 600 }}>
