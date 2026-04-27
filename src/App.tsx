@@ -25,29 +25,36 @@ const OCCURRENCES_TABLE = 'occurrences';
 const CHECKLISTS_TABLE = 'checklists';
 const SESSIONS_TABLE = 'checklist_sessions';
 
-const fetchRoleFromDB = async (userId: string): Promise<'admin' | 'supervisor' | 'colaborador'> => {
+// Modificado para recibir todo el objeto "user" en lugar de solo "userId"
+const fetchRoleFromDB = async (user: any): Promise<'admin' | 'supervisor' | 'colaborador'> => {
   try {
     const result = await Promise.race([
-      supabase.from('profiles').select('role').eq('id', userId).single(),
+      supabase.from('profiles').select('role').eq('id', user.id).single(),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('timeout')), 5000)
       ),
     ]) as { data: any; error: any };
 
-    if (result.error || !result.data) {
-      console.warn('Perfil não encontrado ou timeout, usando role padrão: colaborador');
-      return 'colaborador';
+    if (!result.error && result.data) {
+      const dbRole = result.data.role;
+      if (dbRole === 'admin' || dbRole === 'supervisor' || dbRole === 'colaborador') {
+        return dbRole;
+      }
+    } else {
+      console.warn('Erro ao ler profile da DB:', result.error?.message);
     }
-
-    return result.data.role === 'admin'
-      ? 'admin'
-      : result.data.role === 'supervisor'
-        ? 'supervisor'
-        : 'colaborador';
   } catch (err) {
-    console.warn('Erro ao buscar role, usando padrão: colaborador', err);
-    return 'colaborador';
+    console.warn('Timeout ou erro de rede ao buscar role no BD:', err);
   }
+
+  // Fallback inteligente: si la consulta a DB falla (común al presionar F5), intenta leer del metadata de la sesión
+  const metaRole = user?.user_metadata?.role || user?.app_metadata?.role;
+  if (metaRole === 'admin' || metaRole === 'supervisor' || metaRole === 'colaborador') {
+    return metaRole;
+  }
+
+  console.warn('Perfil não encontrado, usando role padrão: colaborador');
+  return 'colaborador';
 };
 
 export default function App() {
@@ -179,7 +186,8 @@ export default function App() {
     const isMobile = window.innerWidth < 1024;
     if (isBioEnabled && isMobile) setIsLocked(true);
 
-    const dbRole = await fetchRoleFromDB(user.id);
+    // Llamamos la función enviando todo el objeto de usuario para poder usar el fallback
+    const dbRole = await fetchRoleFromDB(user);
     setRole(dbRole);
 
     if (user.user_metadata?.name) setReporterName(user.user_metadata.name);
