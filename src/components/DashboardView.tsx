@@ -75,9 +75,7 @@ function Lightbox({photos,index,onClose}:{photos:string[];index:number;onClose:(
     <div style={{position:'fixed',inset:0,background:'rgba(2,6,23,0.95)',backdropFilter:'blur(10px)',display:'flex',alignItems:'center',justifyContent:'center',zIndex:9000,padding:16}} onClick={onClose}>
       <div style={{position:'relative', maxWidth:'90vw', maxHeight:'90vh'}} onClick={e=>e.stopPropagation()}>
         <img src={photos[index]} alt={`Foto ${index+1}`} style={{maxWidth:'100%',maxHeight:'85vh',objectFit:'contain',borderRadius:16,boxShadow:'0 32px 80px rgba(0,0,0,0.8)', border: '1px solid rgba(255,255,255,0.1)'}}/>
-        <button onClick={onClose} style={{position:'absolute',top:-16,right:-16,width:40,height:40,borderRadius:'50%',background:'#fff',color:'#0f172a',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 4px 12px rgba(0,0,0,0.3)'}}>
-          <X size={20}/>
-        </button>
+        <button onClick={onClose} style={{position:'absolute',top:-16,right:-16,width:40,height:40,borderRadius:'50%',background:'#fff',color:'#0f172a',border:'none',display:'flex',alignItems:'center',justifyContent:'center',cursor:'pointer',boxShadow:'0 4px 12px rgba(0,0,0,0.3)'}}><X size={20}/></button>
       </div>
     </div>
   );
@@ -129,12 +127,9 @@ export default function DashboardView({
   }, [occurrences, checklistSessions]);
 
 
-  /* ================== MÉTRICAS GLOBAIS ================== */
+  const totalItems = useMemo(() => CHECKLIST_DATA.reduce((a, s) => a + s.items.length, 0), []);
   const today = todayKey();
   const todayOccs = useMemo(() => occurrences.filter(o => toLocalDateKey(o.created_at) === today), [occurrences, today]);
-  const totalItems = useMemo(() => CHECKLIST_DATA.reduce((a, s) => a + s.items.length, 0), []);
-  const checkedItems = useMemo(() => Object.values(checklistState).filter(Boolean).length, [checklistState]);
-  const conformPct = totalItems > 0 ? Math.round((checkedItems / totalItems) * 100) : 0;
   const uniqueOps = useMemo(() => new Set(occurrences.map(o => reporterLabel(o.reporter))).size, [occurrences]);
 
   const weekData = useMemo(() => {
@@ -145,28 +140,6 @@ export default function DashboardView({
       return {day:days[d.getDay()],occs:occurrences.filter(o=>toLocalDateKey(o.created_at)===dk).length};
     });
   }, [occurrences]);
-
-  /* ================== DADOS DE ALERTAS ================== */
-  const occurrencesByDate = useMemo(() => {
-    const filtered = occurrences.filter(o =>
-      !searchTerm ||
-      o.section.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      o.item.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      reporterLabel(o.reporter).toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    const dateMap: Record<string, Record<string, OccurrenceData[]>> = {};
-    filtered.forEach(o => {
-      const dKey = toLocalDateKey(o.created_at);
-      if (!dateMap[dKey]) dateMap[dKey] = {};
-      const rep = reporterLabel(o.reporter);
-      if (!dateMap[dKey][rep]) dateMap[dKey][rep] = [];
-      dateMap[dKey][rep].push(o);
-    });
-    return Object.entries(dateMap).sort(([a], [b]) => b.localeCompare(a)).map(([date, reporters]) => ({
-        date, reporters: Object.entries(reporters).sort((a,b)=>b[1].length - a[1].length),
-    }));
-  }, [occurrences, searchTerm]);
-
 
   /* ================== DADOS DE CONFORMIDADES ================== */
   const conformByDate = useMemo(() => {
@@ -179,18 +152,27 @@ export default function DashboardView({
       if (!rep) return;
       
       let mach = machineLabel(entry.reporter || '');
-      if (!mach) mach = sessionMachineMap[entry.item_key] || occurrenceMachineMap[entry.item_key] || globalMachineMap[rep] || 'MÁQUINA NÃO IDENTIFICADA';
+      let actualKey = entry.item_key;
+      
+      // ALGORITMO INTELIGENTE: Separa la máquina de la key
+      if (entry.item_key && entry.item_key.includes('#')) {
+         const parts = entry.item_key.split('#');
+         mach = parts[0];
+         actualKey = parts[1];
+      }
+      
+      if (!mach) mach = sessionMachineMap[actualKey] || occurrenceMachineMap[actualKey] || globalMachineMap[rep] || 'MÁQUINA NÃO IDENTIFICADA';
       
       if (!dateMap[dKey]) dateMap[dKey] = {};
       if (!dateMap[dKey][rep]) dateMap[dKey][rep] = {};
       if (!dateMap[dKey][rep][mach]) dateMap[dKey][rep][mach] = new Set();
       
       if (entry.is_checked) {
-        dateMap[dKey][rep][mach].add(entry.item_key);
+        dateMap[dKey][rep][mach].add(actualKey);
       }
     });
 
-    if (Object.keys(dateMap).length === 0) dateMap[todayKey()] = {}; // Estado vazio
+    if (Object.keys(dateMap).length === 0) dateMap[todayKey()] = {}; 
 
     return Object.entries(dateMap)
       .sort(([a], [b]) => b.localeCompare(a))
@@ -218,7 +200,6 @@ export default function DashboardView({
             return { name: machName, checked, total: totalItems, pct: Math.round((checked/totalItems)*100), groups };
           });
 
-          // Multiplica o total de itens base pelo número de máquinas que o operador operou
           const totalMachineItems = totalItems * Math.max(machines.length, 1);
           const totalChecked = machines.reduce((sum, m) => sum + m.checked, 0);
           const pct = Math.round((totalChecked / totalMachineItems) * 100) || 0;
@@ -229,6 +210,46 @@ export default function DashboardView({
         return { date, reporters };
       });
   }, [checklistEntries, totalItems, sessionMachineMap, occurrenceMachineMap, globalMachineMap]);
+
+
+  /* ================== CÁLCULOS KPI SEGUROS ================== */
+  const { checkedItems, totalExpected, conformPct } = useMemo(() => {
+     if (!conformByDate || conformByDate.length === 0) return { checkedItems: 0, totalExpected: totalItems, conformPct: 0 };
+     const todayData = conformByDate.find(d => d.date === todayKey());
+     if (!todayData || todayData.reporters.length === 0) return { checkedItems: 0, totalExpected: totalItems, conformPct: 0 };
+     
+     let totalChecked = 0;
+     let totalMax = 0;
+     todayData.reporters.forEach(rep => {
+        totalChecked += rep.checked;
+        totalMax += rep.total;
+     });
+     return {
+        checkedItems: totalChecked,
+        totalExpected: totalMax || totalItems,
+        conformPct: totalMax > 0 ? Math.round((totalChecked / totalMax) * 100) : 0
+     };
+  }, [conformByDate, totalItems]);
+
+
+  /* ================== DADOS DE ALERTAS ================== */
+  const occurrencesByDate = useMemo(() => {
+    const filtered = occurrences.filter(o =>
+      !searchTerm || o.section.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      o.item.toLowerCase().includes(searchTerm.toLowerCase()) || reporterLabel(o.reporter).toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    const dateMap: Record<string, Record<string, OccurrenceData[]>> = {};
+    filtered.forEach(o => {
+      const dKey = toLocalDateKey(o.created_at);
+      if (!dateMap[dKey]) dateMap[dKey] = {};
+      const rep = reporterLabel(o.reporter);
+      if (!dateMap[dKey][rep]) dateMap[dKey][rep] = [];
+      dateMap[dKey][rep].push(o);
+    });
+    return Object.entries(dateMap).sort(([a], [b]) => b.localeCompare(a)).map(([date, reporters]) => ({
+        date, reporters: Object.entries(reporters).sort((a,b)=>b[1].length - a[1].length),
+    }));
+  }, [occurrences, searchTerm]);
 
   /* ─── TABS ─── */
   const TABS: Array<{id:Tab;label:string;icon:any;badge?:number;badgeColor?:string}> = [
@@ -251,8 +272,7 @@ export default function DashboardView({
               color: tab === t.id ? 'var(--primary)' : 'var(--text-muted)',
               transition:'all 0.2s', whiteSpace:'nowrap'
             }}>
-            <t.icon size={18} />
-            {t.label}
+            <t.icon size={18} /> {t.label}
             {t.badge !== undefined && (
               <span style={{ background: t.badgeColor, color:'#fff', padding:'2px 6px', borderRadius:'999px', fontSize:'10px', fontWeight:900, marginLeft:'4px' }}>
                 {t.badge}{t.id==='conformidades'?'%':''}
@@ -285,7 +305,7 @@ export default function DashboardView({
                 <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>Conformidade Geral</div>
                 <div style={{ display:'flex', alignItems:'baseline', gap:4 }}>
                   <div style={{ fontSize: 32, fontWeight: 900, fontFamily: 'var(--font-display)', color: 'var(--text)', lineHeight: 1 }}>{conformPct}%</div>
-                  <span style={{ fontSize:12, fontWeight:700, color:'var(--text-muted)' }}>({checkedItems}/{totalItems})</span>
+                  <span style={{ fontSize:12, fontWeight:700, color:'var(--text-muted)' }}>({checkedItems}/{totalExpected})</span>
                 </div>
               </div>
             </div>
@@ -360,7 +380,7 @@ export default function DashboardView({
         </div>
       )}
 
-      {/* ─ Conformidades (Agrupado com detalhe por Máquina) ─────────────────────── */}
+      {/* ─ Conformidades (DETALHE POR MÁQUINA) ─────────────────────── */}
       {tab === 'conformidades' && (
         <div style={{ animation: 'fadeIn 0.3s ease-out' }}>
           {conformByDate.length === 0 || (conformByDate.length === 1 && conformByDate[0].reporters.length === 0) ? (
@@ -398,7 +418,6 @@ export default function DashboardView({
    Sub-Componentes
    ====================================================== */
 
-// Acordeão de Alertas do Utilizador
 function CollaboratorAccordion({ reporter, occs, onOpenPhoto }: { reporter: string; occs: OccurrenceData[]; onOpenPhoto: (photos: string[], index: number) => void }) {
   const [open, setOpen] = useState(false);
   const color = avatarColor(reporter);
@@ -446,7 +465,7 @@ function CollaboratorAccordion({ reporter, occs, onOpenPhoto }: { reporter: stri
   );
 }
 
-// Acordeão de Conformidades (Detalhe por Utilizador e por Máquina)
+// Acordeão de Conformidades
 function ConformityCollaboratorAccordion({ rep }: { rep: any }) {
   const [open, setOpen] = useState(false);
   const color = avatarColor(rep.name);
@@ -464,7 +483,7 @@ function ConformityCollaboratorAccordion({ rep }: { rep: any }) {
               </div>
               <span style={{ fontSize: 12, fontWeight: 900, color: rep.pct === 100 ? 'var(--success)' : 'var(--primary)' }}>{rep.pct}%</span>
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 4 }}>{rep.checked} de {rep.total} verificados ({rep.machines.length} Máquinas)</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 4 }}>{rep.checked} de {rep.total} verificados ({rep.machines.length} Máquina{rep.machines.length > 1 ? 's' : ''})</div>
           </div>
         </div>
         <div style={{ color: 'var(--text-muted)', background: 'var(--surface-2)', padding: '6px', borderRadius: '8px' }}>{open ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</div>
@@ -495,7 +514,7 @@ function ConformityCollaboratorAccordion({ rep }: { rep: any }) {
   );
 }
 
-// Categoria Agrupada do Checklist (dentro da máquina)
+// Categoria Agrupada
 function ConformCategoryGroup({ groupLabel, sections }: { groupLabel: string; sections: any[] }) {
   const [open, setOpen] = useState(false);
   const totalItems  = sections.reduce((a, s) => a + s.totalCount, 0);
@@ -515,19 +534,16 @@ function ConformCategoryGroup({ groupLabel, sections }: { groupLabel: string; se
           {open ? <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />}
         </div>
       </button>
-
       {open && (
         <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border)' }}>
-          {sections.map((section: any) => (
-            <ConformSectionCard key={section.sectionId} section={section} />
-          ))}
+          {sections.map((section: any) => <ConformSectionCard key={section.sectionId} section={section} />)}
         </div>
       )}
     </div>
   );
 }
 
-// Detalhe dos Itens (com as cruzes vermelhas e certos verdes)
+// Detalhe de Itens
 function ConformSectionCard({ section }: { section: any }) {
   const [open, setOpen] = useState(false);
   const pct = section.totalCount > 0 ? Math.round((section.checkedCount / section.totalCount) * 100) : 0;
