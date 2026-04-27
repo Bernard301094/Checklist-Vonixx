@@ -25,45 +25,45 @@ const OCCURRENCES_TABLE = 'occurrences';
 const CHECKLISTS_TABLE = 'checklists';
 const SESSIONS_TABLE = 'checklist_sessions';
 
-// Función mejorada con caché local para sobrevivir a F5 o redes lentas
+// Função totalmente otimizada para evitar timeouts e o erro 404.
 const fetchRoleFromDB = async (user: any): Promise<'admin' | 'supervisor' | 'colaborador'> => {
-  try {
-    // Aumentamos el timeout a 10 segundos
-    const result = await Promise.race([
-      supabase.from('profiles').select('role').eq('id', user.id).single(),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 10000)
-      ),
-    ]) as { data: any; error: any };
-
-    if (!result.error && result.data) {
-      const dbRole = result.data.role;
-      if (dbRole === 'admin' || dbRole === 'supervisor' || dbRole === 'colaborador') {
-        // Guardamos exitosamente el rol en la memoria local para el próximo F5
-        localStorage.setItem(`user_role_${user.id}`, dbRole);
-        return dbRole;
-      }
-    } else {
-      console.warn('Erro ao ler profile da DB:', result.error?.message);
-    }
-  } catch (err) {
-    console.warn('Timeout ou erro de rede ao buscar role no BD:', err);
-  }
-
-  // Fallback 1: Si falla la conexión o da timeout, intentamos recuperar el rol almacenado antes (El F5)
-  const cachedRole = localStorage.getItem(`user_role_${user.id}`);
-  if (cachedRole === 'admin' || cachedRole === 'supervisor' || cachedRole === 'colaborador') {
-    console.log('Recuperado role do cache local:', cachedRole);
-    return cachedRole;
-  }
-
-  // Fallback 2: Metadata de la sesión
+  // 1. PRIORIDADE MÁXIMA: Ler instantaneamente do metadata da sessão.
+  // Não faz nenhuma requisição à rede, ignorando delays do Supabase ao dar F5.
   const metaRole = user?.user_metadata?.role || user?.app_metadata?.role;
   if (metaRole === 'admin' || metaRole === 'supervisor' || metaRole === 'colaborador') {
+    localStorage.setItem(`user_role_${user.id}`, metaRole); // Atualiza o cache silenciosamente
     return metaRole;
   }
 
-  console.warn('Perfil não encontrado, usando role padrão: colaborador');
+  // 2. CACHE LOCAL: Se a sessão falhar em trazer a info, usa o último acesso guardado.
+  const cachedRole = localStorage.getItem(`user_role_${user.id}`);
+  if (cachedRole === 'admin' || cachedRole === 'supervisor' || cachedRole === 'colaborador') {
+    return cachedRole;
+  }
+
+  // 3. BANCO DE DADOS: Último recurso seguro (sem Promise.race problemático).
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      console.warn('Aviso: Erro ao buscar profile no banco (404/Inexistente):', error.message);
+    } else if (data?.role) {
+      const dbRole = data.role;
+      if (dbRole === 'admin' || dbRole === 'supervisor' || dbRole === 'colaborador') {
+        localStorage.setItem(`user_role_${user.id}`, dbRole);
+        return dbRole;
+      }
+    }
+  } catch (err) {
+    console.warn('Erro de comunicação com o BD:', err);
+  }
+
+  // Se tudo falhar, por segurança, cai em colaborador
+  console.warn('Perfil não encontrado. Usando role padrão: colaborador');
   return 'colaborador';
 };
 
@@ -208,7 +208,6 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
-    // Aumentamos a 15 segundos el margen para evitar que se muestre Login por error
     const safetyTimeout = setTimeout(() => {
       if (!cancelled) {
         console.warn('Auth timeout: Supabase demorou demais, exibindo tela de login.');
@@ -242,7 +241,6 @@ export default function App() {
   }, [applySession]);
 
   const handleLogout = async () => {
-    // Limpiamos el caché del rol al salir por seguridad
     if (resolvedUserIdRef.current) {
       localStorage.removeItem(`user_role_${resolvedUserIdRef.current}`);
     }
@@ -328,10 +326,6 @@ export default function App() {
     }
   };
 
-  /**
-   * Salva um snapshot completo do checklist como sessão histórica.
-   * Chamado pelo ColaboradorScreen ao clicar "Sincronizar checklist".
-   */
   const handleSaveSession = async (machine: string, state: Record<string, boolean>) => {
     const items = CHECKLIST_DATA.flatMap(section =>
       section.items.map((_, idx) => ({
