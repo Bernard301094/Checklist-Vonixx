@@ -25,19 +25,22 @@ const OCCURRENCES_TABLE = 'occurrences';
 const CHECKLISTS_TABLE = 'checklists';
 const SESSIONS_TABLE = 'checklist_sessions';
 
-// Modificado para recibir todo el objeto "user" en lugar de solo "userId"
+// Función mejorada con caché local para sobrevivir a F5 o redes lentas
 const fetchRoleFromDB = async (user: any): Promise<'admin' | 'supervisor' | 'colaborador'> => {
   try {
+    // Aumentamos el timeout a 10 segundos
     const result = await Promise.race([
       supabase.from('profiles').select('role').eq('id', user.id).single(),
       new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 5000)
+        setTimeout(() => reject(new Error('timeout')), 10000)
       ),
     ]) as { data: any; error: any };
 
     if (!result.error && result.data) {
       const dbRole = result.data.role;
       if (dbRole === 'admin' || dbRole === 'supervisor' || dbRole === 'colaborador') {
+        // Guardamos exitosamente el rol en la memoria local para el próximo F5
+        localStorage.setItem(`user_role_${user.id}`, dbRole);
         return dbRole;
       }
     } else {
@@ -47,7 +50,14 @@ const fetchRoleFromDB = async (user: any): Promise<'admin' | 'supervisor' | 'col
     console.warn('Timeout ou erro de rede ao buscar role no BD:', err);
   }
 
-  // Fallback inteligente: si la consulta a DB falla (común al presionar F5), intenta leer del metadata de la sesión
+  // Fallback 1: Si falla la conexión o da timeout, intentamos recuperar el rol almacenado antes (El F5)
+  const cachedRole = localStorage.getItem(`user_role_${user.id}`);
+  if (cachedRole === 'admin' || cachedRole === 'supervisor' || cachedRole === 'colaborador') {
+    console.log('Recuperado role do cache local:', cachedRole);
+    return cachedRole;
+  }
+
+  // Fallback 2: Metadata de la sesión
   const metaRole = user?.user_metadata?.role || user?.app_metadata?.role;
   if (metaRole === 'admin' || metaRole === 'supervisor' || metaRole === 'colaborador') {
     return metaRole;
@@ -186,7 +196,6 @@ export default function App() {
     const isMobile = window.innerWidth < 1024;
     if (isBioEnabled && isMobile) setIsLocked(true);
 
-    // Llamamos la función enviando todo el objeto de usuario para poder usar el fallback
     const dbRole = await fetchRoleFromDB(user);
     setRole(dbRole);
 
@@ -199,12 +208,13 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
 
+    // Aumentamos a 15 segundos el margen para evitar que se muestre Login por error
     const safetyTimeout = setTimeout(() => {
       if (!cancelled) {
         console.warn('Auth timeout: Supabase demorou demais, exibindo tela de login.');
         setAuthLoading(false);
       }
-    }, 8000);
+    }, 15000);
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (cancelled) return;
@@ -232,6 +242,10 @@ export default function App() {
   }, [applySession]);
 
   const handleLogout = async () => {
+    // Limpiamos el caché del rol al salir por seguridad
+    if (resolvedUserIdRef.current) {
+      localStorage.removeItem(`user_role_${resolvedUserIdRef.current}`);
+    }
     resolvedUserIdRef.current = null;
     await supabase.auth.signOut();
     setReporterName('');
