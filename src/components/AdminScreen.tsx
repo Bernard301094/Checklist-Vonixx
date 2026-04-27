@@ -71,9 +71,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const [errorMsg, setErrorMsg] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState(() => generatePassword());
   
-  // Estado para guardar as senhas recém criadas/resetadas
+  // Estado para guardar las contraseñas recién creadas/reseteadas
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
-  // Estado para controlar a animação do botão de reset do usuário individual
+  // Estado para controlar la animación del botón de reset del usuario individual
   const [resettingId, setResettingId] = useState<string | null>(null);
   
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
@@ -191,6 +191,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setEditShift(user.shift || 'TURNO A');
   };
 
+  // 1. EDICIÓN OPTIMISTA: Actualiza localmente sin recargar toda la lista
   const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editUser) return;
@@ -212,8 +213,15 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao atualizar usuário');
+      
+      // Actualizamos directamente el estado local para reflejar los cambios instantáneamente
+      setUsers(prevUsers => prevUsers.map(u => 
+        u.id === editUser.id 
+          ? { ...u, full_name: editFullName.trim(), role: editRole, shift: editShift } 
+          : u
+      ));
+      
       setEditUser(null);
-      await loadUsers(); // A edição geral recarrega para garantir coerência de dados de nome/turno
     } catch (err: any) {
       setErrorMsg('Erro na edição: ' + err.message);
     } finally {
@@ -237,6 +245,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
+  // Cargar usuarios solo al entrar al panel por primera vez
   useEffect(() => { loadUsers(); }, []);
 
   const resetForm = () => {
@@ -248,6 +257,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     setErrorMsg('');
   };
 
+  // 2. CREACIÓN OPTIMISTA: Inserta el nuevo usuario al instante en la pantalla
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -263,9 +273,26 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao criar usuário');
       
-      setNewPasswords(prev => ({ ...prev, [result.user_id]: pwd }));
+      const newUserId = result.user_id;
+      setNewPasswords(prev => ({ ...prev, [newUserId]: pwd }));
+      
+      // Construimos el objeto del usuario nuevo para mostrarlo sin llamar a la base de datos
+      const newUserLocal: ManagedUser = {
+        id: newUserId,
+        email: email.trim(),
+        full_name: fullName.trim(),
+        role: role,
+        shift: shift,
+        created_at: new Date().toISOString(),
+        last_sign_in_at: null,
+        force_password_change: true,
+        user_metadata: { force_password_change: true }
+      };
+
+      // Lo agregamos de primero en la lista actual
+      setUsers(prev => [newUserLocal, ...prev]);
       resetForm();
-      await loadUsers(); // Atualiza a lista para o novo usuário aparecer
+
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
     } finally {
@@ -273,6 +300,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
+  // 3. RESETEO OPTIMISTA: Muestra la nueva contraseña solo en esa tarjeta
   const handleResetPassword = async (user: ManagedUser) => {
     setErrorMsg('');
     setResettingId(user.id);
@@ -292,11 +320,10 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao redefinir senha');
       
-      // Salva a nova senha para exibi-la apenas no card desse usuário
+      // Guarda la contraseña nueva para mostrarla
       setNewPasswords(prev => ({ ...prev, [user.id]: newPassword }));
       
-      // Atualiza o estado do usuário localmente para exibir o badge "Senha Pendente"
-      // SEM precisar recarregar todos os usuários do banco (evita piscar a tela inteira)
+      // Actualiza localmente para forzar el badge amarillo de "Senha pendente"
       setUsers(prevUsers => 
         prevUsers.map(u => 
           u.id === user.id 
@@ -316,6 +343,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
+  // 4. ELIMINACIÓN OPTIMISTA: Quita la tarjeta de la vista sin recargar
   const handleDeleteUser = async () => {
     if (!confirmDelete) return;
     setDeleting(true);
@@ -330,8 +358,8 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao excluir usuário');
       
-      // Atualiza localmente removendo da lista, evitando chamar loadUsers()
-      setUsers(prevUsers => prevUsers.filter(u => u.email !== confirmDelete.email));
+      // Eliminamos al usuario directamente del estado local
+      setUsers(prevUsers => prevUsers.filter(u => u.id !== confirmDelete.id));
       setConfirmDelete(null);
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
@@ -556,7 +584,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                             Acesso: {formatDate(user.last_sign_in_at)}
                           </div>
                           
-                          {/* Botão de reset otimizado (não recarrega a lista toda) */}
                           <button 
                             onClick={() => handleResetPassword(user)} 
                             disabled={isResetting}
