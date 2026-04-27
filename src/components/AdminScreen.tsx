@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, Eye, EyeOff, LayoutDashboard, ListTodo, CheckCircle2, FileText } from 'lucide-react';
+import { UserPlus, Users, RefreshCcw, Shield, AlertCircle, Trash2, X, KeyRound, Clock, ShieldCheck, ShieldAlert, LayoutDashboard, ListTodo, CheckCircle2, FileText, Loader2 } from 'lucide-react';
 import Header from './Header';
 import CustomSelect from './CustomSelect';
 import DashboardView from './DashboardView';
@@ -73,6 +73,8 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   
   // Estado para guardar las contraseñas recién creadas/reseteadas
   const [newPasswords, setNewPasswords] = useState<Record<string, string>>({});
+  // Estado para controlar especificamente a animação do botão de reset do usuário
+  const [resettingId, setResettingId] = useState<string | null>(null);
   
   const [confirmDelete, setConfirmDelete] = useState<ManagedUser | null>(null);
   const [deleting, setDeleting] = useState(false);
@@ -166,11 +168,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
   const functionUrl = 'https://aogzdxwruaqgiaprmvuz.supabase.co/functions/v1/create-user';
   const listUrl = 'https://aogzdxwruaqgiaprmvuz.supabase.co/functions/v1/list-users';
 
-  // FIX: Lógica mejorada de getToken para recuperar sesión si venimos de un bloqueo de huella dactilar
   const getToken = async () => {
     let { data, error } = await supabase.auth.getSession();
     
-    // Si no hay sesión o hubo un error al obtenerla, forzamos un refresh
     if (error || !data.session) {
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
       if (refreshError || !refreshData.session) {
@@ -223,7 +223,7 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
 
   const loadUsers = async () => {
     setLoadingUsers(true);
-    setErrorMsg(''); // Limpia posibles errores previos al recargar
+    setErrorMsg(''); 
     try {
       const token = await getToken();
       const res = await fetch(listUrl, { headers: { Authorization: `Bearer ${token}` } });
@@ -237,7 +237,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
     }
   };
 
-  // Vuelve a cargar usuarios automáticamente si cambia la pestaña o componente se monta
   useEffect(() => { loadUsers(); }, []);
 
   const resetForm = () => {
@@ -264,7 +263,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao criar usuário');
       
-      // Guarda la contraseña generada para mostrarla en la lista
       setNewPasswords(prev => ({ ...prev, [result.user_id]: pwd }));
       resetForm();
       await loadUsers();
@@ -277,7 +275,8 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
 
   const handleResetPassword = async (user: ManagedUser) => {
     setErrorMsg('');
-    setLoading(true);
+    setResettingId(user.id); // Ativa apenas a animação deste usuário específico
+    
     const newPassword = generatePassword();
     try {
       const token = await getToken();
@@ -293,13 +292,12 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
       const result = await response.json();
       if (!response.ok) throw new Error(result.error || 'Erro ao redefinir senha');
       
-      // Guarda la nueva contraseña para mostrarla en la lista
       setNewPasswords(prev => ({ ...prev, [user.id]: newPassword }));
       await loadUsers();
     } catch (err: any) {
       setErrorMsg('Erro: ' + err.message);
     } finally {
-      setLoading(false);
+      setResettingId(null);
     }
   };
 
@@ -375,7 +373,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         </button>
       </div>
 
-      {/* Botão flutuante de relatório */}
       <div className="report-btn-fixed">
         <button
           onClick={() => setShowReportModal(true)}
@@ -406,7 +403,6 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
         </button>
       </div>
 
-      {/* Dashboard tab — passa todas las props incluyendo checklistSessions */}
       {activeTab === 'dashboard' && (
         <DashboardView
           occurrences={occurrences}
@@ -501,6 +497,8 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--s4)' }}>
                   {users.map(user => {
                     const ini = user.full_name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || 'U';
+                    const isResetting = resettingId === user.id;
+
                     return (
                       <div key={user.id} className="card card-hover animate-in" style={{ padding: 'var(--s5)', display: 'flex', flexDirection: 'column', gap: 'var(--s4)' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--s4)' }}>
@@ -523,9 +521,9 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                           <StatusBadge user={user} />
                         </div>
 
-                        {/* Visualización del código de acceso generado */}
+                        {/* Visualização com animação da nova senha */}
                         {newPasswords[user.id] && (
-                          <div style={{ marginTop: 'var(--s2)', padding: 'var(--s3)', borderRadius: 'var(--r-md)', background: 'rgba(13, 148, 136, 0.1)', border: '1px dashed var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <div className="new-password-anim" style={{ marginTop: 'var(--s2)', padding: 'var(--s3)', borderRadius: 'var(--r-md)', background: 'rgba(13, 148, 136, 0.1)', border: '1px dashed var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                             <div>
                               <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--primary)', textTransform: 'uppercase' }}>Código de acesso:</span>
                               <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 800, color: 'var(--text)', letterSpacing: '0.1em' }}>{newPasswords[user.id]}</div>
@@ -540,8 +538,33 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
                           <div style={{ fontSize: 10, color: 'var(--text-faint)', fontWeight: 600 }}>
                             Acesso: {formatDate(user.last_sign_in_at)}
                           </div>
-                          <button onClick={() => handleResetPassword(user)} className="btn-ghost" style={{ padding: '4px 10px', minHeight: 0, fontSize: 10, borderRadius: 'var(--r-md)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                            <KeyRound size={12} /> Reset Senha
+                          
+                          {/* Botão de reset com animação */}
+                          <button 
+                            onClick={() => handleResetPassword(user)} 
+                            disabled={isResetting}
+                            className="btn-ghost" 
+                            style={{ 
+                              padding: '4px 10px', 
+                              minHeight: 0, 
+                              fontSize: 10, 
+                              borderRadius: 'var(--r-md)', 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              gap: 6,
+                              opacity: isResetting ? 0.7 : 1,
+                              cursor: isResetting ? 'not-allowed' : 'pointer',
+                              background: isResetting ? 'rgba(13, 148, 136, 0.1)' : 'transparent',
+                              color: isResetting ? 'var(--primary)' : 'inherit',
+                              transition: 'all 0.2s ease'
+                            }}
+                          >
+                            {isResetting ? (
+                              <Loader2 size={12} className="spin-anim" />
+                            ) : (
+                              <KeyRound size={12} />
+                            )}
+                            {isResetting ? 'Processando...' : 'Reset Senha'}
                           </button>
                         </div>
                       </div>
@@ -703,6 +726,25 @@ export default function AdminScreen({ onLogout, currentUserEmail, useBiometrics,
           .report-btn-fixed {
             bottom: 100px;
           }
+        }
+        
+        /* Animações novas para o reset de senha */
+        .spin-anim {
+          animation: spinCustom 1s linear infinite;
+        }
+        
+        .new-password-anim {
+          animation: popInCustom 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        
+        @keyframes spinCustom {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+        
+        @keyframes popInCustom {
+          0% { opacity: 0; transform: translateY(-10px) scale(0.95); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
     </div>
