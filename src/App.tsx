@@ -278,7 +278,7 @@ export default function App() {
   const handleUpdateOccurrence = async (id: string, patch: { comment?: string; photos?: string[] }) => {
     const { data, error } = await supabase
       .from(OCCURRENCES_TABLE)
-      .update({ ...patch, updated_at: new Date().toISOString() })
+      .update({ ...patch })
       .eq('id', id)
       .select()
       .single();

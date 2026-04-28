@@ -7,6 +7,27 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300..700&family=Sora:wght@400;600;700;800&display=swap');
 
+@import "tailwindcss";
+
+@theme {
+  --color-primary: var(--primary);
+  --color-primary-h: var(--primary-h);
+  --color-primary-hl: var(--primary-hl);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+  --radius-2xl: var(--r-2xl);
+  --radius-full: var(--r-full);
+}
+
 /* ── TOKENS ───────────────────────────────────────────────── */
 :root {
   /* Type - More fluid scaling from watch (200px) to TV (4K) */
@@ -336,42 +357,7 @@ select option:hover {
   50% { opacity: 0.4; }
 }
 
-/* ── ADMIN GRID ───────────────────────────────────────────── */
-/*
- * FIX ultra-small screens (<360px, Galaxy Fold):
- * Antes: minmax(320px, 420px) — desbordaba en pantallas <320px.
- * Ahora: minmax(min(100%, 320px), 420px) — el primer carril nunca
- * supera el 100% del viewport. El segundo carril cede con minmax(0,1fr).
- */
-.admin-content-grid {
-  display: grid;
-  grid-template-columns: minmax(min(100%, 320px), 420px) minmax(0, 1fr);
-  gap: var(--s6);
-  padding: var(--s6);
-}
 
-@media (max-width: 860px) {
-  .admin-content-grid {
-    grid-template-columns: 1fr;
-    padding: var(--s4);
-  }
-}
-
-.admin-stats-grid {
-  padding: var(--s5) var(--s6);
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--s4);
-  border-bottom: 1px solid var(--divider);
-  background: var(--surface);
-}
-
-@media (max-width: 860px) {
-  .admin-stats-grid {
-    padding: var(--s4);
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  }
-}
 
 /*
  * employee-detail-grid
@@ -568,16 +554,6 @@ select option:hover {
 
 /* ── 8. GRIDS DE STATS / KPIs ── */
 @media (max-width: 640px) {
-  .dashboard-kpi-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    gap: var(--s3) !important;
-    padding: var(--s3) !important;
-  }
-  .admin-stats-grid {
-    grid-template-columns: repeat(2, 1fr) !important;
-    padding: var(--s3) var(--s3) !important;
-    gap: var(--s3) !important;
-  }
   .stats-grid-4 {
     grid-template-columns: repeat(2, 1fr) !important;
   }
@@ -641,14 +617,7 @@ select option:hover {
   }
 }
 
-/* ── 13. ADMIN CONTENT GRID ── */
-@media (max-width: 640px) {
-  .admin-content-grid {
-    grid-template-columns: 1fr !important;
-    padding: var(--s3) !important;
-    gap: var(--s4) !important;
-  }
-}
+
 
 /* ── 14. MY RECORDS VIEW: filtros empilhados ── */
 @media (max-width: 640px) {
@@ -661,21 +630,7 @@ select option:hover {
   }
 }
 
-/* ── 15. DASHBOARD: charts full-width ── */
-@media (max-width: 640px) {
-  .dashboard-charts-grid {
-    grid-template-columns: 1fr !important;
-    gap: var(--s3) !important;
-    padding: var(--s3) !important;
-  }
-  .dashboard-table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .dashboard-table-wrapper table {
-    min-width: 480px;
-  }
-}
+
 
 /* ── 16. SAFE AREA (notch / barra de navegação Android) ── */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {

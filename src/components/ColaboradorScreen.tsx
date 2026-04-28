@@ -7,6 +7,7 @@ import { uploadPhoto } from '../lib/uploadPhoto';
 import { ToastContainer, useToast } from './Toast';
 import CustomSelect from './CustomSelect';
 import MyRecordsView from './MyRecordsView';
+import ReportModal from './ReportModal';
 
 interface ColaboradorScreenProps {
   onLogout: () => void;
@@ -41,6 +42,7 @@ export default function ColaboradorScreen({
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     Object.fromEntries(CHECKLIST_DATA.map(s => [s.id, true]))
   );
+  const [showReportModal, setShowReportModal] = useState(false);
 
   // ── Historial general del usuario hoy ──
   const myChecklistState = useMemo(() => {
@@ -163,7 +165,7 @@ export default function ColaboradorScreen({
     return { checked, total: len, percent: len ? Math.round((checked / len) * 100) : 0 };
   };
 
-  const myOccCount = useMemo(() => {
+  const myOccurrences = useMemo(() => {
     const normalEmail = userEmail?.trim().toLowerCase() ?? '';
     const normalName  = reporterName.trim().toLowerCase();
     
@@ -174,8 +176,10 @@ export default function ColaboradorScreen({
       
       const label = o.reporter.split(' - Auth:')[0].split(' | Máquina:')[0].replace(/\s*\(.*?\)\s*$/, '').trim().toLowerCase();
       return label === normalName;
-    }).length;
+    });
   }, [occurrences, reporterName, userEmail]);
+
+  const myOccCount = myOccurrences.length;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', width: '100%', minHeight: '100dvh', background: 'var(--bg)', color: 'var(--text)' }}>
@@ -359,8 +363,63 @@ export default function ColaboradorScreen({
           </div>
         </div>
       )}
+
+      {/* Botão flutuante de relatório */}
+      <div className="report-btn-fixed">
+        <button
+          onClick={() => setShowReportModal(true)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '12px 20px',
+            borderRadius: 'var(--r-full)',
+            background: 'var(--primary)',
+            color: '#fff',
+            fontWeight: 700,
+            fontSize: 'var(--text-sm)',
+            boxShadow: '0 8px 24px rgba(13,148,136,0.45)',
+            border: 'none',
+            cursor: 'pointer',
+            transition: 'transform 0.15s, box-shadow 0.15s',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-2px)';
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 12px 32px rgba(13,148,136,0.55)';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLButtonElement).style.transform = 'translateY(0)';
+            (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 8px 24px rgba(13,148,136,0.45)';
+          }}
+        >
+          <FileText size={18} />
+          Gerar Meu Relatório
+        </button>
+      </div>
+
+      {showReportModal && (
+        <ReportModal
+          onClose={() => setShowReportModal(false)}
+          occurrences={myOccurrences}
+          checklistState={myChecklistState}
+          currentUserEmail={userEmail}
+          defaultMachine={machine}
+        />
+      )}
+
       <ToastContainer toasts={toasts} onClose={removeToast} />
-      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .report-btn-fixed {
+          position: fixed;
+          bottom: 24px;
+          right: 20px;
+          z-index: 100;
+        }
+        @media (max-width: 640px) {
+          .report-btn-fixed {
+            bottom: 24px;
+          }
+        }
+      `}</style>
     </div>
   );
 }

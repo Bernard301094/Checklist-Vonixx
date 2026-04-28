@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Lock, AlertCircle, CheckCircle, ArrowRight, Loader2, ShieldCheck, LogOut } from 'lucide-react';
 import { supabase } from '../supabase';
+import AuthLayout from './auth/AuthLayout';
 
 interface Props {
   userEmail: string;
@@ -62,29 +63,7 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
   };
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg)',
-      padding: 'var(--s4)',
-      fontFamily: 'var(--font-body)',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: `radial-gradient(circle at 20% 20%, rgba(13,148,136,0.06) 0%, transparent 60%),
-          radial-gradient(circle at 80% 80%, rgba(45,212,191,0.05) 0%, transparent 50%)`,
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: `linear-gradient(var(--divider) 1px, transparent 1px),
-          linear-gradient(90deg, var(--divider) 1px, transparent 1px)`,
-        backgroundSize: '40px 40px',
-        opacity: 0.5,
-      }} />
+    <AuthLayout>
 
       {/* Botão sair — canto superior direito */}
       <button
@@ -103,13 +82,9 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
         Sair
       </button>
 
-      <div className="animate-in" style={{
-        width: '100%', maxWidth: '440px',
-        display: 'flex', flexDirection: 'column', gap: 'var(--s6)',
-        position: 'relative', zIndex: 1,
-      }}>
+      <div className="animate-in auth-content-wrapper max-w-440">
         <div style={{ textAlign: 'center', marginBottom: 'var(--s2)' }}>
-            <div className="pulse-shield" style={{
+            <div className="pulse-shield login-logo" style={{
               width: 56, height: 56, borderRadius: 'var(--r-xl)',
               background: 'var(--primary)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -131,7 +106,7 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
           </p>
         </div>
 
-        <div className="card" style={{ padding: 'var(--s8)', position: 'relative', overflow: 'hidden' }}>
+        <div className="card login-card" style={{ padding: 'var(--s8)', position: 'relative', overflow: 'hidden' }}>
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, height: 2,
             background: 'linear-gradient(90deg, var(--primary), #06b6d4, var(--primary))',
@@ -220,13 +195,7 @@ export default function ChangePasswordScreen({ userEmail, onPasswordChanged }: P
 
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes pulse-shield {
-          0% { transform: scale(1); box-shadow: 0 8px 24px rgba(13,148,136,0.35); }
-          50% { transform: scale(1.05); box-shadow: 0 12px 32px rgba(13,148,136,0.5); }
-          100% { transform: scale(1); box-shadow: 0 8px 24px rgba(13,148,136,0.35); }
-        }
-        .pulse-shield { animation: pulse-shield 2s infinite ease-in-out; }
       `}</style>
-    </div>
+    </AuthLayout>
   );
 }

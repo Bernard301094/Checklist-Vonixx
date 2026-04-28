@@ -14,6 +14,7 @@ export interface ReportFilters {
   dateTo: string;
   shift: string;
   section: string;
+  machine: string;
   reportTitle: string;
   generatedBy: string;
 }
@@ -27,26 +28,35 @@ interface Props {
 /* ─── Design tokens ────────────────────────────────────── */
 const C = {
   brand:       '#01696f',
-  brandDark:   '#0c4e54',
-  brandLight:  '#e0f0f0',
-  brandMid:    '#cde5e5',
-  accent:      '#d97706',  // amber
-  accentLight: '#fef3c7',
-  success:     '#16a34a',
+  brandDark:   '#013f45',
+  brandGrad1:  '#01696f',
+  brandGrad2:  '#014f55',
+  brandLight:  '#e4f4f4',
+  brandMid:    '#b8e0e1',
+  accent:      '#c2560c',  // burnt orange — mais profissional
+  accentLight: '#fdf0e8',
+  accentMid:   '#f7c9a3',
+  success:     '#15803d',
   successBg:   '#f0fdf4',
-  danger:      '#dc2626',
-  dangerBg:    '#fff1f1',
-  pending:     '#9ca3af',
+  successBorder:'#86efac',
+  danger:      '#b91c1c',
+  dangerBg:    '#fef2f2',
+  dangerBorder:'#fca5a5',
+  pending:     '#6b7280',
   pendingBg:   '#f9fafb',
+  pendingBorder:'#d1d5db',
   white:       '#ffffff',
   bg:          '#f8fafc',
+  bgAlt:       '#f1f5f9',
   surface:     '#ffffff',
   border:      '#e2e8f0',
   borderLight: '#f1f5f9',
   text:        '#0f172a',
-  textMid:     '#334155',
-  textMuted:   '#64748b',
+  textMid:     '#1e293b',
+  textMuted:   '#475569',
   textFaint:   '#94a3b8',
+  // signature
+  signBg:      '#f8fafc',
 };
 
 /* ─── Styles ─────────────────────────────────────────── */
@@ -57,7 +67,7 @@ const s = StyleSheet.create({
     fontSize: 9,
     color: C.text,
     backgroundColor: C.white,
-    paddingTop: 0,
+    paddingTop: 36,
     paddingBottom: 44,
     paddingHorizontal: 0,
   },
@@ -72,12 +82,15 @@ const s = StyleSheet.create({
   },
   coverTop: {
     backgroundColor: C.brandDark,
-    paddingHorizontal: 40,
-    paddingTop: 56,
-    paddingBottom: 40,
-    flex: 1,
+    paddingHorizontal: 44,
+    paddingTop: 60,
+    paddingBottom: 44,
     flexDirection: 'column',
-    justifyContent: 'space-between',
+  },
+  coverStripe: {
+    height: 4,
+    backgroundColor: C.accent,
+    marginBottom: 0,
   },
   coverEyebrow: {
     fontSize: 8,
@@ -152,13 +165,15 @@ const s = StyleSheet.create({
 
   /* — Page header (páginas 2+) — */
   pageHeader: {
-    backgroundColor: C.brand,
+    backgroundColor: C.brandDark,
     paddingHorizontal: 32,
-    paddingVertical: 10,
+    paddingVertical: 11,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 0,
+    borderBottomWidth: 3,
+    borderBottomColor: C.accent,
   },
   pageHeaderTitle: {
     fontSize: 8,
@@ -350,7 +365,8 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.border,
     borderRadius: 6,
-    overflow: 'hidden',
+    // NOTE: overflow:'hidden' intentionally removed — causes react-pdf to clip
+    // content across page breaks instead of flowing to the next page.
   },
   checkBlockHeader: {
     backgroundColor: C.brandDark,
@@ -434,50 +450,50 @@ const s = StyleSheet.create({
 
   /* — Occurrence card — */
   occCard: {
-    marginBottom: 12,
+    marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#fed7aa',
-    borderRadius: 6,
+    borderColor: C.accentMid,
+    borderRadius: 8,
     overflow: 'hidden',
   },
   occStripe: {
-    width: 4,
+    width: 5,
     backgroundColor: C.accent,
   },
   occCardTop: {
     flexDirection: 'row',
-    backgroundColor: '#fff7ed',
+    backgroundColor: C.accentLight,
     borderBottomWidth: 1,
-    borderBottomColor: '#fed7aa',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
+    borderBottomColor: C.accentMid,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
     alignItems: 'center',
   },
   occNumber: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: C.accent,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 11,
     flexShrink: 0,
   },
   occNumberText: {
-    fontSize: 8.5,
+    fontSize: 9,
     fontFamily: 'Helvetica-Bold',
     color: C.white,
   },
   occSection: {
     fontSize: 7,
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    color: '#92400e',
+    letterSpacing: 0.7,
+    color: '#7c3309',
     fontFamily: 'Helvetica-Bold',
     marginBottom: 2,
   },
   occItem: {
-    fontSize: 9.5,
+    fontSize: 10,
     fontFamily: 'Helvetica-Bold',
     color: C.text,
     flex: 1,
@@ -485,8 +501,8 @@ const s = StyleSheet.create({
   occBadge: {
     backgroundColor: C.accent,
     borderRadius: 4,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     flexShrink: 0,
   },
   occBadgeText: {
@@ -497,18 +513,22 @@ const s = StyleSheet.create({
     letterSpacing: 0.5,
   },
   occBody: {
-    paddingHorizontal: 12,
-    paddingVertical: 9,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     backgroundColor: C.surface,
   },
   occComment: {
     fontSize: 9,
     color: C.textMid,
-    lineHeight: 1.55,
+    lineHeight: 1.6,
     marginBottom: 10,
     paddingLeft: 10,
-    borderLeftWidth: 2,
-    borderLeftColor: '#fed7aa',
+    borderLeftWidth: 3,
+    borderLeftColor: C.accent,
+    backgroundColor: C.accentLight,
+    paddingVertical: 6,
+    paddingRight: 8,
+    borderRadius: 3,
   },
   occMetaRow: {
     flexDirection: 'row',
@@ -548,24 +568,42 @@ const s = StyleSheet.create({
   /* — Signature block — */
   signatureArea: {
     flexDirection: 'row',
-    gap: 20,
-    marginTop: 32,
+    gap: 16,
+    marginTop: 36,
   },
   signatureBox: {
     flex: 1,
-    borderTopWidth: 1.5,
-    borderTopColor: C.text,
-    paddingTop: 6,
+    borderWidth: 1,
+    borderColor: C.border,
+    borderRadius: 6,
+    padding: 12,
+    backgroundColor: C.signBg,
+    minHeight: 70,
+    justifyContent: 'space-between',
   },
   signatureLabel: {
-    fontSize: 7.5,
-    color: C.textMuted,
+    fontSize: 7,
+    color: C.textFaint,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    fontFamily: 'Helvetica-Bold',
+    marginBottom: 4,
   },
   signatureValue: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontFamily: 'Helvetica-Bold',
-    color: C.text,
-    marginTop: 2,
+    color: C.textMid,
+    marginBottom: 24,
+  },
+  signatureLine: {
+    borderTopWidth: 1,
+    borderTopColor: C.textMuted,
+    marginTop: 'auto' as any,
+    paddingTop: 4,
+  },
+  signatureLineLbl: {
+    fontSize: 6.5,
+    color: C.textFaint,
   },
 
   /* — Empty state — */
@@ -643,32 +681,59 @@ export default function ReportPDF({occurrences,checklistState,filters}:Props) {
     return true;
   });
 
+  /* — All known machines (hardcoded to match the app) — */
+  const ALL_MACHINES = ['ROMI 01', 'ROMI 02'];
+
+  /* — Determine which machines to render — */
+  const machinesToRender = filters.machine ? [filters.machine] : ALL_MACHINES;
+
+  /* — Helper: resolve state for a SPECIFIC machine (ignores filters.machine) — */
+  function resolveStateForMachine(secId: string, idx: number, machine: string): boolean | undefined {
+    const machineKey = `${machine}#${secId}-${idx}`;
+    return checklistState[machineKey];
+  }
+
   /* — Checklist data — */
-  const sections=filters.section
-    ?CHECKLIST_DATA.filter(s=>s.title===filters.section)
-    :CHECKLIST_DATA;
+  const sections = filters.section
+    ? CHECKLIST_DATA.filter(s => s.title === filters.section)
+    : CHECKLIST_DATA;
 
-  const allItems=sections.flatMap(sec=>sec.items.map(item=>({
-    section:sec.title, sectionId:sec.id, item,
-    key:`${sec.id}__${item}`,
-  })));
+  // For KPIs, aggregate across selected machines
+  const allItems = sections.flatMap(sec => sec.items.map((item, idx) => ({ sectionId: sec.id, idx })));
+  const total   = allItems.length * machinesToRender.length;
+  const ok      = machinesToRender.reduce((acc, mach) =>
+    acc + allItems.filter(i => resolveStateForMachine(i.sectionId, i.idx, mach) === true).length, 0);
+  const nok     = machinesToRender.reduce((acc, mach) =>
+    acc + allItems.filter(i => resolveStateForMachine(i.sectionId, i.idx, mach) === false).length, 0);
+  const pending = total - ok - nok;
+  const pct     = total > 0 ? Math.round((ok / total) * 100) : 0;
 
-  const total   =allItems.length;
-  const ok      =allItems.filter(i=>checklistState[i.key]===true).length;
-  const nok     =allItems.filter(i=>checklistState[i.key]===false).length;
-  const pending =allItems.filter(i=>checklistState[i.key]===undefined).length;
-  const pct     =total>0?Math.round((ok/total)*100):0;
+  /* — Per-machine, per-section stats for rendering — */
+  const machineGroups = machinesToRender.map(mach => {
+    const stats = sections.map(sec => {
+      const items = sec.items.map((item, idx) => ({ item, idx }));
+      const secOk   = items.filter(i => resolveStateForMachine(sec.id, i.idx, mach) === true).length;
+      const secNok  = items.filter(i => resolveStateForMachine(sec.id, i.idx, mach) === false).length;
+      const secPend = items.filter(i => resolveStateForMachine(sec.id, i.idx, mach) === undefined).length;
+      const secTotal = items.length;
+      const secPct  = secTotal > 0 ? Math.round((secOk / secTotal) * 100) : 0;
+      const secOccs = filteredOccs.filter(o => o.section === sec.title).length;
+      return { sec, items, secOk, secNok, secPend, secTotal, secPct, secOccs };
+    });
+    const machOk  = stats.reduce((a, s) => a + s.secOk, 0);
+    const machPct = allItems.length > 0 ? Math.round((machOk / allItems.length) * 100) : 0;
+    return { mach, stats, machOk, machPct };
+  });
 
-  /* — Per-section stats — */
-  const sectionStats=sections.map(sec=>{
-    const items=sec.items.map(item=>({item,key:`${sec.id}__${item}`}));
-    const secOk=items.filter(i=>checklistState[i.key]===true).length;
-    const secNok=items.filter(i=>checklistState[i.key]===false).length;
-    const secPend=items.filter(i=>checklistState[i.key]===undefined).length;
-    const secTotal=items.length;
-    const secPct=secTotal>0?Math.round((secOk/secTotal)*100):0;
-    const secOccs=filteredOccs.filter(o=>o.section===sec.title).length;
-    return {sec,items,secOk,secNok,secPend,secTotal,secPct,secOccs};
+  /* — Per-section stats for summary table (aggregated or single machine) — */
+  const sectionStats = sections.map(sec => {
+    const items = sec.items.map((item, idx) => ({ item, idx }));
+    const secOk   = machinesToRender.reduce((a, m) => a + items.filter(i => resolveStateForMachine(sec.id, i.idx, m) === true).length, 0);
+    const secNok  = machinesToRender.reduce((a, m) => a + items.filter(i => resolveStateForMachine(sec.id, i.idx, m) === false).length, 0);
+    const secTotal = items.length * machinesToRender.length;
+    const secPct  = secTotal > 0 ? Math.round((secOk / secTotal) * 100) : 0;
+    const secOccs = filteredOccs.filter(o => o.section === sec.title).length;
+    return { sec, secOk, secNok, secTotal, secPct, secOccs };
   });
 
   const statusColor=(pct:number)=>pct>=80?C.success:pct>=50?C.brand:C.accent;
@@ -692,6 +757,7 @@ export default function ReportPDF({occurrences,checklistState,filters}:Props) {
             {[
               {label:'Período',value:period},
               {label:'Turno',value:shift},
+              {label:'Máquina',value:filters.machine||'Todas as máquinas'},
               {label:'Seção',value:filters.section||'Todas as seções'},
               {label:'Gerado por',value:filters.generatedBy||'Sistema'},
               {label:'Data de geração',value:generatedAt},
@@ -706,9 +772,12 @@ export default function ReportPDF({occurrences,checklistState,filters}:Props) {
         </View>
 
         {/* Colored bottom bar */}
-        <View style={s.coverBottom}>
-          <Text style={s.coverBottomBrand}>CHECKLIST VONIXX</Text>
-          <Text style={s.coverBottomMeta}>Documento confidencial • Uso interno</Text>
+        <View style={{ backgroundColor: C.brand }}>
+          <View style={s.coverStripe} />
+          <View style={s.coverBottom}>
+            <Text style={s.coverBottomBrand}>CHECKLIST VONIXX</Text>
+            <Text style={s.coverBottomMeta}>Documento confidencial • Uso interno</Text>
+          </View>
         </View>
       </Page>
 
@@ -723,7 +792,7 @@ export default function ReportPDF({occurrences,checklistState,filters}:Props) {
         <View style={s.body}>
 
           {/* ===== 1. Executive Summary ===== */}
-          <View style={{...s.sectionHead, marginTop:18}}>
+          <View style={s.sectionHead}>
             <View style={s.sectionHeadNum}><Text style={s.sectionHeadNumText}>1</Text></View>
             <Text style={s.sectionHeadText}>Resumo Executivo</Text>
           </View>
@@ -800,42 +869,74 @@ export default function ReportPDF({occurrences,checklistState,filters}:Props) {
             <View style={s.sectionHeadBadge}>
               <Text style={s.sectionHeadBadgeText}>{total} itens</Text>
             </View>
+            {filters.machine && (
+              <View style={{...s.sectionHeadBadge, backgroundColor: C.brandDark, marginLeft: 6}}>
+                <Text style={{...s.sectionHeadBadgeText, color: C.white}}>{filters.machine}</Text>
+              </View>
+            )}
           </View>
 
-          {sectionStats.map(({sec,items,secOk,secTotal,secPct})=>(
-            <View key={sec.id} style={s.checkBlock} wrap={false}>
-              <View style={s.checkBlockHeader}>
-                <Text style={s.checkBlockHeaderTitle}>{sec.title}</Text>
-                <View style={s.checkBlockHeaderBadge}>
-                  <Text style={s.checkBlockHeaderBadgeText}>{secOk}/{secTotal} • {secPct}%</Text>
+          {machineGroups.map(({ mach, stats, machOk, machPct }) => (
+            <View key={mach}>
+              {/* Machine group header */}
+              <View style={{
+                flexDirection: 'row', alignItems: 'center', gap: 8,
+                backgroundColor: C.brandDark, borderRadius: 6,
+                paddingHorizontal: 12, paddingVertical: 8,
+                marginTop: 10, marginBottom: 6,
+              }} wrap={false}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: C.white }}>
+                    {mach}
+                  </Text>
+                </View>
+                <View style={{ backgroundColor: statusColor(machPct), borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3 }}>
+                  <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: C.white }}>
+                    {machOk}/{allItems.length} itens • {machPct}%
+                  </Text>
                 </View>
               </View>
-              {/* mini progress */}
-              <View style={s.checkBlockProgressRow}>
-                <View style={{...s.progressBg,flex:1}}>
-                  <View style={{...s.progressFill,backgroundColor:statusColor(secPct),width:`${secPct}%` as any}}/>
-                </View>
-                <Text style={{...s.progressPct,color:statusColor(secPct)}}>{secPct}%</Text>
-              </View>
-              {items.map(({item,key},idx)=>{
-                const st=checklistState[key];
-                const isOk=st===true; const isNok=st===false;
-                return (
-                  <View key={key} style={idx%2===0?s.checkRow:s.checkRowAlt}>
-                    <View style={{...s.checkIcon,...(isOk?s.checkIconOk:isNok?s.checkIconNok:s.checkIconPend)}}>
-                      <Text style={{...s.checkIconText,color:isOk?C.success:isNok?C.danger:C.pending}}>
-                        {isOk?'✓':isNok?'✗':'–'}
-                      </Text>
+
+              {stats.map(({ sec, items, secOk, secTotal, secPct }) => (
+                <View key={`${mach}-${sec.id}`} style={s.checkBlock}>
+                  {/* Header + progress bar — keep together, never orphan */}
+                  <View wrap={false}>
+                    <View style={s.checkBlockHeader}>
+                      <Text style={s.checkBlockHeaderTitle}>{sec.title}</Text>
+                      <View style={s.checkBlockHeaderBadge}>
+                        <Text style={s.checkBlockHeaderBadgeText}>{secOk}/{secTotal} • {secPct}%</Text>
+                      </View>
                     </View>
-                    <Text style={s.checkItemText}>{item}</Text>
-                    <View style={{...s.checkPill,...(isOk?s.checkPillOk:isNok?s.checkPillNok:s.checkPillPend)}}>
-                      <Text style={{...s.checkPillText,color:isOk?C.success:isNok?C.danger:C.pending}}>
-                        {isOk?'Conforme':isNok?'Não conforme':'Pendente'}
-                      </Text>
+                    {/* mini progress */}
+                    <View style={s.checkBlockProgressRow}>
+                      <View style={{ ...s.progressBg, flex: 1 }}>
+                        <View style={{ ...s.progressFill, backgroundColor: statusColor(secPct), width: `${secPct}%` as any }} />
+                      </View>
+                      <Text style={{ ...s.progressPct, color: statusColor(secPct) }}>{secPct}%</Text>
                     </View>
                   </View>
-                );
-              })}
+                  {/* Rows — each row stays intact, page breaks happen between rows */}
+                  {items.map(({ item, idx }, rowIdx) => {
+                    const st = resolveStateForMachine(sec.id, idx, mach);
+                    const isOk = st === true; const isNok = st === false;
+                    return (
+                      <View key={`${mach}-${sec.id}-${idx}`} style={rowIdx % 2 === 0 ? s.checkRow : s.checkRowAlt} wrap={false}>
+                        <View style={{ ...s.checkIcon, ...(isOk ? s.checkIconOk : isNok ? s.checkIconNok : s.checkIconPend) }}>
+                          <Text style={{ ...s.checkIconText, color: isOk ? C.success : isNok ? C.danger : C.pending }}>
+                            {isOk ? '✓' : isNok ? '✗' : '–'}
+                          </Text>
+                        </View>
+                        <Text style={s.checkItemText}>{item}</Text>
+                        <View style={{ ...s.checkPill, ...(isOk ? s.checkPillOk : isNok ? s.checkPillNok : s.checkPillPend) }}>
+                          <Text style={{ ...s.checkPillText, color: isOk ? C.success : isNok ? C.danger : C.pending }}>
+                            {isOk ? 'Conforme' : isNok ? 'Não conforme' : 'Pendente'}
+                          </Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
             </View>
           ))}
 
@@ -875,7 +976,19 @@ export default function ReportPDF({occurrences,checklistState,filters}:Props) {
                   <View style={s.occMetaRow}>
                     <View style={s.occMetaItem}>
                       <Text style={s.occMetaLabel}>Operador</Text>
-                      <Text style={s.occMetaValue}>{occ.reporter?.split(' - Auth:')[0]||'—'}</Text>
+                      <Text style={s.occMetaValue}>{(()=>{
+                        // Format: "Nome (TURNO) | Máquina: ROMI 01 - Auth: email"
+                        const raw = occ.reporter || '';
+                        const withoutAuth = raw.split(' - Auth:')[0].trim();
+                        return withoutAuth || '—';
+                      })()}</Text>
+                    </View>
+                    <View style={s.occMetaItem}>
+                      <Text style={s.occMetaLabel}>Máquina</Text>
+                      <Text style={s.occMetaValue}>{(()=>{
+                        const m = occ.reporter?.match(/Máquina:\s*([^|\-]+)/);
+                        return m ? m[1].trim() : '—';
+                      })()}</Text>
                     </View>
                     <View style={s.occMetaItem}>
                       <Text style={s.occMetaLabel}>Horário</Text>
@@ -916,16 +1029,31 @@ export default function ReportPDF({occurrences,checklistState,filters}:Props) {
           </View>
           <View style={s.signatureArea}>
             <View style={s.signatureBox}>
-              <Text style={s.signatureLabel}>Supervisor Responsável</Text>
-              <Text style={s.signatureValue}>{filters.generatedBy||'_________________________'}</Text>
+              <View>
+                <Text style={s.signatureLabel}>Supervisor Responsável</Text>
+                <Text style={s.signatureValue}>{filters.generatedBy && !filters.generatedBy.includes('@') ? filters.generatedBy : ' '}</Text>
+              </View>
+              <View style={s.signatureLine}>
+                <Text style={s.signatureLineLbl}>Assinatura</Text>
+              </View>
             </View>
             <View style={s.signatureBox}>
-              <Text style={s.signatureLabel}>Data e Hora</Text>
-              <Text style={s.signatureValue}>{generatedAt}</Text>
+              <View>
+                <Text style={s.signatureLabel}>Data de Geração</Text>
+                <Text style={s.signatureValue}>{generatedAt}</Text>
+              </View>
+              <View style={s.signatureLine}>
+                <Text style={s.signatureLineLbl}>Data e Hora</Text>
+              </View>
             </View>
             <View style={s.signatureBox}>
-              <Text style={s.signatureLabel}>Carimbo / Visto</Text>
-              <Text style={s.signatureValue}> </Text>
+              <View>
+                <Text style={s.signatureLabel}>Visto / Carimbo</Text>
+                <Text style={s.signatureValue}> </Text>
+              </View>
+              <View style={s.signatureLine}>
+                <Text style={s.signatureLineLbl}>Validação</Text>
+              </View>
             </View>
           </View>
 

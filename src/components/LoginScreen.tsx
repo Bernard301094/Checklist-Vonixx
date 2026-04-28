@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Mail, Lock, AlertCircle, ArrowRight, Loader2, Factory, Clock } from 'lucide-react';
 import { supabase } from '../supabase';
+import AuthLayout from './auth/AuthLayout';
 
 export default function LoginScreen() {
   const [email, setEmail] = useState('');
@@ -35,7 +36,9 @@ export default function LoginScreen() {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
     } catch (error: any) {
-      if (error.status === 429) {
+      if (error.name === 'AbortError' || (error.message && error.message.includes('aborted'))) {
+        setErrorMsg('A conexão expirou. Verifique sua internet e tente novamente.');
+      } else if (error.status === 429) {
         startCooldown(60);
         setErrorMsg('rate_limit');
       } else if (error.status === 400 || error.code === 'invalid_credentials') {
@@ -49,37 +52,10 @@ export default function LoginScreen() {
   };
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg)',
-      padding: 'var(--s4)',
-      fontFamily: 'var(--font-body)',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: `radial-gradient(circle at 20% 20%, rgba(13,148,136,0.06) 0%, transparent 60%),
-          radial-gradient(circle at 80% 80%, rgba(45,212,191,0.05) 0%, transparent 50%)`,
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: `linear-gradient(var(--divider) 1px, transparent 1px),
-          linear-gradient(90deg, var(--divider) 1px, transparent 1px)`,
-        backgroundSize: '40px 40px',
-        opacity: 0.5,
-      }} />
-
-      <div className="animate-in" style={{
-        width: '100%', maxWidth: 'min(440px, 100%)',
-        display: 'flex', flexDirection: 'column', gap: 'var(--s6)',
-        position: 'relative', zIndex: 1,
-      }}>
+    <AuthLayout>
+      <div className="animate-in auth-content-wrapper max-w-440">
         <div style={{ textAlign: 'center', marginBottom: 'var(--s2)' }}>
-          <div style={{
+          <div className="login-logo" style={{
             width: 56, height: 56, borderRadius: 'var(--r-xl)',
             background: 'var(--primary)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -98,7 +74,7 @@ export default function LoginScreen() {
           </p>
         </div>
 
-        <div className="card" style={{ padding: 'var(--s8)', position: 'relative', overflow: 'hidden' }}>
+        <div className="card login-card" style={{ padding: 'var(--s8)', position: 'relative', overflow: 'hidden' }}>
           <div style={{
             position: 'absolute', top: 0, left: 0, right: 0, height: 2,
             background: 'linear-gradient(90deg, var(--primary), #06b6d4, var(--primary))',
@@ -171,8 +147,7 @@ export default function LoginScreen() {
           </form>
         </div>
       </div>
-
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-    </div>
+    </AuthLayout>
   );
 }

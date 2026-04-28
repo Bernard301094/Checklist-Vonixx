@@ -15,6 +15,11 @@ const config: CapacitorConfig = {
       keystoreAliasPassword: undefined,
     },
   },
+  plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
+  },
 };
 
 export default config;

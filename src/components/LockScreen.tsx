@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Lock, LogOut, Fingerprint } from 'lucide-react';
 import { NativeBiometric } from 'capacitor-native-biometric';
+import AuthLayout from './auth/AuthLayout';
 
 interface LockScreenProps {
   onUnlock: () => void;
@@ -55,29 +56,12 @@ export default function LockScreen({ onUnlock, onLogout, userEmail }: LockScreen
   };
 
   return (
-    <div style={{
-      minHeight: '100dvh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      background: 'var(--bg)',
-      padding: 'var(--s4)',
-      fontFamily: 'var(--font-body)',
-      position: 'relative',
-      overflow: 'hidden',
-    }}>
-      <div style={{
-        position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: `radial-gradient(circle at 50% 30%, rgba(13,148,136,0.07) 0%, transparent 60%)`,
-      }} />
-
-      <div className="animate-in" style={{
-        width: '100%', maxWidth: '380px',
-        display: 'flex', flexDirection: 'column', gap: 'var(--s6)',
-        position: 'relative', zIndex: 1,
-        alignItems: 'center', textAlign: 'center',
-      }}>
-        <div style={{
+    <AuthLayout 
+      showGrid={false} 
+      gradientStyle={{ backgroundImage: `radial-gradient(circle at 50% 30%, rgba(13,148,136,0.07) 0%, transparent 60%)` }}
+    >
+      <div className="animate-in auth-content-wrapper max-w-380" style={{ alignItems: 'center', textAlign: 'center' }}>
+        <div className="login-logo" style={{
           width: 64, height: 64, borderRadius: 'var(--r-xl)',
           background: 'var(--sidebar-surface)',
           border: '1px solid var(--sidebar-border)',
@@ -144,6 +128,6 @@ export default function LockScreen({ onUnlock, onLogout, userEmail }: LockScreen
           <LogOut size={15} /> Sair da conta
         </button>
       </div>
-    </div>
+    </AuthLayout>
   );
 }

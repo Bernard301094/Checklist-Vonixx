@@ -1,0 +1,36 @@
+/* ── 8. GRIDS DE STATS / KPIs ── */
+.dashboard-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 640px) {
+  .dashboard-kpi-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: var(--s3) !important;
+    padding: var(--s3) !important;
+  }
+}
+
+/* ── 15. DASHBOARD: charts full-width ── */
+.dashboard-charts-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr !important;
+    gap: var(--s3) !important;
+    padding: var(--s3) !important;
+  }
+  .dashboard-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .dashboard-table-wrapper table {
+    min-width: 480px;
+  }
+}

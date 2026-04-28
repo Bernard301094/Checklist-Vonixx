@@ -13,14 +13,5 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
-  },
-  global: {
-    fetch: (url, options = {}) => {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout por request
-      return fetch(url, { ...options, signal: controller.signal }).finally(() =>
-        clearTimeout(timeoutId)
-      );
-    },
-  },
+  }
 });
